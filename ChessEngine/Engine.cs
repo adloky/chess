@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace ChessEngine
 {
@@ -43,24 +44,24 @@ namespace ChessEngine
             input.WriteLine($"position fen {fen}");
             input.WriteLine($"go nodes {nodes}");
             var str = "";
-            var prevStr = "";
-            do { prevStr = str; str = output.ReadLine(); } while (str.Split(' ')[0] != "bestmove");
-            var info = prevStr.Split(' ');
-            var score = 0;
-            var isScore = false;
-            for (var i = 0; i < info.Length; i++) {
-                if (info[i] == "cp") {
-                    score = int.Parse(info[i+1]);
-                    isScore = true;
-                    break;
+            int? score = null;
+            do {
+                str = output.ReadLine();
+                var scoreInfoMatch = Regex.Match(str, "^info .*score cp (-?\\d+)");
+                if (scoreInfoMatch.Success) {
+                    score = int.Parse(scoreInfoMatch.Groups[1].Value);
                 }
-            }
+                if (Regex.IsMatch(str, "^error")) {
+                    throw new Exception(str);
+                }
+            } while (Regex.IsMatch(str, "^bestmove"));
 
-            if (!isScore) {
+
+            if (score == null) {
                 throw new Exception("not find info");
             }
 
-            return score * turn;
+            return score.Value * turn;
         }
 
         public void Close() {

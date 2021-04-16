@@ -14,6 +14,7 @@ using System.Xml.Linq;
 using System.Xml.XPath;
 using Newtonsoft.Json;
 using System.Threading;
+using System.Text.RegularExpressions;
 
 namespace ChessCon {
 
@@ -166,14 +167,11 @@ namespace ChessCon {
         }
 
         static void Main(string[] args) {
-            ReadNodesFile();
-
-            var sel = EnumerateNodeTree(oNodeList[0].fen, "d4").Where(x => x.node.score - x.parentNode.score > 40 && x.parentNode.score > -10 && x.node.count > 2000);
-
-            foreach (var x in sel) {
-                Console.WriteLine($"{PrettyPgn(x.moves)}");
+            using (var engine = new Engine()) {
+                engine.Open("d:/Distribs/lc0/lc0.exe");
+                Console.Write(engine.CalcScore("rnbqkb1r/ppp1pppp/3B1n2/3p4/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 3 3", 1000));
+                engine.Close();
             }
-
             Console.ReadLine();
         }
     }
