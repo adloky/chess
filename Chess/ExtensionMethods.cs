@@ -192,6 +192,16 @@ namespace System
             return (Square)Enum.Parse(typeof(Square), ret);
         }
 
+        public static Square ToggleEnPassed(this Square square) {
+            if (square.GetRank() == 5 || square.GetRank() == 3) {
+                return square.Move(MoveDirection.Up).Value;
+            }
+            else if (square.GetRank() == 4 || square.GetRank() == 6) {
+                return square.Move(MoveDirection.Down).Value;
+            }
+            else { throw new Exception("Wrong en passed target."); }
+        }
+
         public static bool IsAdjacent(this Square source, Square target)
         {
             return Math.Abs(source.GetColumn() - target.GetColumn()) <= 1 && Math.Abs(source.GetRank() - target.GetRank()) <= 1;

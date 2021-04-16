@@ -7,13 +7,19 @@ using System.Text;
 
 namespace Chess
 {
-    internal class FEN
+    public class FEN
     {
         #region Properties
 
         public ReadOnlyCollection<PiecePlacement> Pieces { get; private set; }
 
         public PlayerColor Turn { get; private set; }
+
+        public Square? enPassedTarget { get; private set; }
+
+        public int historyLenDiff { get; private set; }
+
+        public int history50LenDiff { get; private set; }
 
         public CastleType BlackCastleAvailability { get; set; }
 
@@ -36,6 +42,9 @@ namespace Chess
             fen.Pieces = new ReadOnlyCollection<PiecePlacement>(GetPieces(config[0]));
             fen.Turn = GetTurn(config[1]);
             fen.SetCastleAvailability(config[2]);
+            fen.enPassedTarget = (config[3] == "-") ? (Square?)null : (Square)Enum.Parse(typeof(Square), config[3].ToUpper());
+            fen.history50LenDiff = (int.Parse(config[4]));
+            fen.historyLenDiff = (int.Parse(config[5]) - 1) * 2 + ((fen.Turn == PlayerColor.White) ? 0 : 1);
             return fen;
         }
 
@@ -89,7 +98,7 @@ namespace Chess
 
         #endregion Methods
 
-        internal class PiecePlacement
+        public class PiecePlacement
         {
             public Type PieceType { get; set; }
 
@@ -145,14 +154,21 @@ namespace Chess
 
             sb.Append(' ');
             if (board.LastMove != null && board.LastMove.Piece is Pawn && Math.Abs(board.LastMove.Source.GetRank() - board.LastMove.Target.GetRank()) == 2)
-                sb.Append(board.LastMove.Target.ToString().ToLower());
+                sb.Append(board.LastMove.Target.ToggleEnPassed().ToString().ToLower());
+            else if (board.LastMove == null && board.fenEnPassedTarget != null)
+                sb.Append(board.fenEnPassedTarget.Value.ToString().ToLower());
             else
                 sb.Append('-');
 
+            var history50Len = board.History.Reverse().TakeWhile(i => !(i.Piece is Pawn) && i.CapturedPiece == null).Count();
+            if (board.History.Count == history50Len) {
+                history50Len += board.fenHistory50LenDiff;
+            }
+
             sb.Append(' ')
-              .Append(board.History.Reverse().TakeWhile(i => !(i.Piece is Pawn) && i.CapturedPiece == null).Count())
+              .Append(history50Len)
               .Append(' ')
-              .Append((int)(board.History.Count / 2));
+              .Append((int)((board.History.Count + board.fenHistoryLenDiff) / 2 + 1));
 
             return sb.ToString();
         }
@@ -174,6 +190,23 @@ namespace Chess
         {
             char notation = piece is Knight ? 'N' : piece.GetType().Name[0];
             return piece.Player == PlayerColor.White ? char.ToUpper(notation) : char.ToLower(notation);
+        }
+        public static string Move(string fen, string move) {
+            var board = Board.Load(fen);
+            board.Start();
+
+            var source = (Square)Enum.Parse(typeof(Square), move.Substring(0, 2).ToUpper());
+            var target = (Square)Enum.Parse(typeof(Square), move.Substring(2, 2).ToUpper());
+            var check = board.Move(source, target, typeof(Queen));
+            if (!check) throw new Exception("bad move");
+
+            return board.GetFEN();
+        }
+
+        public static string Correct(string fen) {
+            var board = Board.Load(fen);
+            board.Start();
+            return board.GetFEN();
         }
     }
 }

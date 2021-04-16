@@ -14,11 +14,13 @@ namespace Chess.Pieces
                     yield return new PieceMove(this, square.Value);
             }
 
-            if (this.CanCastle(CastleType.KingSide))
+            if (this.CanCastle(CastleType.KingSide)) {
                 yield return new KingCastleMove(this, this.Square.Move(MoveDirection.Right).Move(MoveDirection.Right).Value, CastleType.KingSide);
+            }
 
-            if (this.CanCastle(CastleType.QueenSide))
+            if (this.CanCastle(CastleType.QueenSide)) {
                 yield return new KingCastleMove(this, this.Square.Move(MoveDirection.Left).Move(MoveDirection.Left).Value, CastleType.QueenSide);
+            }
         }
 
         protected override bool CanMove(PieceMove move)
@@ -40,7 +42,7 @@ namespace Chess.Pieces
             for (int i = 0; i < castleType.GetRookDistance(); i++)
             {
                 testSquare = testSquare.Move(castleType.GetRookMoveDirection()).Value;
-                if (this.Board[testSquare] != null || this.Board.IsUnderAttack(testSquare, this.Player.Opponent()))
+                if (this.Board[testSquare] != null || (this.Board.IsUnderAttack(testSquare, this.Player.Opponent()) && !(testSquare == Square.B1 || testSquare == Square.B8)))
                     return false;
             }
 

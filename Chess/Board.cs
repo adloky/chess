@@ -12,6 +12,12 @@ namespace Chess
 
         public const string DEFAULT_STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+        public int fenHistoryLenDiff { get; private set; }
+
+        public int fenHistory50LenDiff { get; private set; }
+
+        public Square? fenEnPassedTarget { get; set; }
+
         public Dictionary<PlayerColor, Player> Players { get; private set; }
 
         public Player CurrentPlayer { get { return this.Players[this.Turn]; } }
@@ -103,8 +109,10 @@ namespace Chess
         {
             this.StartFen = fenString;
             var config = FEN.Parse(fenString);
-
+            this.fenHistoryLenDiff = config.historyLenDiff;
+            this.fenHistory50LenDiff = config.history50LenDiff;
             this.Turn = config.Turn;
+            this.fenEnPassedTarget = config.enPassedTarget;
             foreach (var piece in config.Pieces)
                 this[piece.Square] = piece.CreatePiece(this);
 
@@ -121,6 +129,8 @@ namespace Chess
 
             this.Players[PlayerColor.White].OnPreInit();
             this.Players[PlayerColor.Black].OnPreInit();
+
+            this.CorrectCastleAvailability();
         }
 
         public void Start()
@@ -146,6 +156,25 @@ namespace Chess
             var piece = this[source];
             if (this.Turn != piece.Player || !this.IsActive)
                 return false;
+
+            if (piece.GetType() == typeof(King)) {
+                if (source == Square.E1) {
+                    if (target == Square.H1) {
+                        target = Square.G1;
+                    }
+                    else if ((target == Square.A1)) {
+                        target = Square.C1;
+                    }
+                }
+                else if (source == Square.E8) {
+                    if (target == Square.H8) {
+                        target = Square.G8;
+                    }
+                    else if ((target == Square.A8)) {
+                        target = Square.C8;
+                    }
+                }
+            }
 
             var move = piece.GetValidMove(target);
 
@@ -186,6 +215,8 @@ namespace Chess
                 this.OnCheckmate();
             else if (!isInCheck && !hasValidMove)
                 this.OnStalemate(StalemateReason.NoMoveAvailable);
+
+            CorrectCastleAvailability();
 
             return true;
         }
@@ -433,6 +464,33 @@ namespace Chess
         {
             return new Board(white ?? new Player(), black ?? new Player(), fen);
         }
+
+        public void CorrectCastleAvailability() {
+            if (this[Square.E1] == null || !(this[Square.E1] is King) || this[Square.E1].Player != PlayerColor.White) {
+                this.castleAvailability[PlayerColor.White] &= ~CastleType.QueenOrKingSide;
+            }
+
+            if (this[Square.E8] == null || !(this[Square.E8] is King) || this[Square.E8].Player != PlayerColor.Black) {
+                this.castleAvailability[PlayerColor.Black] &= ~CastleType.QueenOrKingSide;
+            }
+
+            if (this[Square.A1] == null || !(this[Square.A1] is Rook) || this[Square.A1].Player != PlayerColor.White) {
+                this.castleAvailability[PlayerColor.White] &= ~CastleType.QueenSide;
+            }
+
+            if (this[Square.H1] == null || !(this[Square.H1] is Rook) || this[Square.H1].Player != PlayerColor.White) {
+                this.castleAvailability[PlayerColor.White] &= ~CastleType.KingSide;
+            }
+
+            if (this[Square.A8] == null || !(this[Square.A8] is Rook) || this[Square.A8].Player != PlayerColor.Black) {
+                this.castleAvailability[PlayerColor.Black] &= ~CastleType.QueenSide;
+            }
+
+            if (this[Square.H8] == null || !(this[Square.H8] is Rook) || this[Square.H8].Player != PlayerColor.Black) {
+                this.castleAvailability[PlayerColor.Black] &= ~CastleType.KingSide;
+            }
+        }
+
         #endregion Methods
 
 

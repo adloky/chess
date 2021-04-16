@@ -44,7 +44,7 @@ namespace Chess.Pieces
                 return new PieceMove(this, destination.Value) { CanCapture = IsCaptureMove(destination.Value), HasPromotion = true };
 
             if (IsEnPassantCapture(destination.Value))
-                return new PieceMove(this, destination.Value, this.Board.LastMove.Piece);
+                return new PieceMove(this, destination.Value, (this.Board.LastMove != null) ? this.Board.LastMove.Piece : this.Board[this.Board.fenEnPassedTarget.Value.ToggleEnPassed()]);
 
             return new PieceMove(this, destination.Value) { CanCapture = IsCaptureMove(destination.Value) };
         }
@@ -65,12 +65,25 @@ namespace Chess.Pieces
         {
             //Is the last moved piece capturable by "En Passant"?
             //There is a previous move? Was it a pawn? Moved two squares?
-            if (this.Board.LastMove == null || !(this.Board.LastMove.Piece is Pawn) || Math.Abs(this.Board.LastMove.Source.GetRank() - this.Board.LastMove.Target.GetRank()) == 1)
+
+            Square lastTarget;
+
+            if (this.Board.LastMove != null) {
+                if (!(this.Board.LastMove.Piece is Pawn) || Math.Abs(this.Board.LastMove.Source.GetRank() - this.Board.LastMove.Target.GetRank()) == 1) {
+                    return false;
+                }
+                else lastTarget = this.Board.LastMove.Target;
+            }
+            else if (this.Board.fenEnPassedTarget != null) {
+                lastTarget = this.Board.fenEnPassedTarget.Value.ToggleEnPassed();
+            }
+            else {
                 return false;
+            }
 
             MoveDirection dir = this.Player == PlayerColor.White ? MoveDirection.Down : MoveDirection.Up;
             //The "En Passant" candidate is imediatelly ahead of target? Is current move a capture move?
-            if (target.Move(dir) == this.Board.LastMove.Target && this.Square.GetColumn() != target.GetColumn())
+            if (target.Move(dir) == lastTarget && this.Square.GetColumn() != target.GetColumn())
                 return true;
 
             return false;
