@@ -82,7 +82,6 @@ namespace ChessCon {
 
         public static Dictionary<string,OpeningNode> oNodeDic { get; set; } = new Dictionary<string,OpeningNode>();
 
-        public static string nodesPath = "d:/london.json";
         public static int nodesWriteInc = 0;
 
         public static void GetProcessNode(string fen, int count) {
@@ -166,12 +165,18 @@ namespace ChessCon {
             return result;
         }
 
+        public static string nodesPath = "d:/french.json";
+
         static void Main(string[] args) {
-            using (var engine = new Engine()) {
-                engine.Open("d:/Distribs/lc0/lc0.exe");
-                Console.Write(engine.CalcScore("rnbqkb1r/ppp1pppp/3B1n2/3p4/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 3 3", 1000));
-                engine.Close();
+            ReadNodesFile();
+
+            var max = 30000;
+            var sel = EnumerateNodeTree("rnbqkb1r/ppp2ppp/4pn2/3p4/3PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4", "e4 e6 d4 d5 Nc3 Nf6").Where(x => x.node.count >= max).Where(x => x.node.moves.Where(y => y.count >= max).Count() == 0);
+
+            foreach (var x in sel) {
+                Console.WriteLine($"{PrettyPgn(x.moves)}");
             }
+
             Console.ReadLine();
         }
     }
@@ -198,14 +203,14 @@ Console.WriteLine(xml);
 Console.ReadLine();
  */
 /*
-ReadNodesFile();
-foreach (var node in oNodeList.Where(x => x.status == 1)) {
-    node.status = 0;
-}
-GetProcessNode("rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1", 1000);
-WriteNodesFile();
-Console.WriteLine(oNodeList.Count);
-Console.ReadLine();
+            ReadNodesFile();
+            foreach (var node in oNodeList.Where(x => x.status == 1)) {
+                node.status = 0;
+            }
+            GetProcessNode("rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1", 1000);
+            WriteNodesFile();
+            Console.WriteLine(oNodeList.Count);
+            Console.ReadLine();
  */
 
 /*
@@ -236,6 +241,7 @@ Console.ReadLine();
             ReadNodesFile();
 
             var sel = EnumerateNodeTree(oNodeList[0].fen, "d4 d5 Bf4").Where(x => x.node.score - x.parentNode.score > 40 && x.parentNode.score > -10 && x.node.count > 5000);
+            // var sel = EnumerateNodeTree(oNodeList[0].fen, "d4").Where(x => x.node.count >= max).Where(x => x.node.moves.Where(y => y.count >= max).Count() == 0);
 
             foreach (var x in sel) {
                 Console.WriteLine($"{PrettyPgn(x.moves)}");

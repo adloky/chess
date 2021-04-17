@@ -54,7 +54,7 @@ namespace ChessEngine
                 if (Regex.IsMatch(str, "^error")) {
                     throw new Exception(str);
                 }
-            } while (Regex.IsMatch(str, "^bestmove"));
+            } while (!Regex.IsMatch(str, "^bestmove"));
 
 
             if (score == null) {
