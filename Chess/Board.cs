@@ -566,7 +566,7 @@ namespace Chess
                 moves = moves.Where(x => IsValid(x)).ToArray();
             }
 
-            if (moves.Length > 1) {
+            if (moves.Length != 1) {
                 throw new Exception("Invalid san move.");
             }
 

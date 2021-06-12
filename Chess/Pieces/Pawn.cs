@@ -31,6 +31,13 @@ namespace Chess.Pieces
             if (IsCaptureMove(move.Target))
                 return this.Board[move.Target] != null || this.IsEnPassantCapture(move.Target);
 
+            if (IsInFirstPosition() && Math.Abs(move.Source.GetRank() - move.Target.GetRank()) == 2) {
+                MoveDirection dir = this.Player == PlayerColor.White ? MoveDirection.Up : MoveDirection.Down;
+                if (this.Board[move.Source.Move(dir)] != null) {
+                    return false;
+                }
+            }
+
             return this.Board[move.Target] == null;
         }
 

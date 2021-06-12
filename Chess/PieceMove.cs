@@ -55,5 +55,9 @@ namespace Chess
         {
             return this.CapturedPiece != null && this.CapturedPiece.Square != this.Target;
         }
+
+        public string ToUciString() {
+            return $"{Source}{Target}{(!HasPromotion ? "" : Piece.GetNotation(PawnPromotedTo))}".ToLower();
+        }
     }
 }
