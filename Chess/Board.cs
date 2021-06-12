@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Chess
 {
@@ -491,8 +492,93 @@ namespace Chess
             }
         }
 
+        #region ParseSanMove
+
+        private static readonly Regex SanTailRegex = new Regex("[+#]?[?!]{0,2}$", RegexOptions.Compiled);
+
+        private static readonly Regex SanPromotionRegex = new Regex("=?([NBRQ])$", RegexOptions.Compiled);
+
+        private static readonly Regex SanCastlingRegex = new Regex("^O-O(-O)?$", RegexOptions.Compiled);
+
+        private static readonly Regex SanMainRegex = new Regex("^(?<piece>[NBRQK])?((?<srcCol>[a-h])|(?<srcRow>[1-8]))?(?<capture>x)?(?<target>[a-h][1-8])$", RegexOptions.Compiled);
+
+        public PieceMove ParseSanMove(string san) {
+            san = SanTailRegex.Replace(san, "");
+
+            Square target;
+            Piece piece;
+
+            var match = SanCastlingRegex.Match(san);
+            if (match.Success) {
+                var source = (Turn == PlayerColor.White) ? Square.E1 : Square.E8;
+                target = (match.Length == 3)
+                    ? source.Move(MoveDirection.Right).Move(MoveDirection.Right).Value
+                    : source.Move(MoveDirection.Left).Move(MoveDirection.Left).Value;
+
+                piece = this[source];
+                if (!(piece is King)) throw new Exception("Invalid san move.");
+
+                var move = piece.GetValidMove(target);
+
+                return move;
+            }
+
+            Type promotion = null;
+            match = SanPromotionRegex.Match(san);
+            if (match.Success) {
+                promotion = Piece.GetPieceType($"{san.Last()}");
+                san = san.Substring(0, san.Length - match.Length);
+            }
+
+            #region main
+
+            match = SanMainRegex.Match(san);
+            if (!match.Success) throw new Exception("Invalid san move.");
+
+            var pieceG = match.Groups["piece"].Value;
+            var srcColG = match.Groups["srcCol"].Value;
+            var srcRowG = match.Groups["srcRow"].Value;
+            var captureG = match.Groups["capture"].Value;
+            var targetG = match.Groups["target"].Value;
+
+            target = (Square)Enum.Parse(typeof(Square), targetG.ToUpper());
+            var pieceType = (pieceG == "") ? typeof(Pawn) : Piece.GetPieceType(pieceG);
+
+            var pieces = this.pieces.Where(x => x != null && x.GetType() == pieceType && x.Player == Turn).ToArray();
+
+            if (pieceType == typeof(Pawn) && captureG == "") {
+                pieces = pieces.Where(x => x.Square.GetColumn() == target.GetColumn()).ToArray();
+            }
+
+            if (srcColG != "") {
+                var col = srcColG[0] - 'a' + 1;
+                pieces = pieces.Where(x => x.Square.GetColumn() == col).ToArray();
+            }
+
+            if (srcRowG != "") {
+                var row = srcRowG[0] - '1' + 1;
+                pieces = pieces.Where(x => x.Square.GetRank() == row).ToArray();
+            }
+
+            var moves = pieces.Select(x => x.GetValidMove(target)).Where(x => x != null).ToArray();
+
+            if (moves.Length > 1) {
+                moves = moves.Where(x => IsValid(x)).ToArray();
+            }
+
+            if (moves.Length > 1) {
+                throw new Exception("Invalid san move.");
+            }
+
+            moves[0].PawnPromotedTo = promotion;
+
+            return moves[0];
+
+            #endregion main
+        }
+
+        #endregion ParseSanMove
+
         #endregion Methods
-
-
     }
 }

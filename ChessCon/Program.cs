@@ -165,17 +165,11 @@ namespace ChessCon {
             return result;
         }
 
-        public static string nodesPath = "d:/french.json";
-
+        public static string nodesPath = "d:/Docs/chess/lichess/caro-kann.json";
+        // rnbqkbnr/pp2pppp/2p5/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3
         static void Main(string[] args) {
-            ReadNodesFile();
-
-            var max = 30000;
-            var sel = EnumerateNodeTree("rnbqkb1r/ppp2ppp/4pn2/3p4/3PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4", "e4 e6 d4 d5 Nc3 Nf6").Where(x => x.node.count >= max).Where(x => x.node.moves.Where(y => y.count >= max).Count() == 0);
-
-            foreach (var x in sel) {
-                Console.WriteLine($"{PrettyPgn(x.moves)}");
-            }
+            var board = Board.Load("k7/5P2/8/8/8/8/8/K7 w - - 0 1");
+            var move = board.ParseSanMove("f8=Q+");
 
             Console.ReadLine();
         }
@@ -240,7 +234,7 @@ Console.ReadLine();
 /*
             ReadNodesFile();
 
-            var sel = EnumerateNodeTree(oNodeList[0].fen, "d4 d5 Bf4").Where(x => x.node.score - x.parentNode.score > 40 && x.parentNode.score > -10 && x.node.count > 5000);
+            var sel = EnumerateNodeTree(oNodeList[0].fen, "d4 d5 Bf4").Where(x => x.node.score - x.parentNode.score > 40 && x.parentNode.score > -10 && x.node.count >= 5000);
             // var sel = EnumerateNodeTree(oNodeList[0].fen, "d4").Where(x => x.node.count >= max).Where(x => x.node.moves.Where(y => y.count >= max).Count() == 0);
 
             foreach (var x in sel) {
@@ -249,15 +243,4 @@ Console.ReadLine();
 
             Console.ReadLine();
  */
-
-/*
-            ReadNodesFile();
-
-            var sel = EnumerateNodeTree("rnbqk2r/ppp1ppbp/3p2p1/7n/3P1B2/4P3/PPP2PP1/RN1QKBNR w KQkq - 0 6", "");
-
-            foreach (var x in sel) {
-                Console.WriteLine($"{x.node.fen}");
-            }
-
-            Console.ReadLine();
- */
+ 
