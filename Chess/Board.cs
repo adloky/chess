@@ -516,7 +516,7 @@ namespace Chess
                     : source.Move(MoveDirection.Left).Move(MoveDirection.Left).Value;
 
                 piece = this[source];
-                if (!(piece is King)) throw new Exception("Invalid san move.");
+                if (!(piece is King)) return null;
 
                 var move = piece.GetValidMove(target);
 
@@ -533,7 +533,7 @@ namespace Chess
             #region main
 
             match = SanMainRegex.Match(san);
-            if (!match.Success) throw new Exception("Invalid san move.");
+            if (!match.Success) return null;
 
             var pieceG = match.Groups["piece"].Value;
             var srcColG = match.Groups["srcCol"].Value;
@@ -567,7 +567,7 @@ namespace Chess
             }
 
             if (moves.Length != 1) {
-                throw new Exception("Invalid san move.");
+                return null;
             }
 
             moves[0].PawnPromotedTo = promotion;
@@ -578,6 +578,29 @@ namespace Chess
         }
 
         #endregion ParseSanMove
+
+        private static readonly Regex UciRegex = new Regex("^([a-h][1-8])([a-h][1-8])([nbrq])?$", RegexOptions.Compiled);
+
+        public bool Move(string s) {
+            var match = UciRegex.Match(s);
+
+            // san
+            if (!match.Success) {
+                var move = ParseSanMove(s);
+                if (move == null) return false;
+                return Move(move.Source, move.Target, move.PawnPromotedTo);
+            }
+
+            // uci
+            var source = (Square)Enum.Parse(typeof(Square), match.Groups[1].Value.ToUpper());
+            var target = (Square)Enum.Parse(typeof(Square), match.Groups[2].Value.ToUpper());
+            Type promotion = null;
+            if (match.Groups[3].Value != "") {
+                promotion = Piece.GetPieceType(match.Groups[3].Value);
+            }
+            
+            return Move(source, target, promotion);
+        }
 
         #endregion Methods
     }

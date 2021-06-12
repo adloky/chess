@@ -166,32 +166,11 @@ namespace ChessCon {
         }
 
         public static string nodesPath = "d:/Docs/chess/lichess/london.json";
-        // rnbqkbnr/pp2pppp/2p5/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3
+
         static void Main(string[] args) {
-            ReadNodesFile();
-
-            foreach (var node in oNodeList) {
-                foreach (var move in node.moves) {
-                    var board = Board.Load(node.fen);
-                    var uci = "";
-                    try {
-                        uci = board.ParseSanMove(move.san).ToUciString();
-                    }
-                    catch (Exception e) {
-                        Console.WriteLine($"{node.fen},{move.san}");
-                        throw e;
-                    }
-
-                    if (move.san[0] == 'O') {
-                        uci = uci.Replace("c", "a");
-                        uci = uci.Replace("g", "h");
-                    }
-
-                    if (uci != move.uci) {
-                        Console.WriteLine($"{node.fen},{move.san}");
-                    }
-                }
-            }
+            var board = Board.Load("k7/4P3/8/8/8/8/8/K7 w - - 0 1");
+            board.Start();
+            Console.WriteLine(board.Move("e7e8q"));
 
             Console.ReadLine();
         }

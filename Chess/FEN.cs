@@ -195,10 +195,7 @@ namespace Chess
             var board = Board.Load(fen);
             board.Start();
 
-            var source = (Square)Enum.Parse(typeof(Square), move.Substring(0, 2).ToUpper());
-            var target = (Square)Enum.Parse(typeof(Square), move.Substring(2, 2).ToUpper());
-            var check = board.Move(source, target, typeof(Queen));
-            if (!check) throw new Exception("bad move");
+            if (!board.Move(move)) throw new Exception($"Invalid move (FEN: {fen}; Move: {move})");
 
             return board.GetFEN();
         }
