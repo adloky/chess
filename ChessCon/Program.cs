@@ -15,6 +15,7 @@ using System.Xml.XPath;
 using Newtonsoft.Json;
 using System.Threading;
 using System.Text.RegularExpressions;
+using System.Reflection;
 
 namespace ChessCon {
 
@@ -167,10 +168,116 @@ namespace ChessCon {
 
         public static string nodesPath = "d:/Docs/chess/lichess/london.json";
 
+        #region ParsePgn
+
+        public enum ParseState {
+            Empty,
+            Param,
+            Moves
+        }
+
+        public class Game {
+            public readonly static Regex ParamRegex = new Regex(@"^\[([^ ]+) ""([^""]*)""\]$", RegexOptions.Compiled);
+            public readonly static Regex CommentRegex = new Regex(@" \{[^}]*\}", RegexOptions.Compiled);
+            public readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);
+            public readonly static Regex ScoreRegex = new Regex(@"[!?]", RegexOptions.Compiled);
+            public readonly static Regex SpaceRegex = new Regex(@"\s+", RegexOptions.Compiled);
+
+            public long StreamPos { get; set; } = 0;
+
+            public Dictionary<string,string> Params { get; private set; } = new Dictionary<string, string>();
+
+            public List<string> Lines { get; private set; } = new List<string>();
+
+            public List<string> MoveList { get; private set; } = new List<string>();
+
+            public string Moves { get; set; } = "";
+        }
+
+        #endregion ParsePgn
+
         static void Main(string[] args) {
-            var board = Board.Load("k7/4P3/8/8/8/8/8/K7 w - - 0 1");
-            board.Start();
-            Console.WriteLine(board.Move("e7e8q"));
+            if (false) {
+                var moves = "e4 d6 Nc3 Nf6 d4 g6 Bg5 Bg7 e5 dxe5 dxe5 Qxd1+ Rxd1 Ng4 Nd5 Bxe5 Bxe7 c6 Nf6+ Nxf6 Rd8+ Kxe7 Rxh8 Na6 Bxa6 bxa6 c3 Bb7 Rxa8 Bxa8 Nf3 Bd6 O-O".Split(' ');
+                var board = Board.Load(Board.DEFAULT_STARTING_FEN);
+                board.Start();
+                foreach (var move in moves) {
+                    board.Move(move);
+                    Console.WriteLine($"{move},{board.GetFEN()}");
+                }
+
+                Console.ReadLine();
+                return;
+            }
+
+
+            using (var stream = File.Open("d:/lichess_db_standard_rated_2018-06.pgn ", FileMode.Open)) using (var reader = new StreamReader(stream)) {
+                stream.Position = 478206495;
+                var prevState = ParseState.Empty;
+                var state = ParseState.Empty;
+                var game = new Game();
+                while (!reader.EndOfStream) {
+                    prevState = state;
+                    var pos = reader.GetVirtualPosition();
+                    var s = reader.ReadLine();
+                    game.Lines.Add(s);
+
+                    state = (s == "") ? ParseState.Empty
+                        : (s[0] == '[') ? ParseState.Param
+                        : ParseState.Moves;
+
+                    if (prevState == ParseState.Empty && state == ParseState.Param) {
+                        game.StreamPos = pos;
+                    }
+
+                    try {
+                        Match match = null;
+
+                        if (state == ParseState.Param) {
+                            match = Game.ParamRegex.Match(s);
+                            if (!match.Success) throw new Exception($"Invalid param: {s}");
+                            game.Params.Add(match.Groups[1].Value, match.Groups[2].Value);
+                        }
+
+                        if (state == ParseState.Moves) {
+                            game.Moves = $"{game.Moves}{(game.Moves == "" ? "" : " ")}{s}";
+                        }
+
+                        if (state == ParseState.Empty && prevState == ParseState.Moves) {
+                            game.Moves = Game.CommentRegex.Replace(game.Moves, "");
+                            game.Moves = Game.NumberRegex.Replace(game.Moves, "");
+                            game.Moves = Game.ScoreRegex.Replace(game.Moves, "");
+                            game.Moves = Game.SpaceRegex.Replace(game.Moves, " ");
+                            game.Moves = game.Moves.Replace($"{game.Params["Result"]}", "");
+                            game.Moves = game.Moves.Trim();
+
+                            var board = Board.Load(Board.DEFAULT_STARTING_FEN);
+                            board.Start();
+                            
+                            var moveSplit = game.Moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                            foreach (var move in moveSplit) {
+                                game.MoveList.Add(move);
+                                if (!board.Move(move)) throw new Exception($"Invalid move: {board.GetFEN()},{move}");
+                            }
+
+                            Console.WriteLine($"{game.StreamPos},{game.Params["Site"].Split('/').Last()},{game.Params["Result"]},{game.Moves}");
+
+                            game = new Game();
+                        }
+                    }
+                    catch (Exception e) {
+                        Console.WriteLine(game.StreamPos);
+
+                        foreach (var l in game.Lines) {
+                            Console.WriteLine(l);
+                        }
+
+                        Console.WriteLine(string.Join(" ", game.MoveList));
+
+                        throw;
+                    }
+                }
+            }
 
             Console.ReadLine();
         }

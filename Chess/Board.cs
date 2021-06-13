@@ -185,11 +185,11 @@ namespace Chess
             if (!IsValid(move))
                 return false;
 
+            CastleAvailabityChangeTest(move.Piece);
             MoveCore(move, true);
 
             this.CurrentPlayer.OnMove(move);
             //The move is valid ready to proceed
-            CastleAvailabityChangeTest(move.Piece);
             this.History.Add(move);
             this.Turn = this.Turn.Opponent();
 
@@ -355,18 +355,20 @@ namespace Chess
 
         private void CastleAvailabityChangeTest(Piece piece)
         {
-            if (piece is King || piece is Rook)
+            if (!(piece is King || piece is Rook)) return;
+
+            CastleType disabled = CastleType.None;
+
+            if (piece is King)
+                disabled = CastleType.QueenOrKingSide;
+
+            if (piece.Player == PlayerColor.White && (piece.Square == Square.A1 || piece.Square == Square.H1)
+             || piece.Player == PlayerColor.Black && (piece.Square == Square.A8 || piece.Square == Square.H8))
             {
-                CastleType disabled = CastleType.None;
-
-                if (piece is King)
-                    disabled = CastleType.QueenOrKingSide;
-
-                if (piece.Square == Square.A1 || piece.Square == Square.H1 || piece.Square == Square.A8 || piece.Square == Square.H8)
-                    disabled = piece.Square.GetColumn() == 1 ? CastleType.QueenSide : CastleType.KingSide;
-
-                this.castleAvailability[piece.Player] = this.castleAvailability[piece.Player] & ~disabled;
+                disabled = piece.Square.GetColumn() == 1 ? CastleType.QueenSide : CastleType.KingSide;
             }
+
+            this.castleAvailability[piece.Player] = this.castleAvailability[piece.Player] & ~disabled;
         }
 
         public bool IsInCheck()
@@ -500,7 +502,7 @@ namespace Chess
 
         private static readonly Regex SanCastlingRegex = new Regex("^O-O(-O)?$", RegexOptions.Compiled);
 
-        private static readonly Regex SanMainRegex = new Regex("^(?<piece>[NBRQK])?((?<srcCol>[a-h])|(?<srcRow>[1-8]))?(?<capture>x)?(?<target>[a-h][1-8])$", RegexOptions.Compiled);
+        private static readonly Regex SanMainRegex = new Regex("^(?<piece>[NBRQK])?(?<srcCol>[a-h])?(?<srcRow>[1-8])?(?<capture>x)?(?<target>[a-h][1-8])$", RegexOptions.Compiled);
 
         public PieceMove ParseSanMove(string san) {
             san = SanTailRegex.Replace(san, "");
