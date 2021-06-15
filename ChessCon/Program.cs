@@ -243,32 +243,63 @@ namespace ChessCon {
             };
 
             long pos = 0;
+            var rnd = new Random();
 
             if (File.Exists("d:/lichess.dat")) {
+                Console.WriteLine("Begin read file ...");
                 using (var stream = File.Open("d:/lichess.dat", FileMode.Open)) using (var reader = new BinaryReader(stream)) {
-                    Console.WriteLine("Begin read file ...");
-                    while (reader.PeekChar() > -1) {
+                    while (reader.BaseStream.Position < reader.BaseStream.Length) {
                         var guid = reader.ReadGuid();
                         var node = PositionNode.Read(reader);
                         dic.TryAdd(guid,node);
                     }
-                    Console.WriteLine("End read file");
                 }
-
+                Console.WriteLine("End read file");
                 pos = long.Parse(File.ReadAllLines("d:/lichess.pos")[0]);
             }
 
             using (var reader = File.OpenText("d:/lichess.csv")) {
+                reader.BaseStream.Position = pos;
                 while (!reader.EndOfStream && !ctrlC) {
                     var s = reader.ReadLine();
-                    Thread.Sleep(100);
+                    Thread.Sleep(300);
+                    Console.WriteLine(s);
+
+                    {
+                        var fen = Guid.NewGuid().ToString() + Guid.NewGuid().ToString();
+                        var hash = StringToGuid(fen);
+                        var node = new PositionNode { };
+                        if (rnd.Next(5) == 0) {
+                            node.Fen = fen;
+                            node.Moves = Guid.NewGuid().ToString();
+                        }
+
+                        dic.TryAdd(hash, node);
+                    }
                 }
                 pos = reader.GetVirtualPosition();
             }
 
-            Console.WriteLine("Finish");
-            Console.ReadLine();
+            Console.WriteLine("Save? (y/n)");
+            if (Console.ReadLine() == "y") {
+                Console.WriteLine("Begin write file...");
 
+                using (var stream = File.Open("d:/lichess2.dat", FileMode.Create)) using (var writer = new BinaryWriter(stream)) {
+                    foreach (var kv in dic) {
+                        writer.WriteGuid(kv.Key);
+                        kv.Value.Write(writer);
+                    }
+                    writer.Close();
+                }
+
+                if (File.Exists("d:/lichess.dat")) File.Delete("d:/lichess.dat");
+                File.Move("d:/lichess2.dat", "d:/lichess.dat");
+                File.WriteAllText("d:/lichess.pos", pos.ToString());
+
+                Console.WriteLine("End write file");
+            }
+
+            Console.ReadLine();
 
             /*
             using (var stream = File.Open("d:/test.bin", FileMode.Create)) using (var writer = new BinaryWriter(stream)) {
