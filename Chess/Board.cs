@@ -359,10 +359,9 @@ namespace Chess
 
             CastleType disabled = CastleType.None;
 
-            if (piece is King)
+            if (piece is King) {
                 disabled = CastleType.QueenOrKingSide;
-
-            if (piece.Player == PlayerColor.White && (piece.Square == Square.A1 || piece.Square == Square.H1)
+            } else if (piece.Player == PlayerColor.White && (piece.Square == Square.A1 || piece.Square == Square.H1)
              || piece.Player == PlayerColor.Black && (piece.Square == Square.A8 || piece.Square == Square.H8))
             {
                 disabled = piece.Square.GetColumn() == 1 ? CastleType.QueenSide : CastleType.KingSide;

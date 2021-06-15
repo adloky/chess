@@ -16,6 +16,9 @@ using Newtonsoft.Json;
 using System.Threading;
 using System.Text.RegularExpressions;
 using System.Reflection;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Security.Cryptography;
 
 namespace ChessCon {
 
@@ -168,118 +171,140 @@ namespace ChessCon {
 
         public static string nodesPath = "d:/Docs/chess/lichess/london.json";
 
-        #region ParsePgn
+        public class PositionNode {
+            public int Count { get; set; }
 
-        public enum ParseState {
-            Empty,
-            Param,
-            Moves
+            public string Fen { get; set; }
+
+            public string Moves { get; set; }
+
+            public void Write(BinaryWriter writer) {
+                writer.WriteVarint(2);
+                writer.WriteVarint(Count);
+
+                if (Fen != null) {
+                    writer.WriteVarint(3);
+                    writer.Write(Fen);
+                }
+
+                if (Moves != null) {
+                    writer.WriteVarint(4);
+                    writer.Write(Moves);
+                }
+
+                writer.WriteVarint(0);
+            }
+
+            public static PositionNode Read(BinaryReader reader) {
+                var node = new PositionNode();
+
+                long fieldNum;
+                do {
+                    fieldNum = reader.ReadVarint();
+                    switch (fieldNum) {
+                        case 0:
+                            break;
+                        case 2:
+                            node.Count = (int)reader.ReadVarint();
+                            break;
+                        case 3:
+                            node.Fen = reader.ReadString();
+                            break;
+                        case 4:
+                            node.Moves = reader.ReadString();
+                            break;
+                        default:
+                            throw new Exception($"Unknown fieldNum: {fieldNum}");
+                    }
+
+                } while (fieldNum != 0);
+
+                return node;
+            }
         }
 
-        public class Game {
-            public readonly static Regex ParamRegex = new Regex(@"^\[([^ ]+) ""([^""]*)""\]$", RegexOptions.Compiled);
-            public readonly static Regex CommentRegex = new Regex(@" \{[^}]*\}", RegexOptions.Compiled);
-            public readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);
-            public readonly static Regex ScoreRegex = new Regex(@"[!?]", RegexOptions.Compiled);
-            public readonly static Regex SpaceRegex = new Regex(@"\s+", RegexOptions.Compiled);
+        private static SHA256 sha = SHA256.Create();
 
-            public long StreamPos { get; set; } = 0;
-
-            public Dictionary<string,string> Params { get; private set; } = new Dictionary<string, string>();
-
-            public List<string> Lines { get; private set; } = new List<string>();
-
-            public List<string> MoveList { get; private set; } = new List<string>();
-
-            public string Moves { get; set; } = "";
+        public static Guid StringToGuid(string s) {
+            var b = Encoding.UTF8.GetBytes(s);
+            var hash = sha.ComputeHash(b);
+            var guid = new Guid(hash.Take(16).ToArray());
+            return guid;
         }
 
-        #endregion ParsePgn
+        private static ConcurrentDictionary<Guid, PositionNode>  dic = new ConcurrentDictionary<Guid, PositionNode>();
+
+        private static volatile bool ctrlC = false;
 
         static void Main(string[] args) {
-            if (false) {
-                var moves = "e4 d6 Nc3 Nf6 d4 g6 Bg5 Bg7 e5 dxe5 dxe5 Qxd1+ Rxd1 Ng4 Nd5 Bxe5 Bxe7 c6 Nf6+ Nxf6 Rd8+ Kxe7 Rxh8 Na6 Bxa6 bxa6 c3 Bb7 Rxa8 Bxa8 Nf3 Bd6 O-O".Split(' ');
-                var board = Board.Load(Board.DEFAULT_STARTING_FEN);
-                board.Start();
-                foreach (var move in moves) {
-                    board.Move(move);
-                    Console.WriteLine($"{move},{board.GetFEN()}");
+            Console.CancelKeyPress += (o,e) => {
+                ctrlC = true;
+                e.Cancel = true;
+            };
+
+            long pos = 0;
+
+            if (File.Exists("d:/lichess.dat")) {
+                using (var stream = File.Open("d:/lichess.dat", FileMode.Open)) using (var reader = new BinaryReader(stream)) {
+                    Console.WriteLine("Begin read file ...");
+                    while (reader.PeekChar() > -1) {
+                        var guid = reader.ReadGuid();
+                        var node = PositionNode.Read(reader);
+                        dic.TryAdd(guid,node);
+                    }
+                    Console.WriteLine("End read file");
                 }
 
-                Console.ReadLine();
-                return;
+                pos = long.Parse(File.ReadAllLines("d:/lichess.pos")[0]);
             }
 
-
-            using (var stream = File.Open("d:/lichess_db_standard_rated_2018-06.pgn ", FileMode.Open)) using (var reader = new StreamReader(stream)) {
-                stream.Position = 478206495;
-                var prevState = ParseState.Empty;
-                var state = ParseState.Empty;
-                var game = new Game();
-                while (!reader.EndOfStream) {
-                    prevState = state;
-                    var pos = reader.GetVirtualPosition();
+            using (var reader = File.OpenText("d:/lichess.csv")) {
+                while (!reader.EndOfStream && !ctrlC) {
                     var s = reader.ReadLine();
-                    game.Lines.Add(s);
+                    Thread.Sleep(100);
+                }
+                pos = reader.GetVirtualPosition();
+            }
 
-                    state = (s == "") ? ParseState.Empty
-                        : (s[0] == '[') ? ParseState.Param
-                        : ParseState.Moves;
+            Console.WriteLine("Finish");
+            Console.ReadLine();
 
-                    if (prevState == ParseState.Empty && state == ParseState.Param) {
-                        game.StreamPos = pos;
+
+            /*
+            using (var stream = File.Open("d:/test.bin", FileMode.Create)) using (var writer = new BinaryWriter(stream)) {
+                writer.Write("Hello world");
+                writer.Close();
+            }
+
+            using (var stream = File.Open("d:/test.bin", FileMode.Open)) using (var reader = new BinaryReader(stream)) {
+                var s = reader.ReadString();
+                Console.WriteLine(s);
+                reader.Close();
+            }
+            */
+            /*
+            var rnd = new Random();
+
+            using (var stream = File.Open("d:/test.bin", FileMode.Create)) using (var writer = new BinaryWriter(stream)) {
+                for (var i = 0; i < 50000000; i++) {
+                    var fen = Guid.NewGuid().ToString() + Guid.NewGuid().ToString();
+                    var hash = StringToGuid(fen);
+                    var node = new PositionNode { };
+                    if (rnd.Next(5) == 0) {
+                        node.Fen = fen;
+                        node.Moves = Guid.NewGuid().ToString();
                     }
 
-                    try {
-                        Match match = null;
-
-                        if (state == ParseState.Param) {
-                            match = Game.ParamRegex.Match(s);
-                            if (!match.Success) throw new Exception($"Invalid param: {s}");
-                            game.Params.Add(match.Groups[1].Value, match.Groups[2].Value);
-                        }
-
-                        if (state == ParseState.Moves) {
-                            game.Moves = $"{game.Moves}{(game.Moves == "" ? "" : " ")}{s}";
-                        }
-
-                        if (state == ParseState.Empty && prevState == ParseState.Moves) {
-                            game.Moves = Game.CommentRegex.Replace(game.Moves, "");
-                            game.Moves = Game.NumberRegex.Replace(game.Moves, "");
-                            game.Moves = Game.ScoreRegex.Replace(game.Moves, "");
-                            game.Moves = Game.SpaceRegex.Replace(game.Moves, " ");
-                            game.Moves = game.Moves.Replace($"{game.Params["Result"]}", "");
-                            game.Moves = game.Moves.Trim();
-
-                            var board = Board.Load(Board.DEFAULT_STARTING_FEN);
-                            board.Start();
-                            
-                            var moveSplit = game.Moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                            foreach (var move in moveSplit) {
-                                game.MoveList.Add(move);
-                                if (!board.Move(move)) throw new Exception($"Invalid move: {board.GetFEN()},{move}");
-                            }
-
-                            Console.WriteLine($"{game.StreamPos},{game.Params["Site"].Split('/').Last()},{game.Params["Result"]},{game.Moves}");
-
-                            game = new Game();
-                        }
-                    }
-                    catch (Exception e) {
-                        Console.WriteLine(game.StreamPos);
-
-                        foreach (var l in game.Lines) {
-                            Console.WriteLine(l);
-                        }
-
-                        Console.WriteLine(string.Join(" ", game.MoveList));
-
-                        throw;
-                    }
+                    //dic.TryAdd(hash, node);
+                    writer.WriteGuid(hash);
+                    node.Write(writer);
                 }
             }
 
+            Console.WriteLine("Finish");
+            GC.Collect();
             Console.ReadLine();
+            */
         }
     }
 }
@@ -351,4 +376,21 @@ Console.ReadLine();
 
             Console.ReadLine();
  */
- 
+
+/*
+            var dic = new ConcurrentDictionary<ulong, PositionNode>();
+            var rnd = new Random();
+
+            for (var i = 0; i < 50000000; i++) {
+                var key = BitConverter.ToUInt64(Guid.NewGuid().ToByteArray(), 0);
+                var node = new PositionNode { Hash = key };
+                if (rnd.Next(5) == 0) {
+                    node.Fen = Guid.NewGuid().ToString();
+                    node.Moves = Guid.NewGuid().ToString();
+                }
+                dic.TryAdd(key, node);
+            }
+            Console.WriteLine("Finish");
+            Console.ReadLine();
+
+ */
