@@ -221,11 +221,27 @@ namespace ChessCon {
 
                 return node;
             }
+
+            public void PushMove(string move) {
+                if (Moves == null) {
+                    Moves = move;
+                    return;
+                }
+
+                var moves = Moves.Split(' ');
+                if (!moves.Contains(move)) {
+                    Moves += $" {move}";
+                }
+            }
         }
 
-        private static SHA256 sha = SHA256.Create();
+        private static SHA256 sha;
 
         public static Guid StringToGuid(string s) {
+            if (sha == null) {
+                sha = SHA256.Create();
+            }
+
             var b = Encoding.UTF8.GetBytes(s);
             var hash = sha.ComputeHash(b);
             var guid = new Guid(hash.Take(16).ToArray());
@@ -234,16 +250,16 @@ namespace ChessCon {
 
         private static ConcurrentDictionary<Guid, PositionNode>  dic = new ConcurrentDictionary<Guid, PositionNode>();
 
+        private static long pos = 0;
+
+        private static Random rnd = new Random();
+
         private static volatile bool ctrlC = false;
 
-        static void Main(string[] args) {
-            Console.CancelKeyPress += (o,e) => {
-                ctrlC = true;
-                e.Cancel = true;
-            };
+        private static readonly Guid rootGuid = StringToGuid(Board.DEFAULT_STARTING_FEN);
 
-            long pos = 0;
-            var rnd = new Random();
+        static void Main(string[] args) {
+            Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
 
             if (File.Exists("d:/lichess.dat")) {
                 Console.WriteLine("Begin read file ...");
@@ -258,23 +274,46 @@ namespace ChessCon {
                 pos = long.Parse(File.ReadAllLines("d:/lichess.pos")[0]);
             }
 
+            var rootNode = dic.GetOrAdd(rootGuid, x => new PositionNode());
+
             using (var reader = File.OpenText("d:/lichess.csv")) {
                 reader.BaseStream.Position = pos;
                 while (!reader.EndOfStream && !ctrlC) {
                     var s = reader.ReadLine();
-                    Thread.Sleep(300);
-                    Console.WriteLine(s);
 
-                    {
-                        var fen = Guid.NewGuid().ToString() + Guid.NewGuid().ToString();
-                        var hash = StringToGuid(fen);
-                        var node = new PositionNode { };
-                        if (rnd.Next(5) == 0) {
-                            node.Fen = fen;
-                            node.Moves = Guid.NewGuid().ToString();
+                    var mfs = new List<Tuple<string, string>>();
+                    try {
+                        var moves = s.Split(',')[3].Split(' ');
+                        var board = Board.Load(Board.DEFAULT_STARTING_FEN);
+                        board.Start();
+                        foreach (var move in moves) {
+                            if (!board.Move(move)) {
+                                throw new Exception("Invalid move");
+                            }
+                            mfs.Add(new Tuple<string, string>(move,board.GetFEN()));
                         }
+                    }
+                    catch (Exception) {
+                        mfs = null;
+                        File.AppendAllLines("d:/lichess.err", new string[] { s });
+                        Console.WriteLine($"Exception: {s}");
+                    }
 
-                        dic.TryAdd(hash, node);
+                    if (mfs == null) break;
+
+                    var parentNode = rootNode;
+                    parentNode.Count++;
+                    foreach (var mp in mfs) {
+                        var move = mp.Item1;
+                        var fen = mp.Item2;
+                        var hash = StringToGuid(fen);
+                        var node = dic.GetOrAdd(rootGuid, x => new PositionNode());
+                        node.Count++;
+                        if (node.Count == 10) {
+                            node.Fen = fen;
+                            parentNode.PushMove(move);
+                        }
+                        parentNode = node;
                     }
                 }
                 pos = reader.GetVirtualPosition();
