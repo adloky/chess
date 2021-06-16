@@ -423,7 +423,7 @@ namespace Chess
 
             if (this.Checkmate != null)
                 this.Checkmate(this.Turn);
-            this.Turn = (PlayerColor)(-1);
+            // this.Turn = (PlayerColor)(-1);
         }
 
         public void OnStalemate(StalemateReason reason)
@@ -435,7 +435,7 @@ namespace Chess
 
             if (this.Stalemate != null)
                 this.Stalemate(reason);
-            this.Turn = (PlayerColor)(-1);
+            // this.Turn = (PlayerColor)(-1);
         }
 
         private void OnSquareChanged(Square square)

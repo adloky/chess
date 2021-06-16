@@ -278,12 +278,19 @@ namespace ChessCon {
 
             using (var reader = File.OpenText("d:/lichess.csv")) {
                 reader.BaseStream.Position = pos;
+                var sw = new Stopwatch();
+                sw.Start();
                 while (!reader.EndOfStream && !ctrlC) {
+                    if (sw.ElapsedMilliseconds >= 1000) {
+                        Console.WriteLine(reader.GetVirtualPosition());
+                        sw.Restart();
+                    }
+
                     var s = reader.ReadLine();
 
                     var mfs = new List<Tuple<string, string>>();
                     try {
-                        var moves = s.Split(',')[3].Split(' ');
+                        var moves = s.Split(',')[3].Split(' ').Take(16).ToArray();
                         var board = Board.Load(Board.DEFAULT_STARTING_FEN);
                         board.Start();
                         foreach (var move in moves) {
@@ -293,27 +300,27 @@ namespace ChessCon {
                             mfs.Add(new Tuple<string, string>(move,board.GetFEN()));
                         }
                     }
-                    catch (Exception) {
+                    catch (Exception e) {
                         mfs = null;
                         File.AppendAllLines("d:/lichess.err", new string[] { s });
                         Console.WriteLine($"Exception: {s}");
                     }
 
-                    if (mfs == null) break;
-
-                    var parentNode = rootNode;
-                    parentNode.Count++;
-                    foreach (var mp in mfs) {
-                        var move = mp.Item1;
-                        var fen = mp.Item2;
-                        var hash = StringToGuid(fen);
-                        var node = dic.GetOrAdd(rootGuid, x => new PositionNode());
-                        node.Count++;
-                        if (node.Count == 10) {
-                            node.Fen = fen;
-                            parentNode.PushMove(move);
+                    if (mfs != null) {
+                        var parentNode = rootNode;
+                        parentNode.Count++;
+                        foreach (var mp in mfs) {
+                            var move = mp.Item1;
+                            var fen = mp.Item2;
+                            var guid = StringToGuid(fen);
+                            var node = dic.GetOrAdd(guid, x => new PositionNode());
+                            node.Count++;
+                            if (node.Count == 10) {
+                                node.Fen = fen;
+                                parentNode.PushMove(move);
+                            }
+                            parentNode = node;
                         }
-                        parentNode = node;
                     }
                 }
                 pos = reader.GetVirtualPosition();
