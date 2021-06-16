@@ -274,7 +274,7 @@ namespace ChessCon {
                 pos = long.Parse(File.ReadAllLines("d:/lichess.pos")[0]);
             }
 
-            var rootNode = dic.GetOrAdd(rootGuid, x => new PositionNode());
+            var rootNode = dic.GetOrAdd(rootGuid, x => new PositionNode() { Fen = Board.DEFAULT_STARTING_FEN });
 
             using (var reader = File.OpenText("d:/lichess.csv")) {
                 reader.BaseStream.Position = pos;
@@ -290,7 +290,7 @@ namespace ChessCon {
 
                     var mfs = new List<Tuple<string, string>>();
                     try {
-                        var moves = s.Split(',')[3].Split(' ').Take(16).ToArray();
+                        var moves = s.Split(',')[3].Split(' ').Take(20).ToArray();
                         var board = Board.Load(Board.DEFAULT_STARTING_FEN);
                         board.Start();
                         foreach (var move in moves) {
