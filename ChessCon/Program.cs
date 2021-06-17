@@ -172,24 +172,26 @@ namespace ChessCon {
         public static string nodesPath = "d:/Docs/chess/lichess/london.json";
 
         public class PositionNode {
-            public int Count { get; set; }
+            public string fen { get; set; }
 
-            public string Fen { get; set; }
+            public int count { get; set; }
 
-            public string Moves { get; set; }
+            public int? score { get; set; }
+
+            public string moves { get; set; }
 
             public void Write(BinaryWriter writer) {
                 writer.WriteVarint(2);
-                writer.WriteVarint(Count);
+                writer.WriteVarint(count);
 
-                if (Fen != null) {
+                if (fen != null) {
                     writer.WriteVarint(3);
-                    writer.Write(Fen);
+                    writer.Write(fen);
                 }
 
-                if (Moves != null) {
+                if (moves != null) {
                     writer.WriteVarint(4);
-                    writer.Write(Moves);
+                    writer.Write(moves);
                 }
 
                 writer.WriteVarint(0);
@@ -205,13 +207,13 @@ namespace ChessCon {
                         case 0:
                             break;
                         case 2:
-                            node.Count = (int)reader.ReadVarint();
+                            node.count = (int)reader.ReadVarint();
                             break;
                         case 3:
-                            node.Fen = reader.ReadString();
+                            node.fen = reader.ReadString();
                             break;
                         case 4:
-                            node.Moves = reader.ReadString();
+                            node.moves = reader.ReadString();
                             break;
                         default:
                             throw new Exception($"Unknown fieldNum: {fieldNum}");
@@ -223,14 +225,14 @@ namespace ChessCon {
             }
 
             public void PushMove(string move) {
-                if (Moves == null) {
-                    Moves = move;
+                if (this.moves == null) {
+                    this.moves = move;
                     return;
                 }
 
-                var moves = Moves.Split(' ');
+                var moves = this.moves.Split(' ');
                 if (!moves.Contains(move)) {
-                    Moves += $" {move}";
+                    this.moves += $" {move}";
                 }
             }
         }
@@ -274,7 +276,7 @@ namespace ChessCon {
                 pos = long.Parse(File.ReadAllLines("d:/lichess.pos")[0]);
             }
 
-            var rootNode = dic.GetOrAdd(rootGuid, x => new PositionNode() { Fen = Board.DEFAULT_STARTING_FEN });
+            var rootNode = dic.GetOrAdd(rootGuid, x => new PositionNode() { fen = Board.DEFAULT_STARTING_FEN });
 
             using (var reader = File.OpenText("d:/lichess.csv")) {
                 reader.BaseStream.Position = pos;
@@ -290,7 +292,7 @@ namespace ChessCon {
 
                     var mfs = new List<Tuple<string, string>>();
                     try {
-                        var moves = s.Split(',')[3].Split(' ').Take(20).ToArray();
+                        var moves = s.Split(',')[3].Split(' ').Take(30).ToArray();
                         var board = Board.Load(Board.DEFAULT_STARTING_FEN);
                         board.Start();
                         foreach (var move in moves) {
@@ -308,15 +310,15 @@ namespace ChessCon {
 
                     if (mfs != null) {
                         var parentNode = rootNode;
-                        parentNode.Count++;
+                        parentNode.count++;
                         foreach (var mp in mfs) {
                             var move = mp.Item1;
                             var fen = mp.Item2;
                             var guid = StringToGuid(fen);
                             var node = dic.GetOrAdd(guid, x => new PositionNode());
-                            node.Count++;
-                            if (node.Count == 10) {
-                                node.Fen = fen;
+                            node.count++;
+                            if (node.count == 10) {
+                                node.fen = fen;
                                 parentNode.PushMove(move);
                             }
                             parentNode = node;
@@ -327,7 +329,7 @@ namespace ChessCon {
             }
 
             Console.WriteLine("Save? (y/n)");
-            if (Console.ReadLine() == "y") {
+            if (!ctrlC || Console.ReadLine() == "y") {
                 Console.WriteLine("Begin write file...");
 
                 using (var stream = File.Open("d:/lichess2.dat", FileMode.Create)) using (var writer = new BinaryWriter(stream)) {
