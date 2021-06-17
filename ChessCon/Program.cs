@@ -93,13 +93,24 @@ namespace ChessCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
 
-            foreach (var wn in EnumerateNodes("e4 e6 d4 d5")) {
-                Console.WriteLine(wn.moves);
+            using (var engine = Engine.Open("d:/Distribs/lc0/lc0.exe")) {
+                foreach (var wn in EnumerateNodes("d4 d5 Bf4")) {
+                    if (ctrlC) break;
+                    foreach (var node in new OpeningNode[] { wn.parentNode, wn.node }) {
+                        if (node.score == null) {
+                            try {
+                                node.score = engine.CalcScore(node.fen, 1200);
+                            } catch {}
+                            
+                            Console.WriteLine($"{node.fen}, {node.score}");
+                        }
+                    }
+                }
             }
 
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
-                File.WriteAllLines(nodesPath, nodeDic.Select(x => JsonConvert.SerializeObject(x)).ToArray());
+                File.WriteAllLines(nodesPath, nodeDic.Select(x => JsonConvert.SerializeObject(x.Value)).ToArray());
             }
         }
     }

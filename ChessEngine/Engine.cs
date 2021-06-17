@@ -15,7 +15,7 @@ namespace ChessEngine
         private StreamWriter input;
         private StreamReader output;
 
-        public void Open(string path) {
+        private void open(string path) {
             process = new Process();
             process.StartInfo.FileName = path;
             process.StartInfo.UseShellExecute = false;
@@ -32,6 +32,14 @@ namespace ChessEngine
             input.WriteLine("isready");
             str = "";
             do { str = output.ReadLine(); } while (str != "readyok");
+
+            SetOption("Threads", 8);
+        }
+
+        public static Engine Open(string path) {
+            var engine = new Engine();
+            engine.open(path);
+            return engine;
         }
 
         public void SetOption(string name, int value) {
