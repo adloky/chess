@@ -143,7 +143,7 @@ namespace Chess
                     sb.Append('/');
             }
 
-            sb.Append(' ').Append(char.ToLower(board.CurrentPlayer.PlayerColor.ToString()[0]));
+            sb.Append(' ').Append(((PlayerColor)Math.Abs((int)board.Turn) == PlayerColor.White ? "w" : "b"));
 
             sb.Append(' ');
             string castle = GetNotation(board.GetCastleAvailabity(PlayerColor.White), PlayerColor.White) + GetNotation(board.GetCastleAvailabity(PlayerColor.Black), PlayerColor.Black);

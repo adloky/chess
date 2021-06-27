@@ -1,0 +1,94 @@
+<html>
+  <head>
+    <style>
+      .z0 { background-color: #eddcbe; }
+      .z1 { background-color: #c2a480; }
+      .sel { background-color: #a3c6b3; }
+      .board td { width: 12.5%; height: 12.5%; background-repeat: no-repeat; background-position: center center; background-size: cover; }
+      
+      .pbr { background-image: url(img/br.svg); }
+      .pbn { background-image: url(img/bn.svg); }
+      .pbb { background-image: url(img/bb.svg); }
+      .pbq { background-image: url(img/bq.svg); }
+      .pbk { background-image: url(img/bk.svg); }
+      .pbp { background-image: url(img/bp.svg); }
+      .pwr { background-image: url(img/wr.svg); }
+      .pwn { background-image: url(img/wn.svg); }
+      .pwb { background-image: url(img/wb.svg); }
+      .pwq { background-image: url(img/wq.svg); }
+      .pwk { background-image: url(img/wk.svg); }
+      .pwp { background-image: url(img/wp.svg); }
+      .pzz { background-image: none; }
+    </style>
+    <script src="jquery-3.3.1.js"></script>
+  </head>
+  <body>
+      <div style="display: inline-block; float: left; width: 400pt; height: 400pt; position: relative">
+          <table class="board" cellpadding="0" cellspacing="0" style="width: 100%; height: 100%">
+              <tr><td class="fa8 z0">&nbsp;</td><td class="fb8 z1">&nbsp;</td><td class="fc8 z0">&nbsp;</td><td class="fd8 z1">&nbsp;</td><td class="fe8 z0">&nbsp;</td><td class="ff8 z1">&nbsp;</td><td class="fg8 z0">&nbsp;</td><td class="fh8 z1"></td></tr>
+              <tr><td class="fa7 z1">&nbsp;</td><td class="fb7 z0">&nbsp;</td><td class="fc7 z1">&nbsp;</td><td class="fd7 z0">&nbsp;</td><td class="fe7 z1">&nbsp;</td><td class="ff7 z0">&nbsp;</td><td class="fg7 z1">&nbsp;</td><td class="fh7 z0"></td></tr>
+              <tr><td class="fa6 z0">&nbsp;</td><td class="fb6 z1">&nbsp;</td><td class="fc6 z0">&nbsp;</td><td class="fd6 z1">&nbsp;</td><td class="fe6 z0">&nbsp;</td><td class="ff6 z1">&nbsp;</td><td class="fg6 z0">&nbsp;</td><td class="fh6 z1"></td></tr>
+              <tr><td class="fa5 z1">&nbsp;</td><td class="fb5 z0">&nbsp;</td><td class="fc5 z1">&nbsp;</td><td class="fd5 z0">&nbsp;</td><td class="fe5 z1">&nbsp;</td><td class="ff5 z0">&nbsp;</td><td class="fg5 z1">&nbsp;</td><td class="fh5 z0"></td></tr>
+              <tr><td class="fa4 z0">&nbsp;</td><td class="fb4 z1">&nbsp;</td><td class="fc4 z0">&nbsp;</td><td class="fd4 z1">&nbsp;</td><td class="fe4 z0">&nbsp;</td><td class="ff4 z1">&nbsp;</td><td class="fg4 z0">&nbsp;</td><td class="fh4 z1"></td></tr>
+              <tr><td class="fa3 z1">&nbsp;</td><td class="fb3 z0">&nbsp;</td><td class="fc3 z1">&nbsp;</td><td class="fd3 z0">&nbsp;</td><td class="fe3 z1">&nbsp;</td><td class="ff3 z0">&nbsp;</td><td class="fg3 z1">&nbsp;</td><td class="fh3 z0"></td></tr>
+              <tr><td class="fa2 z0">&nbsp;</td><td class="fb2 z1">&nbsp;</td><td class="fc2 z0">&nbsp;</td><td class="fd2 z1">&nbsp;</td><td class="fe2 z0">&nbsp;</td><td class="ff2 z1">&nbsp;</td><td class="fg2 z0">&nbsp;</td><td class="fh2 z1"></td></tr>
+              <tr><td class="fa1 z1">&nbsp;</td><td class="fb1 z0">&nbsp;</td><td class="fc1 z1">&nbsp;</td><td class="fd1 z0">&nbsp;</td><td class="fe1 z1">&nbsp;</td><td class="ff1 z0">&nbsp;</td><td class="fg1 z1">&nbsp;</td><td class="fh1 z0"></td></tr>
+          </table>
+          
+          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-repeat: no-repeat; background-position: center center; background-size: cover; background-image: url(img/arrows.svg); pointer-events: none; ">
+              &nbsp;
+          </div>
+      </div>
+
+      <div style=" width: 70pt; float: left; ">
+      </div>
+      <script>
+          var pieceClassMap = new Map([["P", "pwp"], ["R", "pwr"], ["N", "pwn"], ["B", "pwb"], ["Q", "pwq"], ["K", "pwk"], ["p", "pbp"], ["r", "pbr"], ["n", "pbn"], ["b", "pbb"], ["q", "pbq"], ["k", "pbk"], ["z", "pzz"]]);
+
+          function applyFen(fen) {
+              var fen0 = fen.split(" ")[0];
+              fen0 = fen0.replaceAll("1", "z",).replaceAll("2", "zz").replaceAll("3", "zzz").replaceAll("4", "zzzz")
+                  .replaceAll("5", "zzzzz").replaceAll("6", "zzzzzz").replaceAll("7", "zzzzzzz").replaceAll("8", "zzzzzzzz");
+
+              var fs = fen0.split("/");
+              var cols = "abcdefgh";
+              var rows = "87654321";
+
+              for (var y = 0; y < 8; y++) {
+                  for (var x = 0; x < 8; x++) {
+                      var elem = $(".f" + cols[x] + rows[y]);
+                      elem.attr("class", elem.attr("class").replace(/p(zz|[bw][prnbqk])/, pieceClassMap.get(fs[y][x])));
+                  }
+              }
+          }
+
+          function handleMove(move) {
+              console.log(move);
+          }
+
+          $(document).ready(function () {
+              $(".board td").each(function () { $(this).addClass("pzz"); });
+
+              $(".board td").click(function () {
+                  if ($(this).hasClass("sel")) {
+                      $(this).removeClass("sel");
+                  }
+                  else {
+                      var curSel = $(".board td.sel");
+                      if (curSel.length == 0) {
+                          $(this).addClass("sel");
+                      }
+                      else {
+                          var srcSquare = curSel.attr("class").match(/f[a-h][1-8]/)[0].substring(1);
+                          var dstSquare = $(this).attr("class").match(/f[a-h][1-8]/)[0].substring(1);
+                          handleMove(srcSquare + dstSquare);
+                          curSel.removeClass("sel");
+                      }
+                  }
+              });
+
+              applyFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+          });
+      </script>
+  </body>
+</html>

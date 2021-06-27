@@ -33,7 +33,7 @@ namespace ChessEngine
             str = "";
             do { str = output.ReadLine(); } while (str != "readyok");
 
-            SetOption("Threads", 8);
+            SetOption("Threads", Math.Max(1, Environment.ProcessorCount-1));
         }
 
         public static Engine Open(string path) {

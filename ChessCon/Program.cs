@@ -86,26 +86,46 @@ namespace ChessCon {
 
         private static string nodesPath = "d:/lichess.json";
 
-        private static Dictionary<string,OpeningNode> nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
+        private static Dictionary<string,OpeningNode> nodeDic;
 
         private static volatile bool ctrlC = false;
 
-        static void Main(string[] args) {
-            Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
+        public static string GetArrow(int x1, int y1, int x2, int y2, int width) {
+            var dx = x1 - x2;
+            var dy = y1 - y2;
+            var length = Math.Sqrt(dx * dx + dy * dy);
+            var sin = dx / length;
+            var cos = dy / length;
 
-            using (var engine = Engine.Open("d:/Distribs/lc0/lc0.exe")) {
-                foreach (var wn in EnumerateNodes("d4 d5 Bf4")) {
-                    if (ctrlC) break;
-                    foreach (var node in new OpeningNode[] { wn.parentNode, wn.node }) {
-                        if (node.score == null) {
-                            try {
-                                node.score = engine.CalcScore(node.fen, 1200);
-                            } catch {}
-                            
-                            Console.WriteLine($"{node.fen}, {node.score}");
-                        }
-                    }
-                }
+            var ps = new List<Tuple<double, double>>();
+
+            ps.Add(new Tuple<double, double>(0, 0));
+            ps.Add(new Tuple<double, double>(width * 1.5f, width * 3));
+            ps.Add(new Tuple<double, double>(width / 2, width * 3));
+            ps.Add(new Tuple<double, double>(width / 2, length));
+            ps.Add(new Tuple<double, double>(-width / 2, length));
+            ps.Add(new Tuple<double, double>(-width / 2, width * 3));
+            ps.Add(new Tuple<double, double>(-width * 1.5f, width * 3));
+
+            for (var i = 0; i < ps.Count; i++) {
+                ps[i] = new Tuple<double, double>(Math.Round(ps[i].Item1 * cos + ps[i].Item2 * sin) + x2, Math.Round(-ps[i].Item1 * sin + ps[i].Item2 * cos) + y2);
+            }
+
+            return string.Join(" ", ps.Select(p => $"{p.Item1},{p.Item2}"));
+        }
+
+        static void Main(string[] args) {
+            var board = Board.Load("8/8/8/8/8/3k4/3p4/3K4 w - - 0 1");
+            board.Start();
+            Console.WriteLine(board.GetMateState());
+            Console.ReadLine();
+            return;
+
+            Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
+            nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
+
+            foreach (var wn in EnumerateNodes("d4 d5 Bf4").Where(x => x.node.score - x.parentNode.score > 30 && x.parentNode.score > -10 && x.node.count >= 0)) {
+                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
             }
 
             Console.WriteLine("Save? (y/n)");
@@ -115,3 +135,22 @@ namespace ChessCon {
         }
     }
 }
+
+/*
+           using (var engine = Engine.Open("d:/Distribs/lc0/lc0.exe")) {
+                var nodes = EnumerateNodes("d4 d5 Bf4").ToArray();
+                var nullCount = nodes.Where(x => x.node.score == null).Count();
+                foreach (var wn in nodes) {
+                    if (ctrlC) break;
+                    foreach (var node in new OpeningNode[] { wn.parentNode, wn.node }) {
+                        if (node.score == null) {
+                            try {
+                                node.score = engine.CalcScore(node.fen, 1200);
+                            } catch {}
+                            nullCount--;
+                            Console.WriteLine($"{node.fen}, Score: {node.score}, {nullCount}");
+                        }
+                    }
+                }
+            }
+ */
