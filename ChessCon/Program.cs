@@ -115,9 +115,12 @@ namespace ChessCon {
         }
 
         static void Main(string[] args) {
-            var board = Board.Load("8/8/8/8/8/3k4/3p4/3K4 w - - 0 1");
-            board.Start();
-            Console.WriteLine(board.GetMateState());
+            using (var engine = Engine.Open("d:/Distribs/lc0/lc0.exe")) {
+                foreach (var sr in engine.CalcScores("r3kb1r/pp1qpppp/2n2n2/3p1b2/2pP1B2/2P1PN2/PP1N1PPP/R2QKB1R b KQkq - 1 8", 1000)) {
+                    var s = string.Join(" ",sr.Select(x => x.score.ToString()));
+                    Console.WriteLine(s);
+                }
+            }
             Console.ReadLine();
             return;
 

@@ -205,5 +205,11 @@ namespace Chess
             board.Start();
             return board.GetFEN();
         }
+
+        public static int? GetMateState(string fen) {
+            var board = Board.Load(fen);
+            board.Start();
+            return board.GetMateState();
+        }
     }
 }
