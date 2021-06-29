@@ -5,6 +5,7 @@
       .z1 { background-color: #c2a480; }
       .sel { background-color: #a3c6b3; }
       .board td { width: 12.5%; height: 12.5%; background-repeat: no-repeat; background-position: center center; background-size: cover; }
+      .arrows { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-repeat: no-repeat; background-position: center center; background-size: cover; pointer-events: none; }
       
       .pbr { background-image: url(img/br.svg); }
       .pbn { background-image: url(img/bn.svg); }
@@ -38,7 +39,7 @@
               <tr><td class="fa1 z1">&nbsp;</td><td class="fb1 z0">&nbsp;</td><td class="fc1 z1">&nbsp;</td><td class="fd1 z0">&nbsp;</td><td class="fe1 z1">&nbsp;</td><td class="ff1 z0">&nbsp;</td><td class="fg1 z1">&nbsp;</td><td class="fh1 z0"></td></tr>
           </table>
           
-          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-repeat: no-repeat; background-position: center center; background-size: cover; background-image: none; pointer-events: none; ">
+          <div class="arrows">
               &nbsp;
           </div>
       </div>
@@ -48,10 +49,51 @@
       <script>
           var pieceClassMap = new Map([["P", "pwp"], ["R", "pwr"], ["N", "pwn"], ["B", "pwb"], ["Q", "pwq"], ["K", "pwk"], ["p", "pbp"], ["r", "pbr"], ["n", "pbn"], ["b", "pbb"], ["q", "pbq"], ["k", "pbk"], ["z", "pzz"]]);
           var curFen;
-          
-          var engine = $.connection.engineHub;
-          $.connection.hub.url = "http://192.168.0.2:8080/signalr";
-          $.connection.hub.start();
+
+          var engine;
+
+          function getArrowCoords(move, width) {
+              var x1 = (move.charCodeAt(0) - "a".charCodeAt(0)) * 100 + 50;
+              var y1 = ("8".charCodeAt(0) - move.charCodeAt(1)) * 100 + 50;
+              var x2 = (move.charCodeAt(2) - "a".charCodeAt(0)) * 100 + 50;
+              var y2 = ("8".charCodeAt(0) - move.charCodeAt(3)) * 100 + 50;
+
+              var dx = x1 - x2;
+              var dy = y1 - y2;
+              var length = Math.sqrt(dx * dx + dy * dy);
+              var sin = dx / length;
+              var cos = dy / length;
+
+              var ps = [];
+
+              ps.push({ x: 0, y: 0 });
+              ps.push({ x: width * 1.5, y: width * 3 });
+              ps.push({ x: width / 2, y: width * 3 });
+              ps.push({ x: width / 2, y: length });
+              ps.push({ x: -width / 2, y: length });
+              ps.push({ x: -width / 2, y: width * 3 });
+              ps.push({ x: -width * 1.5, y: width * 3 });
+
+              for (var i = 0; i < ps.length; i++) {
+                  var x = ps[i].x;
+                  var y = ps[i].y;
+                  ps[i].x = Math.round(  x * cos + y * sin + x2);
+                  ps[i].y = Math.round(- x * sin + y * cos + y2);
+              }
+
+              return ps.map(p => "" + p.x + "," + p.y).join(" ");
+          }
+
+          function getArrowsSvg(crs) {
+              var as = crs.map(x => { return { move: x.move, width: 30 - Math.abs(crs[0].score - x.score) * (20 / 30) }; }).filter(x => x.width >= 10 && x.move !== null);
+              var s = as.map(x => "<polygon points=\"" + getArrowCoords(x.move, x.width) + "\" style=\"fill: #028; fill-opacity: 0.3\"/>").join("");
+              return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"800\">" + s + "</svg>";
+          }
+
+          function applyArrows(crs) {
+              var style = "background-image: url('data:image/svg+xml;ut8," + getArrowsSvg(crs).replaceAll("#", "%23") + "'); ";
+              $(".arrows").attr("style", style);
+          }
 
           function applyFen(fen) {
               var fen0 = fen.split(" ")[0];
@@ -74,7 +116,11 @@
 
           function handleMove(fen, move) {
               engine.server.move(fen, move).done(function (result) {
-                  if (result !== null) { applyFen(result); }
+                  if (result !== null) {
+                      applyFen(result);
+                      applyArrows([]);
+                      engine.server.calcScores(curFen);
+                  }
               });
           }
 
@@ -99,6 +145,13 @@
                       }
                   }
               });
+
+              engine = $.connection.engineHub;
+              $.connection.hub.url = "http://192.168.0.2:8080/signalr";
+              engine.client.applyScores = function (crs) {
+                  applyArrows(crs);
+              }
+              $.connection.hub.start();
           });
       </script>
   </body>

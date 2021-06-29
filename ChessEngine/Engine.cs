@@ -102,6 +102,10 @@ namespace ChessEngine
             return CalcScores(fen, nodes).Last()[0].score;
         }
 
+        public void Stop() {
+            input.WriteLine("stop");
+        }
+
         public void Close() {
             input.WriteLine("quit");
             process.Dispose();
