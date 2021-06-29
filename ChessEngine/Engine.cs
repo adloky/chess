@@ -99,29 +99,7 @@ namespace ChessEngine
         }
 
         public int CalcScore(string fen, int nodes) {
-            var turn = (fen.Split(' ')[1] == "w") ? 1 : -1;
-            input.WriteLine("ucinewgame");
-            input.WriteLine($"position fen {fen}");
-            input.WriteLine($"go nodes {nodes}");
-            var str = "";
-            int? score = null;
-            do {
-                str = output.ReadLine();
-                var scoreInfoMatch = Regex.Match(str, "^info .*score cp (-?\\d+)");
-                if (scoreInfoMatch.Success) {
-                    score = int.Parse(scoreInfoMatch.Groups[1].Value);
-                }
-                if (Regex.IsMatch(str, "^error")) {
-                    throw new Exception(str);
-                }
-            } while (!Regex.IsMatch(str, "^bestmove"));
-
-
-            if (score == null) {
-                throw new Exception("not find info");
-            }
-
-            return score.Value * turn;
+            return CalcScores(fen, nodes).Last()[0].score;
         }
 
         public void Close() {
