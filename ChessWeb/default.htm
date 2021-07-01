@@ -3,9 +3,13 @@
     <style>
       .z0 { background-color: #eddcbe; }
       .z1 { background-color: #c2a480; }
-      .sel { background-color: #a3c6b3; }
+      .square-sel { background-color: #99bdd8; }
       .board td { width: 12.5%; height: 12.5%; background-repeat: no-repeat; background-position: center center; background-size: cover; }
       .arrows { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-repeat: no-repeat; background-position: center center; background-size: cover; pointer-events: none; }
+      .move { display: inline-block; font-size: 16pt; padding: 2pt 5pt; cursor: pointer; border-radius: 2pt; }
+      .move-sel { background-color: #c8daed; }
+      .pgn-box { display: none; }
+      .pgn-box.visible { display: block; }
       
       .pbr { background-image: url(img/br.svg); }
       .pbn { background-image: url(img/bn.svg); }
@@ -22,21 +26,21 @@
       .pzz { background-image: none; }
     </style>
 
-    <script src="Scripts/jquery-1.6.4.js"></script>
+    <script src="jquery-3.3.1.js"></script>
     <script src="Scripts/jquery.signalR-2.4.2.js"></script>
     <script src="http://192.168.0.2:8080/signalr/hubs"></script>
   </head>
-  <body>
+  <body style="font-family: sans-serif; ">
       <div style="display: inline-block; float: left; width: 400pt; height: 400pt; position: relative">
           <table class="board" cellpadding="0" cellspacing="0" style="width: 100%; height: 100%">
-              <tr><td class="fa8 z0">&nbsp;</td><td class="fb8 z1">&nbsp;</td><td class="fc8 z0">&nbsp;</td><td class="fd8 z1">&nbsp;</td><td class="fe8 z0">&nbsp;</td><td class="ff8 z1">&nbsp;</td><td class="fg8 z0">&nbsp;</td><td class="fh8 z1"></td></tr>
-              <tr><td class="fa7 z1">&nbsp;</td><td class="fb7 z0">&nbsp;</td><td class="fc7 z1">&nbsp;</td><td class="fd7 z0">&nbsp;</td><td class="fe7 z1">&nbsp;</td><td class="ff7 z0">&nbsp;</td><td class="fg7 z1">&nbsp;</td><td class="fh7 z0"></td></tr>
-              <tr><td class="fa6 z0">&nbsp;</td><td class="fb6 z1">&nbsp;</td><td class="fc6 z0">&nbsp;</td><td class="fd6 z1">&nbsp;</td><td class="fe6 z0">&nbsp;</td><td class="ff6 z1">&nbsp;</td><td class="fg6 z0">&nbsp;</td><td class="fh6 z1"></td></tr>
-              <tr><td class="fa5 z1">&nbsp;</td><td class="fb5 z0">&nbsp;</td><td class="fc5 z1">&nbsp;</td><td class="fd5 z0">&nbsp;</td><td class="fe5 z1">&nbsp;</td><td class="ff5 z0">&nbsp;</td><td class="fg5 z1">&nbsp;</td><td class="fh5 z0"></td></tr>
-              <tr><td class="fa4 z0">&nbsp;</td><td class="fb4 z1">&nbsp;</td><td class="fc4 z0">&nbsp;</td><td class="fd4 z1">&nbsp;</td><td class="fe4 z0">&nbsp;</td><td class="ff4 z1">&nbsp;</td><td class="fg4 z0">&nbsp;</td><td class="fh4 z1"></td></tr>
-              <tr><td class="fa3 z1">&nbsp;</td><td class="fb3 z0">&nbsp;</td><td class="fc3 z1">&nbsp;</td><td class="fd3 z0">&nbsp;</td><td class="fe3 z1">&nbsp;</td><td class="ff3 z0">&nbsp;</td><td class="fg3 z1">&nbsp;</td><td class="fh3 z0"></td></tr>
-              <tr><td class="fa2 z0">&nbsp;</td><td class="fb2 z1">&nbsp;</td><td class="fc2 z0">&nbsp;</td><td class="fd2 z1">&nbsp;</td><td class="fe2 z0">&nbsp;</td><td class="ff2 z1">&nbsp;</td><td class="fg2 z0">&nbsp;</td><td class="fh2 z1"></td></tr>
-              <tr><td class="fa1 z1">&nbsp;</td><td class="fb1 z0">&nbsp;</td><td class="fc1 z1">&nbsp;</td><td class="fd1 z0">&nbsp;</td><td class="fe1 z1">&nbsp;</td><td class="ff1 z0">&nbsp;</td><td class="fg1 z1">&nbsp;</td><td class="fh1 z0"></td></tr>
+              <tr><td class="sa8 z0">&nbsp;</td><td class="sb8 z1">&nbsp;</td><td class="sc8 z0">&nbsp;</td><td class="sd8 z1">&nbsp;</td><td class="se8 z0">&nbsp;</td><td class="sf8 z1">&nbsp;</td><td class="sg8 z0">&nbsp;</td><td class="sh8 z1"></td></tr>
+              <tr><td class="sa7 z1">&nbsp;</td><td class="sb7 z0">&nbsp;</td><td class="sc7 z1">&nbsp;</td><td class="sd7 z0">&nbsp;</td><td class="se7 z1">&nbsp;</td><td class="sf7 z0">&nbsp;</td><td class="sg7 z1">&nbsp;</td><td class="sh7 z0"></td></tr>
+              <tr><td class="sa6 z0">&nbsp;</td><td class="sb6 z1">&nbsp;</td><td class="sc6 z0">&nbsp;</td><td class="sd6 z1">&nbsp;</td><td class="se6 z0">&nbsp;</td><td class="sf6 z1">&nbsp;</td><td class="sg6 z0">&nbsp;</td><td class="sh6 z1"></td></tr>
+              <tr><td class="sa5 z1">&nbsp;</td><td class="sb5 z0">&nbsp;</td><td class="sc5 z1">&nbsp;</td><td class="sd5 z0">&nbsp;</td><td class="se5 z1">&nbsp;</td><td class="sf5 z0">&nbsp;</td><td class="sg5 z1">&nbsp;</td><td class="sh5 z0"></td></tr>
+              <tr><td class="sa4 z0">&nbsp;</td><td class="sb4 z1">&nbsp;</td><td class="sc4 z0">&nbsp;</td><td class="sd4 z1">&nbsp;</td><td class="se4 z0">&nbsp;</td><td class="sf4 z1">&nbsp;</td><td class="sg4 z0">&nbsp;</td><td class="sh4 z1"></td></tr>
+              <tr><td class="sa3 z1">&nbsp;</td><td class="sb3 z0">&nbsp;</td><td class="sc3 z1">&nbsp;</td><td class="sd3 z0">&nbsp;</td><td class="se3 z1">&nbsp;</td><td class="sf3 z0">&nbsp;</td><td class="sg3 z1">&nbsp;</td><td class="sh3 z0"></td></tr>
+              <tr><td class="sa2 z0">&nbsp;</td><td class="sb2 z1">&nbsp;</td><td class="sc2 z0">&nbsp;</td><td class="sd2 z1">&nbsp;</td><td class="se2 z0">&nbsp;</td><td class="sf2 z1">&nbsp;</td><td class="sg2 z0">&nbsp;</td><td class="sh2 z1"></td></tr>
+              <tr><td class="sa1 z1">&nbsp;</td><td class="sb1 z0">&nbsp;</td><td class="sc1 z1">&nbsp;</td><td class="sd1 z0">&nbsp;</td><td class="se1 z1">&nbsp;</td><td class="sf1 z0">&nbsp;</td><td class="sg1 z1">&nbsp;</td><td class="sh1 z0"></td></tr>
           </table>
           
           <div class="arrows">
@@ -44,13 +48,29 @@
           </div>
       </div>
 
-      <div style=" width: 70pt; float: left; ">
+      <div style=" width: 300pt; float: left; padding: 0pt 10pt; ">
+          <div style="align-content: center; display: flex; ">
+              <div class="score" style="display: inline-block; font-size: 24pt; width: 90pt; ">&nbsp;</div>
+              <button class="pgn-btn" style="font-size: 12pt; ">PGN</button>
+              <button class="right-btn" style="font-size: 12pt; margin-left: 5pt; ">&nbsp;>&nbsp;</button>
+          </div>
+          <div class="pgn-box">
+              <textarea class="pgn-text" rows="3" style="width: 100%; margin: 5pt 0; "></textarea>
+              <button class="pgn-ok" style="font-size: 12pt; ">OK</button>
+          </div>
+          <div class="move-box" style="padding: 10pt 0;">&nbsp;</div>
       </div>
       <script>
-          var pieceClassMap = new Map([["P", "pwp"], ["R", "pwr"], ["N", "pwn"], ["B", "pwb"], ["Q", "pwq"], ["K", "pwk"], ["p", "pbp"], ["r", "pbr"], ["n", "pbn"], ["b", "pbb"], ["q", "pbq"], ["k", "pbk"], ["z", "pzz"]]);
+          var pieceClassMap = new Map([["P", "pwp"], ["R", "pwr"], ["N", "pwn"], ["B", "pwb"], ["Q", "pwq"], ["K", "pwk"],
+                                       ["p", "pbp"], ["r", "pbr"], ["n", "pbn"], ["b", "pbb"], ["q", "pbq"], ["k", "pbk"], ["z", "pzz"]]);
           var curFen;
 
-          var engine;
+          var engine = $.connection.engineHub;
+          $.connection.hub.url = "http://192.168.0.2:8080/signalr";
+          engine.client.applyScores = function (crs) {
+              applyArrows(crs);
+              $(".score").text(crs[0].score / 100);
+          }
 
           function getArrowCoords(move, width) {
               var x1 = (move.charCodeAt(0) - "a".charCodeAt(0)) * 100 + 50;
@@ -106,7 +126,7 @@
 
               for (var y = 0; y < 8; y++) {
                   for (var x = 0; x < 8; x++) {
-                      var elem = $(".f" + cols[x] + rows[y]);
+                      var elem = $(".s" + cols[x] + rows[y]);
                       elem.attr("class", elem.attr("class").replace(/p(zz|[bw][prnbqk])/, pieceClassMap.get(fs[y][x])));
                   }
               }
@@ -114,12 +134,19 @@
               curFen = fen;
           }
 
+          function applyFenNCalc(fen) {
+              if (curFen !== fen) {
+                  applyFen(fen);
+                  applyArrows([]);
+                  $(".score").html("&nbsp;");
+                  engine.server.calcScores(curFen);
+              }
+          }
+
           function handleMove(fen, move) {
-              engine.server.move(fen, move).done(function (result) {
-                  if (result !== null) {
-                      applyFen(result);
-                      applyArrows([]);
-                      engine.server.calcScores(curFen);
+              engine.server.move(fen, move).done(function (fen) {
+                  if (fen !== null) {
+                      applyFenNCalc(fen);
                   }
               });
           }
@@ -129,28 +156,58 @@
               applyFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 
               $(".board td").click(function () {
-                  if ($(this).hasClass("sel")) {
-                      $(this).removeClass("sel");
+                  if ($(this).hasClass("square-sel")) {
+                      $(this).removeClass("square-sel");
                   }
                   else {
-                      var curSel = $(".board td.sel");
+                      var curSel = $(".board td.square-sel");
                       if (curSel.length == 0) {
-                          $(this).addClass("sel");
+                          $(this).addClass("square-sel");
                       }
                       else {
-                          var srcSquare = curSel.attr("class").match(/f[a-h][1-8]/)[0].substring(1);
-                          var dstSquare = $(this).attr("class").match(/f[a-h][1-8]/)[0].substring(1);
+                          var srcSquare = curSel.attr("class").match(/s[a-h][1-8]/)[0].substring(1);
+                          var dstSquare = $(this).attr("class").match(/s[a-h][1-8]/)[0].substring(1);
                           handleMove(curFen, srcSquare + dstSquare);
-                          curSel.removeClass("sel");
+                          curSel.removeClass("square-sel");
                       }
                   }
               });
 
-              engine = $.connection.engineHub;
-              $.connection.hub.url = "http://192.168.0.2:8080/signalr";
-              engine.client.applyScores = function (crs) {
-                  applyArrows(crs);
-              }
+              $(".pgn-btn").click(function () {
+                  $(".pgn-box").toggleClass("visible");
+              });
+
+              $(".pgn-ok").click(function () {
+                  engine.server.getMoves($(".pgn-text").val()).done(moveFens => {
+                      $(".pgn-box").removeClass("visible");
+                      $(".pgn-text").val("");
+                      var html = moveFens.map((x,i) => "<div class=\"move\" data-fen=\"" + x.fen + "\" data-index=\"" + i + "\">" + x.move + "</div>").join("");
+                      $(".move-box").html(html);
+                  });
+              });
+
+              $(".move-box").on("click", ".move", function () {
+                  $(".move-sel").removeClass("move-sel");
+                  $(this).addClass("move-sel");
+                  var fen = $(this).data("fen");
+                  applyFenNCalc(fen);
+              });
+
+              $(".right-btn").click(function () {
+                  var index = -1;
+                  var moveSels = $(".move-sel");
+                  if (moveSels.length > 0) {
+                      index = Number(moveSels.data("index"));
+                  }
+                  index++;
+                  var nextMove = $(".move[data-index=\"" + index + "\"]");
+                  if (nextMove.length == 0) return;
+                  moveSels.removeClass("move-sel");
+                  nextMove.addClass("move-sel");
+                  var fen = nextMove.data("fen");
+                  applyFenNCalc(fen);
+              });
+
               $.connection.hub.start();
           });
       </script>

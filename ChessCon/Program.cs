@@ -115,12 +115,13 @@ namespace ChessCon {
         }
 
         static void Main(string[] args) {
-            using (var engine = Engine.Open("d:/Distribs/lc0/lc0.exe")) {
-                foreach (var sr in engine.CalcScores("r3kb1r/pp1qpppp/2n2n2/3p1b2/2pP1B2/2P1PN2/PP1N1PPP/R2QKB1R b KQkq - 1 8", 1000)) {
-                    var s = string.Join(" ",sr.Select(x => x.score.ToString()));
-                    Console.WriteLine(s);
+            using (var engine = Engine.Open("d:/Distribs/stockfish_13_win_x64/stockfish_13_win_x64.exe")) {
+                var crs = engine.CalcScores("r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 4 6", 10000000).Last();
+                foreach (var cr in crs) {
+                    Console.Write($"{cr.score} ");
                 }
             }
+
             Console.ReadLine();
             return;
 

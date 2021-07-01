@@ -10,6 +10,7 @@ using Microsoft.Owin.Cors;
 using Chess;
 using ChessEngine;
 using System.Diagnostics;
+using static ChessEngine.Engine;
 
 namespace ChessEngineHub {
     class Program {
@@ -42,6 +43,19 @@ namespace ChessEngineHub {
             return rFen;
         }
 
+        public IList<MoveFen> getMoves(string pgn) {
+            var moveStr = Pgn.GetMoves(pgn);
+            var moves = moveStr.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var moveFenList = new List<MoveFen>();
+            var fen = Board.DEFAULT_STARTING_FEN;
+            foreach (var move in moves) {
+                fen = FEN.Move(fen, move);
+                moveFenList.Add(new MoveFen { fen = fen, move = move });
+            }
+
+            return moveFenList;
+        }
+
         public void calcScores(string fen) {
             engine.Stop();
             calcStopped = true;
@@ -50,12 +64,28 @@ namespace ChessEngineHub {
                     calcStopped = false;
                     var sw = new Stopwatch();
                     sw.Start();
-                    foreach (var crs in engine.CalcScores(fen, 5000)) {
-                        if (calcStopped || sw.ElapsedMilliseconds < 300) continue;
+                    IList<CalcResult> lastSkipped = null;
+                    foreach (var crs in engine.CalcScores(fen, 10000)) {
+                        if (calcStopped) { continue; }
+                        if (sw.ElapsedMilliseconds >= 500) {
+                            sw.Restart();
+                        } else {
+                            lastSkipped = crs;
+                            continue;
+                        }
+
                         Clients.Caller.applyScores(crs);
+                        lastSkipped = null;
                     }
+
+                    if (lastSkipped != null && !calcStopped) { Clients.Caller.applyScores(lastSkipped); }
                 }
             });
+        }
+
+        public class MoveFen {
+            public string move { get; set; }
+            public string fen { get; set; }
         }
     }
 }

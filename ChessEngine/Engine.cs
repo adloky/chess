@@ -51,7 +51,7 @@ namespace ChessEngine
         public IEnumerable<IList<CalcResult>> CalcScores(string fen, int nodes) {
             var mateState = FEN.GetMateState(fen);
             if (mateState != null) {
-                yield return new CalcResult[] { new CalcResult() { score = mateState.Value * 300 } };
+                yield return new CalcResult[] { new CalcResult() { score = mateState.Value * 30000 } };
                 yield break;
             }
 
@@ -66,13 +66,19 @@ namespace ChessEngine
             var max = 0;
             do {
                 str = output.ReadLine();
-                var m = Regex.Match(str, "^info .*score (?<scoreName>cp|mate) (?<scoreValue>-?\\d+) .*multipv (?<multipv>\\d+) .*pv (?<move>([a-h][1-8]){2,2}[qrbn]?)");
+                var m = Regex.Match(str, "^info.* score (?<scoreName>cp|mate) (?<scoreValue>-?\\d+).* pv (?<move>([a-h][1-8]){2,2}[qrbn]?)");
                 if (m.Success) {
                     var r = new CalcResult();
                     var scoreValue = int.Parse(m.Groups["scoreValue"].Value);
-                    r.score = turn * ((m.Groups["scoreName"].Value == "cp") ? scoreValue : scoreValue * 30000);
+                    r.score = (m.Groups["scoreName"].Value == "cp") ? scoreValue * turn : (Math.Sign(scoreValue) * 30000 - scoreValue * 100) * turn;
                     r.move = m.Groups["move"].Value;
-                    var mulipv = int.Parse(m.Groups["multipv"].Value);
+
+                    var multipvMatch = Regex.Match(str, " multipv (\\d+)");
+                    var mulipv = 1;
+                    if (multipvMatch.Success) {
+                        mulipv = int.Parse(multipvMatch.Groups[1].Value);
+                    }
+                    
                     if (mulipv == 1) i++;
 
                     if (i == 2 && mulipv == 1) {
