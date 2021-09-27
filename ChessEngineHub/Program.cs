@@ -30,7 +30,7 @@ namespace ChessEngineHub {
     }
 
     public class EngineHub : Hub {
-        private static Engine engine = Engine.Open("d:/Distribs/lc0/lc0.exe");
+        private static Engine engine = Engine.Open(@"d:\Distribs\stockfish_13_win_x64\stockfish_13_win_x64.exe");
         private static object calcSyncRoot = new object();
         private static volatile bool calcStopped;
 
@@ -57,15 +57,16 @@ namespace ChessEngineHub {
         }
 
         public void calcScores(string fen) {
-            engine.Stop();
             calcStopped = true;
+            engine.Stop();
+            var caller = Clients.Caller;
             Task.Run(() => {
                 lock (calcSyncRoot) {
                     calcStopped = false;
                     var sw = new Stopwatch();
                     sw.Start();
                     IList<CalcResult> lastSkipped = null;
-                    foreach (var crs in engine.CalcScores(fen, 10000)) {
+                    foreach (var crs in engine.CalcScores(fen, 10000000)) {
                         if (calcStopped) { continue; }
                         if (sw.ElapsedMilliseconds >= 500) {
                             sw.Restart();
@@ -74,11 +75,13 @@ namespace ChessEngineHub {
                             continue;
                         }
 
-                        Clients.Caller.applyScores(crs);
+                        caller.applyScores(crs);
                         lastSkipped = null;
                     }
 
-                    if (lastSkipped != null && !calcStopped) { Clients.Caller.applyScores(lastSkipped); }
+                    if (lastSkipped != null && !calcStopped) {
+                        caller.applyScores(lastSkipped);
+                    }
                 }
             });
         }

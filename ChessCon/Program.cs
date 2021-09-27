@@ -115,21 +115,13 @@ namespace ChessCon {
         }
 
         static void Main(string[] args) {
-            using (var engine = Engine.Open("d:/Distribs/stockfish_13_win_x64/stockfish_13_win_x64.exe")) {
-                var crs = engine.CalcScores("r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 4 6", 10000000).Last();
-                foreach (var cr in crs) {
-                    Console.Write($"{cr.score} ");
-                }
-            }
-
-            Console.ReadLine();
-            return;
-
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
             nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
 
-            foreach (var wn in EnumerateNodes("d4 d5 Bf4").Where(x => x.node.score - x.parentNode.score > 30 && x.parentNode.score > -10 && x.node.count >= 0)) {
-                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
+            // e4 e5 Nf3 Nc6 Bb5
+
+            foreach (var wn in EnumerateNodes("e4 e5 Nf3 Nc6 Bb5").Where(x => x.node.score - x.parentNode.score > 100 && x.parentNode.score > -20 && x.node.count >= 20)) {
+                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}; {wn.node.count}");
             }
 
             Console.WriteLine("Save? (y/n)");
@@ -141,7 +133,14 @@ namespace ChessCon {
 }
 
 /*
-           using (var engine = Engine.Open("d:/Distribs/lc0/lc0.exe")) {
+            foreach (var wn in EnumerateNodes("d4 d5 Bf4").Where(x => x.node.score - x.parentNode.score > 30 && x.parentNode.score > -10 && x.node.count >= 0)) {
+                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
+            }
+ 
+ */
+
+/*
+           using (var engine = Engine.Open("d:/Distribs/stockfish_13_win_x64/stockfish_13_win_x64.exe")) {
                 var nodes = EnumerateNodes("d4 d5 Bf4").ToArray();
                 var nullCount = nodes.Where(x => x.node.score == null).Count();
                 foreach (var wn in nodes) {
@@ -149,7 +148,7 @@ namespace ChessCon {
                     foreach (var node in new OpeningNode[] { wn.parentNode, wn.node }) {
                         if (node.score == null) {
                             try {
-                                node.score = engine.CalcScore(node.fen, 1200);
+                                node.score = engine.CalcScore(node.fen, 2000000);
                             } catch {}
                             nullCount--;
                             Console.WriteLine($"{node.fen}, Score: {node.score}, {nullCount}");

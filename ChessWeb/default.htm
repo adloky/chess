@@ -52,7 +52,7 @@
           <div style="align-content: center; display: flex; ">
               <div class="score" style="display: inline-block; font-size: 24pt; width: 90pt; ">&nbsp;</div>
               <button class="pgn-btn" style="font-size: 12pt; ">PGN</button>
-              <button class="right-btn" style="font-size: 12pt; margin-left: 5pt; ">&nbsp;>&nbsp;</button>
+              <button class="right-btn" style="font-size: 12pt; margin-left: 5pt; ">&nbsp;&nbsp;>&nbsp;&nbsp;</button>
           </div>
           <div class="pgn-box">
               <textarea class="pgn-text" rows="3" style="width: 100%; margin: 5pt 0; "></textarea>
@@ -65,12 +65,7 @@
                                        ["p", "pbp"], ["r", "pbr"], ["n", "pbn"], ["b", "pbb"], ["q", "pbq"], ["k", "pbk"], ["z", "pzz"]]);
           var curFen;
 
-          var engine = $.connection.engineHub;
-          $.connection.hub.url = "http://192.168.0.2:8080/signalr";
-          engine.client.applyScores = function (crs) {
-              applyArrows(crs);
-              $(".score").text(crs[0].score / 100);
-          }
+          var engine;
 
           function getArrowCoords(move, width) {
               var x1 = (move.charCodeAt(0) - "a".charCodeAt(0)) * 100 + 50;
@@ -207,6 +202,13 @@
                   var fen = nextMove.data("fen");
                   applyFenNCalc(fen);
               });
+
+              engine = $.connection.engineHub;
+              $.connection.hub.url = "http://192.168.0.2:8080/signalr";
+              engine.client.applyScores = function (crs) {
+                  applyArrows(crs);
+                  $(".score").text(crs[0].score / 100);
+              }
 
               $.connection.hub.start();
           });
