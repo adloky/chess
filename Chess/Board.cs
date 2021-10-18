@@ -261,8 +261,13 @@ namespace Chess
 
         private bool IsValid(PieceMove move)
         {
+            return IsValid(move, Turn);
+        }
+
+        private bool IsValid(PieceMove move, PlayerColor player)
+        {
             MoveCore(move, false);
-            bool ret = !this.IsInCheck();
+            bool ret = !this.IsInCheck(player);
 
             //Undo move
             this[move.Source] = this[move.Target];
@@ -271,6 +276,7 @@ namespace Chess
 
             return ret;
         }
+
 
         private void Castle(KingCastleMove move)
         {
@@ -315,10 +321,14 @@ namespace Chess
             this.castleAvailability[piece.Player] = this.castleAvailability[piece.Player] & ~disabled;
         }
 
+        private bool IsInCheck(PlayerColor player) {
+            var king = this.King(player);
+            return this.GetAttackers(king.Square, king.Player.Opponent()).Any();
+        }
+
         public bool IsInCheck()
         {
-            var king = this.King(this.Turn);
-            return this.GetAttackers(king.Square, king.Player.Opponent()).Any();
+            return IsInCheck(Turn);
         }
 
         public IList<Piece> GetAttackers(Square square, PlayerColor attacker)
@@ -610,10 +620,9 @@ namespace Chess
             }
 
             var king = King(this.Turn.Opponent());
-            var isInCheck = GetAttackers(king.Square, king.Player.Opponent()).Any();
 
-            if (isInCheck) {
-                var validMoves = this[this.Turn.Opponent()].SelectMany(p => p.GetValidMoves()).Where(m => IsValid(m)).ToArray();
+            if (IsInCheck(king.Player)) {
+                var validMoves = this[this.Turn.Opponent()].SelectMany(p => p.GetValidMoves()).Where(m => IsValid(m, king.Player)).ToArray();
 
                 // fix bug
                 this[king.Square] = null;
