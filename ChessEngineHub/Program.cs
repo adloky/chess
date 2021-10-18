@@ -38,13 +38,18 @@ namespace ChessEngineHub {
         private static object calcSyncRoot = new object();
         private static volatile bool calcStopped;
 
-        public string move(string fen, string move) {
-            string rFen = null;
+        public MoveFen move(string fen, string move) {
+            var mf = new MoveFen();
             try {
-                rFen = FEN.Move(fen, move);
+                var board = Board.Load(fen);
+                board.Start();
+                mf.move = board.Uci2San(move);
+                if (board.Move(move)) {
+                    mf.fen = board.GetFEN();
+                }
             } catch { }
 
-            return rFen;
+            return mf;
         }
 
         public IList<MoveFen> getMoves(string pgn) {

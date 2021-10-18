@@ -62,7 +62,7 @@
               <textarea class="pgn-text" rows="3" style="width: 100%; margin: 5pt 0; "></textarea>
               <button class="pgn-ok" style="font-size: 12pt; ">OK</button>
           </div>
-          <div class="move-box" style="padding: 10pt 0;">&nbsp;</div>
+          <div class="move-box" style="padding: 10pt 0;"><span class="move-end"/></div>
       </div>
       <script>
           var pieceClassMap = new Map([["P", "pwp"], ["R", "pwr"], ["N", "pwn"], ["B", "pwb"], ["Q", "pwq"], ["K", "pwk"],
@@ -142,10 +142,27 @@
               }
           }
 
+          function getMoveIndex() {
+              var index = -1;
+              var moveSels = $(".move-sel");
+              if (moveSels.length > 0) {
+                  index = Number(moveSels.data("index"));
+              }
+              return index;
+          }
+
+          function addMove(mf) {
+              var index = getMoveIndex();
+              $(".move").get().filter(x => Number($(x).data("index")) > index).forEach(x => $(x).remove());
+              $(".move").removeClass("move-sel");
+              $(".move-end").before("<div class=\"move move-sel\" data-fen=\"" + mf.fen + "\" data-index=\"" + (index+1) + "\">" + mf.move + "</div>");
+          }
+
           function handleMove(fen, move) {
-              engine.server.move(fen, move).done(function (fen) {
-                  if (fen !== null) {
-                      applyFenNCalc(fen);
+              engine.server.move(fen, move).done(function (mf) {
+                  if (mf.fen !== null) {
+                      applyFenNCalc(mf.fen);
+                      addMove(mf);
                   }
               });
           }
@@ -180,7 +197,7 @@
                   engine.server.getMoves($(".pgn-text").val()).done(moveFens => {
                       $(".pgn-box").removeClass("visible");
                       $(".pgn-text").val("");
-                      var html = moveFens.map((x,i) => "<div class=\"move\" data-fen=\"" + x.fen + "\" data-index=\"" + i + "\">" + x.move + "</div>").join("");
+                      var html = moveFens.map((x,i) => "<div class=\"move\" data-fen=\"" + x.fen + "\" data-index=\"" + i + "\">" + x.move + "</div>").join("") + "<span class=\"move-end\"/>";
                       $(".move-box").html(html);
                   });
               });
@@ -193,15 +210,11 @@
               });
 
               $(".right-btn").click(function () {
-                  var index = -1;
-                  var moveSels = $(".move-sel");
-                  if (moveSels.length > 0) {
-                      index = Number(moveSels.data("index"));
-                  }
+                  var index = getMoveIndex();
                   index++;
                   var nextMove = $(".move[data-index=\"" + index + "\"]");
                   if (nextMove.length == 0) return;
-                  moveSels.removeClass("move-sel");
+                  $(".move").removeClass("move-sel");
                   nextMove.addClass("move-sel");
                   var fen = nextMove.data("fen");
                   applyFenNCalc(fen);
