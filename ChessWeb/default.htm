@@ -53,6 +53,10 @@
               <div class="score" style="display: inline-block; font-size: 24pt; width: 90pt; ">&nbsp;</div>
               <button class="pgn-btn" style="font-size: 12pt; ">PGN</button>
               <button class="right-btn" style="font-size: 12pt; margin-left: 5pt; ">&nbsp;&nbsp;>&nbsp;&nbsp;</button>
+              <select class="engine-num" style="font-size: 12pt; margin-left: 5pt; ">
+                  <option value="0">Lc0</option>
+                  <option value="1">SF</option>
+              </select>
           </div>
           <div class="pgn-box">
               <textarea class="pgn-text" rows="3" style="width: 100%; margin: 5pt 0; "></textarea>
@@ -129,8 +133,8 @@
               curFen = fen;
           }
 
-          function applyFenNCalc(fen) {
-              if (curFen !== fen) {
+          function applyFenNCalc(fen, force) {
+              if (curFen !== fen || force) {
                   applyFen(fen);
                   applyArrows([]);
                   $(".score").html("&nbsp;");
@@ -203,6 +207,12 @@
                   applyFenNCalc(fen);
               });
 
+              $(".engine-num").change(function () {
+                  engine.server.engineNumber($(".engine-num").val()).done(function () {
+                      applyFenNCalc(curFen, true);
+                  });
+              });
+
               engine = $.connection.engineHub;
               $.connection.hub.url = "http://192.168.0.2:8080/signalr";
               engine.client.applyScores = function (crs) {
@@ -210,7 +220,13 @@
                   $(".score").text(crs[0].score / 100);
               }
 
-              $.connection.hub.start();
+              $.connection.hub.start().done(function () {
+                  engine.server.engineNumber(null).done(function (n) {
+                      $(".engine-num").val(n);
+                  });
+
+                  applyFenNCalc(curFen,true);
+              });
           });
       </script>
   </body>

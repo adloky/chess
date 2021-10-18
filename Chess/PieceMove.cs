@@ -14,9 +14,9 @@ namespace Chess
 
         public Type PawnPromotedTo { get; internal set; }
 
-        public Square Source { get; private set; }
+        public Square Source { get; set; }
 
-        public Square Target { get; private set; }
+        public Square Target { get; set; }
 
         protected Board Board
         {

@@ -30,7 +30,11 @@ namespace ChessEngineHub {
     }
 
     public class EngineHub : Hub {
-        private static Engine engine = Engine.Open(@"d:\Distribs\stockfish_13_win_x64\stockfish_13_win_x64.exe");
+        private static Engine engine { get { return engines[engineNum]; } }
+        private static int engineNum = 0;
+        private static Engine[] engines = { Engine.Open(@"d:/Distribs/lc0/lc0.exe"), Engine.Open(@"d:/Distribs/stockfish_13_win_x64/stockfish_13_win_x64.exe") };
+        private static int[] nodeCounts = { 20000, 20000000 };
+        private static int nodeCount { get { return nodeCounts[engineNum]; } }
         private static object calcSyncRoot = new object();
         private static volatile bool calcStopped;
 
@@ -66,7 +70,7 @@ namespace ChessEngineHub {
                     var sw = new Stopwatch();
                     sw.Start();
                     IList<CalcResult> lastSkipped = null;
-                    foreach (var crs in engine.CalcScores(fen, 10000000)) {
+                    foreach (var crs in engine.CalcScores(fen, nodeCount)) {
                         if (calcStopped) { continue; }
                         if (sw.ElapsedMilliseconds >= 500) {
                             sw.Restart();
@@ -84,6 +88,17 @@ namespace ChessEngineHub {
                     }
                 }
             });
+        }
+
+        public int engineNumber(int? n = null) {
+            if (n != null) {
+                calcStopped = true;
+                engine.Stop();
+                lock (calcSyncRoot) {
+                    engineNum = n.Value;
+                };
+            }
+            return engineNum;
         }
 
         public class MoveFen {

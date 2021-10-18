@@ -115,22 +115,49 @@ namespace ChessCon {
         }
 
         static void Main(string[] args) {
+            var board = Board.Load("3k4/1R6/7R/8/8/8/8/1K6 w - - 4 3");
+            board.Start();
+            var r = board.Uci2San("h6h8");
+            Console.WriteLine(r);
+            Console.ReadLine();
+
+            /*
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
             nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
 
-            // e4 e5 Nf3 Nc6 Bb5
+            var wns = EnumerateNodes("e4 c5 d4", 150).ToList();
 
-            foreach (var wn in EnumerateNodes("e4 e5 Nf3 Nc6 Bb5").Where(x => x.node.score - x.parentNode.score > 100 && x.parentNode.score > -20 && x.node.count >= 20)) {
-                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}; {wn.node.count}");
+            var i = 1;
+            do {
+                if (wns[i].moves.Contains(wns[i-1].moves)) { wns.RemoveAt(i-1); } else { i++; }
+            } while (i < wns.Count); 
+
+            foreach (var wn in wns) {
+                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score}; {wn.node.count}");
             }
 
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
                 File.WriteAllLines(nodesPath, nodeDic.Select(x => JsonConvert.SerializeObject(x.Value)).ToArray());
             }
+            */
         }
     }
 }
+
+/*
+            var wns = EnumerateNodes("e4 c5 d4", 150).ToList();
+
+            var i = 1;
+            do {
+                if (wns[i].moves.Contains(wns[i-1].moves)) { wns.RemoveAt(i-1); } else { i++; }
+            } while (i < wns.Count); 
+
+            foreach (var wn in wns) {
+                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score}; {wn.node.count}");
+            }
+ */
+
 
 /*
             foreach (var wn in EnumerateNodes("d4 d5 Bf4").Where(x => x.node.score - x.parentNode.score > 30 && x.parentNode.score > -10 && x.node.count >= 0)) {

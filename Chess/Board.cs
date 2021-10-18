@@ -152,13 +152,10 @@ namespace Chess
 
         #region Methods
 
-        public bool Move(Square source, Square target, Type promotePawnTo)
-        {
+        public Square CorrectCastleTarget(Square source, Square target) {
             var piece = this[source];
-            if (this.Turn != piece.Player || !this.IsActive)
-                return false;
 
-            if (piece.GetType() == typeof(King)) {
+            if (piece is King) {
                 if (source == Square.E1) {
                     if (target == Square.H1) {
                         target = Square.G1;
@@ -176,6 +173,17 @@ namespace Chess
                     }
                 }
             }
+
+            return target;
+        }
+
+        public bool Move(Square source, Square target, Type promotePawnTo)
+        {
+            var piece = this[source];
+            if (this.Turn != piece.Player || !this.IsActive)
+                return false;
+
+            target = CorrectCastleTarget(source, target);
 
             var move = piece.GetValidMove(target);
 
@@ -519,25 +527,108 @@ namespace Chess
 
         private static readonly Regex UciRegex = new Regex("^([a-h][1-8])([a-h][1-8])([nbrq])?$", RegexOptions.Compiled);
 
-        public bool Move(string s) {
-            var match = UciRegex.Match(s);
+        public PieceMove ParseUciMove(string uci) {
+            var match = UciRegex.Match(uci);
 
-            // san
-            if (!match.Success) {
-                var move = ParseSanMove(s);
-                if (move == null) return false;
-                return Move(move.Source, move.Target, move.PawnPromotedTo);
-            }
+            if (!match.Success) { return null; }
 
-            // uci
-            var source = (Square)Enum.Parse(typeof(Square), match.Groups[1].Value.ToUpper());
-            var target = (Square)Enum.Parse(typeof(Square), match.Groups[2].Value.ToUpper());
-            Type promotion = null;
+            var piece = this[(Square)Enum.Parse(typeof(Square), match.Groups[1].Value.ToUpper())];
+            var move = piece.GetValidMove((Square)Enum.Parse(typeof(Square), match.Groups[2].Value.ToUpper()));
+
             if (match.Groups[3].Value != "") {
-                promotion = Piece.GetPieceType(match.Groups[3].Value);
+                move.PawnPromotedTo = Piece.GetPieceType(match.Groups[3].Value);
             }
-            
-            return Move(source, target, promotion);
+
+            return move;
+        }
+
+        public bool Move(string s) {
+            var move = ParseUciMove(s);
+            if (move == null) {
+                move = ParseSanMove(s);
+                if (move == null) return false;
+            }
+
+            return Move(move.Source, move.Target, move.PawnPromotedTo);
+        }
+
+        public string Uci2San(string uci) {
+            var move = ParseUciMove(uci);
+
+            move.Target = CorrectCastleTarget(move.Source, move.Target);
+
+            var san = (string)null;
+
+            if (move.Piece is Pawn) {
+                san = (move.CapturedPiece == null)
+                    ? move.Target.ToString().ToLower()
+                    : (char)('a' + move.Source.GetColumn() - 1) + "x" + move.Target.ToString().ToLower();
+
+                if (move.PawnPromotedTo != null) {
+                    san += "=" + Piece.GetNotation(move.PawnPromotedTo).ToUpper();
+                }
+            }
+            else if (move is KingCastleMove) {
+                san = (((KingCastleMove)move).Castle == CastleType.KingSide) ? "O-O" : "O-O-O";
+            }
+            else {
+                san = Piece.GetNotation(move.Piece.GetType()).ToUpper();
+                var otherMoves = pieces.Where(x => x != null && x != move.Piece && x.GetType() == move.Piece.GetType() && x.Player == move.Piece.Player)
+                    .Select(x => x.GetValidMove(move.Target)).Where(x => x != null).ToArray();
+
+                if (otherMoves.Length > 0) {
+                    otherMoves = otherMoves.Where(x => IsValid(x)).ToArray();
+                }
+
+                if (otherMoves.Length > 0) {
+                    if (!otherMoves.Where(x => x.Source.GetColumn() == move.Source.GetColumn()).Any()) {
+                        san += (char)('a' + move.Source.GetColumn() - 1);
+                    }
+                    else if (!otherMoves.Where(x => x.Source.GetRank() == move.Source.GetRank()).Any()) {
+                        san += (char)('1' + move.Source.GetRank() - 1);
+                    }
+                    else {
+                        san += move.Source.ToString().ToLower();
+                    }
+                }
+
+                if (move.CapturedPiece != null) { san += "x"; }
+
+                san += move.Target.ToString().ToLower();
+            }
+
+            #region check and checkmate
+
+            MoveCore(move, false);
+
+            var castleRookSource = (Square)0;
+            var castleRookTarget = (Square)0;
+            if (move is KingCastleMove) {
+                castleRookSource = (((KingCastleMove)move).Castle == CastleType.KingSide) ? move.Target.Move(MoveDirection.Right).Value : move.Target.Move(MoveDirection.Left).Move(MoveDirection.Left).Value;
+                castleRookTarget = (((KingCastleMove)move).Castle == CastleType.KingSide) ? move.Target.Move(MoveDirection.Left).Value : move.Target.Move(MoveDirection.Right).Value;
+                this[castleRookTarget] = this[castleRookSource];
+            }
+
+            var king = King(this.Turn.Opponent());
+            var isInCheck = GetAttackers(king.Square, king.Player.Opponent()).Any();
+
+            if (isInCheck) {
+                var hasValidMove = this[this.Turn.Opponent()].SelectMany(p => p.GetValidMoves()).Where(m => IsValid(m)).Any();
+                san += (hasValidMove) ? "+" : "#";
+            }
+
+            // undo move
+            this[move.Source] = this[move.Target];
+            if (move.CapturedPiece != null) {
+                this[move.CapturedPiece.Square] = move.CapturedPiece;
+            }
+            if (move is KingCastleMove) {
+                this[castleRookSource] = this[castleRookTarget];
+            }
+
+            #endregion
+
+            return san;
         }
 
         #endregion Methods
