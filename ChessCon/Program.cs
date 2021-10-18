@@ -115,7 +115,7 @@ namespace ChessCon {
         }
 
         static void Main(string[] args) {
-            var board = Board.Load("4k3/8/R7/2R5/8/8/8/3K4 w - - 0 1");
+            var board = Board.Load("5k2/2R5/R7/8/8/8/8/3K4 w - - 2 2");
             board.Start();
             var r = board.Uci2San("a6a8");
             Console.WriteLine(r);

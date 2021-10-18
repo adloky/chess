@@ -617,7 +617,7 @@ namespace Chess
 
                 // fix bug
                 this[king.Square] = null;
-                validMoves = validMoves.Where(x => !GetAttackers(x.Target, king.Player.Opponent()).Any()).ToArray();
+                validMoves = validMoves.Where(x => !(x.Piece is King) || !GetAttackers(x.Target, king.Player.Opponent()).Any()).ToArray();
                 this[king.Square] = king;
 
                 var hasValidMove = validMoves.Any();
