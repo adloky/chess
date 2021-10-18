@@ -613,7 +613,14 @@ namespace Chess
             var isInCheck = GetAttackers(king.Square, king.Player.Opponent()).Any();
 
             if (isInCheck) {
-                var hasValidMove = this[this.Turn.Opponent()].SelectMany(p => p.GetValidMoves()).Where(m => IsValid(m)).Any();
+                var validMoves = this[this.Turn.Opponent()].SelectMany(p => p.GetValidMoves()).Where(m => IsValid(m)).ToArray();
+
+                // fix bug
+                this[king.Square] = null;
+                validMoves = validMoves.Where(x => !GetAttackers(x.Target, king.Player.Opponent()).Any()).ToArray();
+                this[king.Square] = king;
+
+                var hasValidMove = validMoves.Any();
                 san += (hasValidMove) ? "+" : "#";
             }
 
