@@ -611,11 +611,10 @@ namespace Chess
 
             MoveCore(move, false);
 
-            var castleRookSource = (Square)0;
-            var castleRookTarget = (Square)0;
             if (move is KingCastleMove) {
-                castleRookSource = (((KingCastleMove)move).Castle == CastleType.KingSide) ? move.Target.Move(MoveDirection.Right).Value : move.Target.Move(MoveDirection.Left).Move(MoveDirection.Left).Value;
-                castleRookTarget = (((KingCastleMove)move).Castle == CastleType.KingSide) ? move.Target.Move(MoveDirection.Left).Value : move.Target.Move(MoveDirection.Right).Value;
+                var castleMove = (KingCastleMove)move;
+                var castleRookSource = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 8 : 1);
+                var castleRookTarget = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 6 : 4);
                 this[castleRookTarget] = this[castleRookSource];
             }
 
@@ -639,7 +638,10 @@ namespace Chess
                 this[move.CapturedPiece.Square] = move.CapturedPiece;
             }
             if (move is KingCastleMove) {
-                this[castleRookSource] = this[castleRookTarget];
+                var castleMove = (KingCastleMove)move;
+                var castleRookSource = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 6 : 4);
+                var castleRookTarget = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 8 : 1);
+                this[castleRookTarget] = this[castleRookSource];
             }
 
             #endregion

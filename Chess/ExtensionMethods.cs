@@ -202,6 +202,11 @@ namespace System
             else { throw new Exception("Wrong en passed target."); }
         }
 
+        public static Square ReplaceColumn(this Square square, int newColumn) {
+            return (Square)(((short)square & 0x38) | (newColumn-1));
+
+        }
+
         public static bool IsAdjacent(this Square source, Square target)
         {
             return Math.Abs(source.GetColumn() - target.GetColumn()) <= 1 && Math.Abs(source.GetRank() - target.GetRank()) <= 1;
