@@ -58,6 +58,7 @@
                   <option value="1">SF</option>
               </select>
           </div>
+          <div class="move-var" style="padding-top: 5pt; ">&nbsp;</div>
           <div class="pgn-box">
               <textarea class="pgn-text" rows="3" style="width: 100%; margin: 5pt 0; "></textarea>
               <button class="pgn-ok" style="font-size: 12pt; ">OK</button>
@@ -148,6 +149,7 @@
                   applyFen(fen);
                   applyArrows([]);
                   $(".score").html("&nbsp;");
+                  $(".move-var").html("&nbsp;");
                   engine.server.calcScores(curFen);
               }
           }
@@ -192,9 +194,7 @@
                       $(".square-sel").removeClass("square-sel");
                       $(this).addClass("square-sel");
                   }
-                  else if (curSel.length == 0) {
-                  }
-                  else {
+                  else if (curSel.length > 0) {
                       var srcSquare = curSel.attr("class").match(/s[a-h][1-8]/)[0].substring(1);
                       var dstSquare = $(this).attr("class").match(/s[a-h][1-8]/)[0].substring(1);
                       var move = srcSquare + dstSquare;
@@ -255,6 +255,7 @@
               engine.client.applyScores = function (crs) {
                   applyArrows(crs);
                   $(".score").text(crs[0].score / 100);
+                  $(".move-var").html(crs.filter(x => x.san).slice(0, 3).map(x => (x.score / 100) + " <b>" + x.san + "</b>").join(" &nbsp;") + "&nbsp;");
               }
 
               $.connection.hub.start().done(function () {

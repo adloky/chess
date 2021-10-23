@@ -49,6 +49,8 @@ namespace ChessEngine
         }
 
         public IEnumerable<IList<CalcResult>> CalcScores(string fen, int nodes) {
+            while (output.Peek() >= 0) { output.ReadLine(); }
+
             var mateState = FEN.GetMateState(fen);
             if (mateState != null) {
                 yield return new CalcResult[] { new CalcResult() { score = mateState.Value * 30000 } };
@@ -124,6 +126,7 @@ namespace ChessEngine
         public class CalcResult {
             public int score { get; set; }
             public string move { get; set; }
+            public string san { get; set; }
         }
     }
 }

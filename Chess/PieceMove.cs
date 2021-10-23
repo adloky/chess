@@ -59,5 +59,10 @@ namespace Chess
         public string ToUciString() {
             return $"{Source}{Target}{(!HasPromotion ? "" : Piece.GetNotation(PawnPromotedTo))}".ToLower();
         }
+
+        public override string ToString()
+        {
+            return ToUciString();
+        }
     }
 }

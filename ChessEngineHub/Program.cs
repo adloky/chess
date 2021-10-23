@@ -43,7 +43,7 @@ namespace ChessEngineHub {
             try {
                 var board = Board.Load(fen);
                 board.Start();
-                mf.move = board.Uci2San(move);
+                mf.move = board.UciToSan(move);
                 if (board.Move(move)) {
                     mf.fen = board.GetFEN();
                 }
@@ -76,6 +76,11 @@ namespace ChessEngineHub {
                     sw.Start();
                     IList<CalcResult> lastSkipped = null;
                     foreach (var crs in engine.CalcScores(fen, nodeCount)) {
+                        var board = Board.Load(fen);
+                        foreach (var cr in crs.Where(x => x.move != null)) {
+                            cr.san = board.UciToSan(cr.move);
+                        }
+
                         if (calcStopped) { continue; }
                         if (sw.ElapsedMilliseconds >= 500) {
                             sw.Restart();

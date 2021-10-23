@@ -115,11 +115,9 @@ namespace ChessCon {
         }
 
         static void Main(string[] args) {
-            var board = Board.Load("r3kbnr/pppq1ppp/2np4/1B2p3/4P1b1/3P1N2/PPPN1PPP/R1BQK2R w KQkq - 3 6");
-            board.Start();
-            var r = board.Uci2San("e8c8");
+            var board = Board.Load("4k3/8/8/8/8/8/8/R3K2r w Q - 0 1");
+            var r = board[Square.E1].GetValidMove(Square.C1);
             Console.WriteLine(r);
-            Console.WriteLine(board.GetFEN());
             Console.ReadLine();
 
             /*

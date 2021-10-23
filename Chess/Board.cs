@@ -132,10 +132,13 @@ namespace Chess
             this.Players[PlayerColor.Black].OnPreInit();
 
             this.CorrectCastleAvailability();
+            Start();
         }
 
         public void Start()
         {
+            if (this.IsActive) return;
+
             this.Players[PlayerColor.White].OnInitialize();
             this.Players[PlayerColor.Black].OnInitialize();
 
@@ -153,9 +156,7 @@ namespace Chess
         #region Methods
 
         public Square CorrectCastleTarget(Square source, Square target) {
-            var piece = this[source];
-
-            if (piece is King) {
+            if (this[source] is King) {
                 if (source == Square.E1) {
                     if (target == Square.H1) {
                         target = Square.G1;
@@ -193,16 +194,14 @@ namespace Chess
             if (!IsValid(move))
                 return false;
 
-            CastleAvailabityChangeTest(move.Piece);
+            RetrieveCastleAvailabity(move);
+
             MoveCore(move, true);
 
             this.CurrentPlayer.OnMove(move);
             //The move is valid ready to proceed
             this.History.Add(move);
             this.Turn = this.Turn.Opponent();
-
-            if (move is KingCastleMove)
-                Castle(move as KingCastleMove);
 
             if (move.HasPromotion)
             {
@@ -225,7 +224,7 @@ namespace Chess
             else if (!isInCheck && !hasValidMove)
                 this.OnStalemate(StalemateReason.NoMoveAvailable);
 
-            CorrectCastleAvailability();
+            // CorrectCastleAvailability();
 
             return true;
         }
@@ -251,11 +250,39 @@ namespace Chess
                 this.OnSquareChanged(move.Source);
                 this.OnSquareChanged(move.Target);
             }
+
             if (move.HasEnPassantCapture())
             {
                 this[move.CapturedPiece.Square] = null;
                 if (raiseEvent)
                     this.OnSquareChanged(move.CapturedPiece.Square);
+            }
+
+            if (move is KingCastleMove) {
+                var castleMove = (KingCastleMove)move;
+                var castleRookSource = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 8 : 1);
+                var castleRookTarget = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 6 : 4);
+                this[castleRookTarget] = this[castleRookSource];
+                if (raiseEvent) {
+                    this.OnSquareChanged(castleRookSource);
+                    this.OnSquareChanged(castleRookTarget);
+                }
+            }
+        }
+
+        private void MoveCoreUndo(PieceMove move)
+        {
+            this[move.Source] = this[move.Target];
+
+            if (move.CapturedPiece != null) {
+                this[move.CapturedPiece.Square] = move.CapturedPiece;
+            }
+
+            if (move is KingCastleMove) {
+                var castleMove = (KingCastleMove)move;
+                var castleRookSource = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 6 : 4);
+                var castleRookTarget = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 8 : 1);
+                this[castleRookTarget] = this[castleRookSource];
             }
         }
 
@@ -269,27 +296,8 @@ namespace Chess
             MoveCore(move, false);
             bool ret = !this.IsInCheck(player);
 
-            //Undo move
-            this[move.Source] = this[move.Target];
-            if (move.CapturedPiece != null)
-                this[move.CapturedPiece.Square] = move.CapturedPiece;
-
+            MoveCoreUndo(move);
             return ret;
-        }
-
-
-        private void Castle(KingCastleMove move)
-        {
-            Square rookSquare = move.Castle.GetRookSquare(move.Piece.Player);
-            Square target = rookSquare;
-
-            for (int i = 0; i < move.Castle.GetRookDistance(); i++)
-                target = target.Move(move.Castle.GetRookMoveDirection()).Value;
-
-            var rook = this[rookSquare];
-            this[target] = this[rookSquare];
-            this.OnSquareChanged(rookSquare);
-            this.OnSquareChanged(target);
         }
 
         internal void Promote(Piece piece, Type type)
@@ -304,21 +312,30 @@ namespace Chess
             return this.castleAvailability[player];
         }
 
-        private void CastleAvailabityChangeTest(Piece piece)
+        private void RetrieveCastleAvailabity(PieceMove move)
         {
-            if (!(piece is King || piece is Rook)) return;
+            var piece = move.Piece;
+            var capturedPiece = move.CapturedPiece;
 
             CastleType disabled = CastleType.None;
 
             if (piece is King) {
                 disabled = CastleType.QueenOrKingSide;
-            } else if (piece.Player == PlayerColor.White && (piece.Square == Square.A1 || piece.Square == Square.H1)
-             || piece.Player == PlayerColor.Black && (piece.Square == Square.A8 || piece.Square == Square.H8))
+            } else if (piece.Player == PlayerColor.White && (new Square[] { Square.A1, Square.H1 }).Contains(piece.Square)
+                    || piece.Player == PlayerColor.Black && (new Square[] { Square.A8, Square.H8 }).Contains(piece.Square))
             {
                 disabled = piece.Square.GetColumn() == 1 ? CastleType.QueenSide : CastleType.KingSide;
             }
 
             this.castleAvailability[piece.Player] = this.castleAvailability[piece.Player] & ~disabled;
+
+            if (capturedPiece is Rook
+                && (capturedPiece.Player == PlayerColor.White && (new Square[] { Square.A1, Square.H1 }).Contains(capturedPiece.Square)
+                 || capturedPiece.Player == PlayerColor.Black && (new Square[] { Square.A8, Square.H8 }).Contains(capturedPiece.Square)))
+            {
+                var capturedDisabled = (capturedPiece.Square.GetColumn() == 1) ? CastleType.QueenSide : CastleType.KingSide;
+                this.castleAvailability[capturedPiece.Player] = this.castleAvailability[capturedPiece.Player] & ~capturedDisabled;
+            }
         }
 
         private bool IsInCheck(PlayerColor player) {
@@ -417,7 +434,7 @@ namespace Chess
             return FEN.FromBoard(this);
         }
 
-        public static Board Load(string fen, Player white = null, Player black = null)
+        public static Board Load(string fen = DEFAULT_STARTING_FEN, Player white = null, Player black = null)
         {
             return new Board(white ?? new Player(), black ?? new Player(), fen);
         }
@@ -562,7 +579,7 @@ namespace Chess
             return Move(move.Source, move.Target, move.PawnPromotedTo);
         }
 
-        public string Uci2San(string uci) {
+        public string UciToSan(string uci) {
             var move = ParseUciMove(uci);
 
             move.Target = CorrectCastleTarget(move.Source, move.Target);
@@ -611,13 +628,6 @@ namespace Chess
 
             MoveCore(move, false);
 
-            if (move is KingCastleMove) {
-                var castleMove = (KingCastleMove)move;
-                var castleRookSource = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 8 : 1);
-                var castleRookTarget = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 6 : 4);
-                this[castleRookTarget] = this[castleRookSource];
-            }
-
             var king = King(this.Turn.Opponent());
 
             if (IsInCheck(king.Player)) {
@@ -628,21 +638,10 @@ namespace Chess
                 validMoves = validMoves.Where(x => !(x.Piece is King) || !GetAttackers(x.Target, king.Player.Opponent()).Any()).ToArray();
                 this[king.Square] = king;
 
-                var hasValidMove = validMoves.Any();
-                san += (hasValidMove) ? "+" : "#";
+                san += (validMoves.Any()) ? "+" : "#";
             }
 
-            // undo move
-            this[move.Source] = this[move.Target];
-            if (move.CapturedPiece != null) {
-                this[move.CapturedPiece.Square] = move.CapturedPiece;
-            }
-            if (move is KingCastleMove) {
-                var castleMove = (KingCastleMove)move;
-                var castleRookSource = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 6 : 4);
-                var castleRookTarget = move.Source.ReplaceColumn((castleMove.Castle == CastleType.KingSide) ? 8 : 1);
-                this[castleRookTarget] = this[castleRookSource];
-            }
+            MoveCoreUndo(move);
 
             #endregion
 
