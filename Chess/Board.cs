@@ -212,16 +212,17 @@ namespace Chess
             if (this.PieceMoved != null)
                 this.PieceMoved(move);
 
-            bool hasValidMove = this[this.Turn].SelectMany(p => p.GetValidMoves()).Where(m => IsValid(m)).Any();
             bool isInCheck = this.IsInCheck();
+            var mateState = GetMateState();
 
-            if (isInCheck && hasValidMove)
+            if (isInCheck && mateState == null)
                 this.OnCheck();
 
             this.CurrentPlayer.OnTurn();
-            if (isInCheck && !hasValidMove)
+
+            if (mateState == 1 || mateState == -1)
                 this.OnCheckmate();
-            else if (!isInCheck && !hasValidMove)
+            else if (mateState == 0)
                 this.OnStalemate(StalemateReason.NoMoveAvailable);
 
             // CorrectCastleAvailability();
@@ -230,15 +231,19 @@ namespace Chess
         }
 
         public int? GetMateState() {
-            bool hasValidMove = this[this.Turn].SelectMany(p => p.GetValidMoves()).Where(m => IsValid(m)).Any();
-            bool isInCheck = this.IsInCheck();
+            var validMoves = this[this.Turn].SelectMany(p => p.GetValidMoves()).Where(m => IsValid(m)).ToArray();
 
-            if (isInCheck && !hasValidMove)
-                return (1 - ((int)this.Turn - 1) * 2) * (-1);
-            else if (!isInCheck && !hasValidMove)
-                return 0;
+            // fix bug
+            var king = King(Turn);
+            this[king.Square] = null;
+            validMoves = validMoves.Where(x => !(x.Piece is King) || !GetAttackers(x.Target, Turn.Opponent()).Any()).ToArray();
+            this[king.Square] = king;
 
-            return null;
+            if (validMoves.Any()) {
+                return null;
+            }
+
+            return !IsInCheck() ? 0 : (Turn == PlayerColor.White) ? -1 : 1;
         }
 
         private void MoveCore(PieceMove move, bool raiseEvent)
@@ -288,13 +293,8 @@ namespace Chess
 
         private bool IsValid(PieceMove move)
         {
-            return IsValid(move, Turn);
-        }
-
-        private bool IsValid(PieceMove move, PlayerColor player)
-        {
             MoveCore(move, false);
-            bool ret = !this.IsInCheck(player);
+            bool ret = !this.IsInCheck();
 
             MoveCoreUndo(move);
             return ret;
@@ -338,14 +338,10 @@ namespace Chess
             }
         }
 
-        private bool IsInCheck(PlayerColor player) {
-            var king = this.King(player);
-            return this.GetAttackers(king.Square, king.Player.Opponent()).Any();
-        }
-
         public bool IsInCheck()
         {
-            return IsInCheck(Turn);
+            var king = this.King(Turn);
+            return this.GetAttackers(king.Square, king.Player.Opponent()).Any();
         }
 
         public IList<Piece> GetAttackers(Square square, PlayerColor attacker)
@@ -627,21 +623,14 @@ namespace Chess
             #region check and checkmate
 
             MoveCore(move, false);
+            Turn = Turn.Opponent();
 
-            var king = King(this.Turn.Opponent());
-
-            if (IsInCheck(king.Player)) {
-                var validMoves = this[this.Turn.Opponent()].SelectMany(p => p.GetValidMoves()).Where(m => IsValid(m, king.Player)).ToArray();
-
-                // fix bug
-                this[king.Square] = null;
-                validMoves = validMoves.Where(x => !(x.Piece is King) || !GetAttackers(x.Target, king.Player.Opponent()).Any()).ToArray();
-                this[king.Square] = king;
-
-                san += (validMoves.Any()) ? "+" : "#";
+            if (IsInCheck()) {
+                san += ((GetMateState() ?? 0) == 0) ? "+" : "#";
             }
 
             MoveCoreUndo(move);
+            Turn = Turn.Opponent();
 
             #endregion
 
