@@ -10,6 +10,7 @@ using Microsoft.Owin.Cors;
 using Chess;
 using ChessEngine;
 using System.Diagnostics;
+using System.Threading;
 using static ChessEngine.Engine;
 
 namespace ChessEngineHub {
@@ -36,13 +37,13 @@ namespace ChessEngineHub {
         private static int[] nodeCounts = { 20000, 20000000 };
         private static int nodeCount { get { return nodeCounts[engineNum]; } }
         private static object calcSyncRoot = new object();
+        private static AutoResetEvent startCalcWaiter = new AutoResetEvent(true);
         private static volatile bool calcStopped;
 
         public MoveFen move(string fen, string move) {
             var mf = new MoveFen();
             try {
                 var board = Board.Load(fen);
-                board.Start();
                 mf.move = board.UciToSan(move);
                 if (board.Move(move)) {
                     mf.fen = board.GetFEN();
@@ -67,7 +68,12 @@ namespace ChessEngineHub {
 
         public void calcScores(string fen) {
             calcStopped = true;
+
+            startCalcWaiter.WaitOne();
             engine.Stop();
+            startCalcWaiter.Set();
+
+            startCalcWaiter.WaitOne();
             var caller = Clients.Caller;
             Task.Run(() => {
                 lock (calcSyncRoot) {
@@ -75,7 +81,13 @@ namespace ChessEngineHub {
                     var sw = new Stopwatch();
                     sw.Start();
                     IList<CalcResult> lastSkipped = null;
+                    var isFirst = true;
                     foreach (var crs in engine.CalcScores(fen, nodeCount)) {
+                        if (isFirst) {
+                            startCalcWaiter.Set();
+                            isFirst = false;
+                        }
+
                         var board = Board.Load(fen);
                         foreach (var cr in crs.Where(x => x.move != null)) {
                             cr.san = board.UciToSan(cr.move);
@@ -103,7 +115,11 @@ namespace ChessEngineHub {
         public int engineNumber(int? n = null) {
             if (n != null) {
                 calcStopped = true;
+
+                startCalcWaiter.WaitOne();
                 engine.Stop();
+                startCalcWaiter.Set();
+
                 lock (calcSyncRoot) {
                     engineNum = n.Value;
                 };
