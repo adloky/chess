@@ -63,9 +63,10 @@
               <textarea class="pgn-text" rows="3" style="width: 100%; margin: 5pt 0; "></textarea>
               <button class="pgn-ok" style="font-size: 12pt; ">OK</button>
           </div>
-          <div class="move-box" style="padding: 10pt 0;"><span class="move-end"/></div>
+          <div class="move-box" style="padding: 10pt 0;"><span class="move-end"/>&nbsp;</div>
       </div>
       <script>
+          var startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
           var pieceClassMap = new Map([["P", "pwp"], ["R", "pwr"], ["N", "pwn"], ["B", "pwb"], ["Q", "pwq"], ["K", "pwk"],
                                        ["p", "pbp"], ["r", "pbr"], ["n", "pbn"], ["b", "pbb"], ["q", "pbq"], ["k", "pbk"], ["z", "pzz"]]);
           var curFen;
@@ -89,7 +90,7 @@
               ps.push({ x: 0, y: 0 });
               ps.push({ x: width * 1.5, y: width * 3 });
               ps.push({ x: width / 2, y: width * 3 });
-              ps.push({ x: width / 2, y: length });
+              ps.push({ x: width / 2, y: length});
               ps.push({ x: -width / 2, y: length });
               ps.push({ x: -width / 2, y: width * 3 });
               ps.push({ x: -width * 1.5, y: width * 3 });
@@ -163,24 +164,23 @@
               return index;
           }
 
-          function addMove(mf) {
+          function addMoves(mfs) {
+              if (!mfs) {
+                  mfs = [];
+              }
+              else if (!Array.isArray(mfs)) {
+                  mfs = [mfs];
+              }
+
               var index = getMoveIndex();
               $(".move").get().filter(x => Number($(x).data("index")) > index).forEach(x => $(x).remove());
               $(".move-sel").removeClass("move-sel");
-              $(".move-end").before("<div class=\"move move-sel\" data-fen=\"" + mf.fen + "\" data-index=\"" + (index+1) + "\">" + mf.move + "</div>");
-          }
-
-          function handleMove(fen, move) {
-              engine.server.move(fen, move).done(function (mf) {
-                  if (mf.fen !== null) {
-                      applyFenNCalc(mf.fen);
-                      addMove(mf);
-                  }
-              });
+              $(".move-end").before(mfs.map((mf, i) => "<div class=\"move" + ((i < mfs.length - 1) ? "" : " move-sel") + "\" data-fen=\""
+                  + mf.fen + "\" data-index=\"" + (index + i + 1) + "\">" + mf.move + "</div>").join(""));
           }
 
           $(document).ready(function () {
-              applyFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+              applyFen(startFen);
 
               $(".board td").click(function () {
                   var turn = curFen.split(" ")[1];
@@ -207,7 +207,7 @@
                           if (mf.fen === null) return;
 
                           applyFenNCalc(mf.fen);
-                          addMove(mf);
+                          addMoves(mf);
                           curSel.removeClass("square-sel");
                       });
                   }
@@ -221,8 +221,11 @@
                   engine.server.getMoves($(".pgn-text").val()).done(moveFens => {
                       $(".pgn-box").removeClass("visible");
                       $(".pgn-text").val("");
-                      var html = moveFens.map((x,i) => "<div class=\"move\" data-fen=\"" + x.fen + "\" data-index=\"" + i + "\">" + x.move + "</div>").join("") + "<span class=\"move-end\"/>";
-                      $(".move-box").html(html);
+
+                      $(".move-sel").removeClass("move-sel");
+                      addMoves(moveFens);
+                      $(".move-sel").removeClass("move-sel");
+                      applyFenNCalc(startFen);
                   });
               });
 

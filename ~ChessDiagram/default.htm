@@ -1,0 +1,201 @@
+<html>
+  <head>
+    <style>
+      .z0 { }
+      .z1 { background-image: url(img/square.svg); }
+      .square-sel { background-color: #99bdd8; }
+      .square-move { border: 5px solid black; }
+      .board td { width: 12.5%; height: 12.5%; background-repeat: no-repeat; background-position: center center; background-size: cover; }
+      .back td { width: 12.5%; height: 12.5%; background-repeat: no-repeat; background-position: center center; background-size: cover; }
+      .arrows { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-repeat: no-repeat; background-position: center center; background-size: cover; pointer-events: none; }
+      .move { display: inline-block; font-size: 16pt; padding: 2pt 5pt; cursor: pointer; border-radius: 2pt; }
+      .move-sel { background-color: #c8daed; }
+      .pgn-box { display: none; }
+      .pgn-box.visible { display: block; }
+      
+      .pbr { background-image: url(img/br.svg); }
+      .pbn { background-image: url(img/bn.svg); }
+      .pbb { background-image: url(img/bb.svg); }
+      .pbq { background-image: url(img/bq.svg); }
+      .pbk { background-image: url(img/bk.svg); }
+      .pbp { background-image: url(img/bp.svg); }
+      .pwr { background-image: url(img/wr.svg); }
+      .pwn { background-image: url(img/wn.svg); }
+      .pwb { background-image: url(img/wb.svg); }
+      .pwq { background-image: url(img/wq.svg); }
+      .pwk { background-image: url(img/wk.svg); }
+      .pwp { background-image: url(img/wp.svg); }
+      .pzz { background-image: none; }
+    </style>
+
+    <script src="jquery-3.3.1.js"></script>
+  </head>
+  <body style="font-family: sans-serif; ">
+      <div style="display: inline-block; width: 810px; height: 810px; position: relative; border: 5px solid black; ">
+          <table class="back" cellpadding="0" cellspacing="0" style="position: absolute; width: 100%; height: 100%">
+              <tr><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1"></td></tr>
+              <tr><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0"></td></tr>
+              <tr><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1"></td></tr>
+              <tr><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0"></td></tr>
+              <tr><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1"></td></tr>
+              <tr><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0"></td></tr>
+              <tr><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1"></td></tr>
+              <tr><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0">&nbsp;</td><td class="z1">&nbsp;</td><td class="z0"></td></tr>
+          </table>
+          <table class="board" cellpadding="0" cellspacing="0" style="position: absolute; width: 100%; height: 100%">
+              <tr><td class="sa8">&nbsp;</td><td class="sb8">&nbsp;</td><td class="sc8">&nbsp;</td><td class="sd8">&nbsp;</td><td class="se8">&nbsp;</td><td class="sf8">&nbsp;</td><td class="sg8">&nbsp;</td><td class="sh8"></td></tr>
+              <tr><td class="sa7">&nbsp;</td><td class="sb7">&nbsp;</td><td class="sc7">&nbsp;</td><td class="sd7">&nbsp;</td><td class="se7">&nbsp;</td><td class="sf7">&nbsp;</td><td class="sg7">&nbsp;</td><td class="sh7"></td></tr>
+              <tr><td class="sa6">&nbsp;</td><td class="sb6">&nbsp;</td><td class="sc6">&nbsp;</td><td class="sd6">&nbsp;</td><td class="se6">&nbsp;</td><td class="sf6">&nbsp;</td><td class="sg6">&nbsp;</td><td class="sh6"></td></tr>
+              <tr><td class="sa5">&nbsp;</td><td class="sb5">&nbsp;</td><td class="sc5">&nbsp;</td><td class="sd5">&nbsp;</td><td class="se5">&nbsp;</td><td class="sf5">&nbsp;</td><td class="sg5">&nbsp;</td><td class="sh5"></td></tr>
+              <tr><td class="sa4">&nbsp;</td><td class="sb4">&nbsp;</td><td class="sc4">&nbsp;</td><td class="sd4">&nbsp;</td><td class="se4">&nbsp;</td><td class="sf4">&nbsp;</td><td class="sg4">&nbsp;</td><td class="sh4"></td></tr>
+              <tr><td class="sa3">&nbsp;</td><td class="sb3">&nbsp;</td><td class="sc3">&nbsp;</td><td class="sd3">&nbsp;</td><td class="se3">&nbsp;</td><td class="sf3">&nbsp;</td><td class="sg3">&nbsp;</td><td class="sh3"></td></tr>
+              <tr><td class="sa2">&nbsp;</td><td class="sb2">&nbsp;</td><td class="sc2">&nbsp;</td><td class="sd2">&nbsp;</td><td class="se2">&nbsp;</td><td class="sf2">&nbsp;</td><td class="sg2">&nbsp;</td><td class="sh2"></td></tr>
+              <tr><td class="sa1">&nbsp;</td><td class="sb1">&nbsp;</td><td class="sc1">&nbsp;</td><td class="sd1">&nbsp;</td><td class="se1">&nbsp;</td><td class="sf1">&nbsp;</td><td class="sg1">&nbsp;</td><td class="sh1"></td></tr>
+          </table>
+          <div class="arrows">
+              &nbsp;
+          </div>
+      </div>
+
+      <div style="padding: 10pt 10pt; width: 800px; ">
+          <input class="fen-box" type="text" style="width: 100%; "/><br/>
+          <textarea class="arrows-box" rows="3" style="width: 100%; "></textarea>
+      </div>
+      <script>
+          var pieceClassMap = new Map([["P", "pwp"], ["R", "pwr"], ["N", "pwn"], ["B", "pwb"], ["Q", "pwq"], ["K", "pwk"],
+                                       ["p", "pbp"], ["r", "pbr"], ["n", "pbn"], ["b", "pbb"], ["q", "pbq"], ["k", "pbk"], ["z", "pzz"]]);
+          var curFen;
+
+          var arrows = [];
+
+          function getArrowCoords(move, width, n, d) {
+              if (!Number.isInteger(n)) { n = 0; }
+              if (!Number.isInteger(d)) { d = 0; }
+
+              var x1 = (move.charCodeAt(0) - "a".charCodeAt(0)) * 100 + 50;
+              var y1 = ("8".charCodeAt(0) - move.charCodeAt(1)) * 100 + 50;
+              var x2 = (move.charCodeAt(2) - "a".charCodeAt(0)) * 100 + 50;
+              var y2 = ("8".charCodeAt(0) - move.charCodeAt(3)) * 100 + 50;
+
+              var dx = x1 - x2;
+              var dy = y1 - y2;
+              var length = Math.sqrt(dx * dx + dy * dy);
+              var sin = dx / length;
+              var cos = dy / length;
+
+              if (sin < 0 || cos === -1) { d = -d; }
+
+              var ps = [];
+
+              var relPush = function (x, y, sign) {
+                  p = ps[ps.length - 1];
+                  ps.push({ x: p.x + x * sign * width, y: p.y + y * sign * width });
+              }
+
+              var nPush = function (sign) {
+                  for (var i = 0; i < n; i++) {
+                      if (sign === 1) {
+                          relPush(0, 0.75, sign);
+                      }
+                      relPush(1, 0, sign);
+                      relPush(0, 0.75, sign);
+                      relPush(-1, 0, sign);
+
+                      if (sign === -1) {
+                          relPush(0, 0.75, sign);
+                      }
+                  }
+              }
+              var ofs = width / 2;
+              ps.push({ x: 0, y: 0 + ofs });
+              ps.push({ x: width * 1.5, y: width * 3 + ofs });
+              ps.push({ x: width / 2, y: width * 3 + ofs });
+              ps.push({ x: width / 2, y: length - n * 0.75 * 2 * width - ofs });
+              nPush(1);
+              ps.push({ x: -width / 2, y: length - ofs });
+              nPush(-1);
+              ps.push({ x: -width / 2, y: width * 3 + ofs });
+              ps.push({ x: -width * 1.5, y: width * 3 + ofs });
+
+              for (var i = 0; i < ps.length; i++) {
+                  var x = ps[i].x;
+                  var y = ps[i].y;
+                  ps[i].x = Math.round(  x * cos + y * sin + x2 + d * width * cos);
+                  ps[i].y = Math.round(- x * sin + y * cos + y2 - d * width * sin);
+              }
+
+              return ps.map(p => "" + p.x + "," + p.y).join(" ");
+          }
+
+          function getD(move) {
+              var x = move.split("~");
+              return (x.length == 1) ? 0 : Number(x[1]) - 5;
+          }
+
+          function getArrowsSvg() {
+              var arrows = $(".arrows-box").val().split(" ");
+              var s = arrows.map((x, i) => "<polygon points=\"" + getArrowCoords(x, 12, Math.floor(i / 2), getD(x)) + "\" style=\"fill: black; stroke: white; stroke-width: 3; \"/>").join("");
+              return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"800\">" + s + "</svg>";
+          }
+
+          function applyArrows() {
+              var style = "background-image: url('data:image/svg+xml;ut8," + getArrowsSvg().replaceAll("#", "%23") + "'); ";
+              $(".arrows").attr("style", style);
+          }
+
+          function applyFen(fen) {
+              var fen0 = fen.split(" ")[0];
+              fen0 = fen0.replaceAll("1", "z",).replaceAll("2", "zz").replaceAll("3", "zzz").replaceAll("4", "zzzz")
+                  .replaceAll("5", "zzzzz").replaceAll("6", "zzzzzz").replaceAll("7", "zzzzzzz").replaceAll("8", "zzzzzzzz");
+
+              var fs = fen0.split("/");
+              var cols = "abcdefgh";
+              var rows = "87654321";
+
+              for (var y = 0; y < 8; y++) {
+                  for (var x = 0; x < 8; x++) {
+                      var elem = $(".s" + cols[x] + rows[y]);
+                      elem.attr("class", elem.attr("class").replace(/p(zz|[bw][prnbqk])/, pieceClassMap.get(fs[y][x])));
+                  }
+              }
+
+              curFen = fen;
+          }
+
+          $(document).ready(function () {
+              $(".board td").each(function () { $(this).addClass("pzz"); });
+              applyFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+
+              $(".fen-box").change(function () {
+                  applyFen($(this).val());
+              });
+
+              $(".arrows-box").change(() => {
+                  applyArrows();
+              });
+
+              $(".board td").click(function () {
+                  if ($(this).hasClass("square-sel")) {
+                      $(this).removeClass("square-sel");
+                      $(this).toggleClass("square-move");
+                  }
+                  else {
+                      var curSel = $(".board td.square-sel");
+                      if (curSel.length == 0) {
+                          $(this).addClass("square-sel");
+                      }
+                      else {
+                          var srcSquare = curSel.attr("class").match(/s[a-h][1-8]/)[0].substring(1);
+                          var dstSquare = $(this).attr("class").match(/s[a-h][1-8]/)[0].substring(1);
+                          var v = $(".arrows-box").val();
+                          if (v !== "") v += " ";
+                          $(".arrows-box").val(v + srcSquare + dstSquare);
+                          applyArrows();
+                          curSel.removeClass("square-sel");
+                      }
+                  }
+              });
+          });
+      </script>
+  </body>
+</html>

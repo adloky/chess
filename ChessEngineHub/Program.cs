@@ -66,47 +66,52 @@ namespace ChessEngineHub {
             return moveFenList;
         }
 
-        public void calcScores(string fen) {
-            calcStopped = true;
-
+        private static void Stop() {
             startCalcWaiter.WaitOne();
             engine.Stop();
             startCalcWaiter.Set();
+        }
 
-            startCalcWaiter.WaitOne();
+        public void calcScores(string fen) {
             var caller = Clients.Caller;
+            calcStopped = true;
+            Stop();
+            startCalcWaiter.WaitOne();
             Task.Run(() => {
-                lock (calcSyncRoot) {
-                    calcStopped = false;
-                    var sw = new Stopwatch();
-                    sw.Start();
-                    IList<CalcResult> lastSkipped = null;
-                    var isFirst = true;
-                    foreach (var crs in engine.CalcScores(fen, nodeCount)) {
-                        if (isFirst) {
-                            startCalcWaiter.Set();
-                            isFirst = false;
+                var isLock = true;
+                try {
+                    lock (calcSyncRoot) {
+                        calcStopped = false;
+                        var sw = new Stopwatch();
+                        sw.Start();
+                        IList<CalcResult> lastSkipped = null;
+                    
+                        foreach (var crs in engine.CalcScores(fen, nodeCount)) {
+                            if (isLock) {
+                                startCalcWaiter.Set();
+                                isLock = false;
+                            }
+
+                            if (calcStopped) { continue; }
+                            if (sw.ElapsedMilliseconds >= 500) {
+                                sw.Restart();
+                            } else {
+                                lastSkipped = crs;
+                                continue;
+                            }
+
+                            caller.applyScores(crs);
+                            lastSkipped = null;
                         }
 
-                        var board = Board.Load(fen);
-                        foreach (var cr in crs.Where(x => x.move != null)) {
-                            cr.san = board.UciToSan(cr.move);
+                        if (lastSkipped != null && !calcStopped) {
+                            caller.applyScores(lastSkipped);
                         }
-
-                        if (calcStopped) { continue; }
-                        if (sw.ElapsedMilliseconds >= 500) {
-                            sw.Restart();
-                        } else {
-                            lastSkipped = crs;
-                            continue;
-                        }
-
-                        caller.applyScores(crs);
-                        lastSkipped = null;
                     }
-
-                    if (lastSkipped != null && !calcStopped) {
-                        caller.applyScores(lastSkipped);
+                }
+                finally {
+                    if (isLock) {
+                        startCalcWaiter.Set();
                     }
                 }
             });
@@ -115,11 +120,7 @@ namespace ChessEngineHub {
         public int engineNumber(int? n = null) {
             if (n != null) {
                 calcStopped = true;
-
-                startCalcWaiter.WaitOne();
-                engine.Stop();
-                startCalcWaiter.Set();
-
+                Stop();
                 lock (calcSyncRoot) {
                     engineNum = n.Value;
                 };

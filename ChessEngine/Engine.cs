@@ -59,6 +59,19 @@ namespace ChessEngine
 
             var scoreList = new List<CalcResult>();
             var turn = (fen.Split(' ')[1] == "w") ? 1 : -1;
+
+            Func<IList<CalcResult>, IList<CalcResult>> handleScores = sl => {
+                sl = sl.OrderByDescending(x => x.score * turn).ToArray();
+
+                var board = Board.Load(fen);
+                foreach (var s in sl) {
+                    s.san = board.UciToSan(s.move);
+                }
+
+                return sl;
+            };
+
+
             input.WriteLine("ucinewgame");
             input.WriteLine($"position fen {fen}");
             input.WriteLine($"go nodes {nodes}");
@@ -84,7 +97,7 @@ namespace ChessEngine
                     if (mulipv == 1) i++;
 
                     if (i == 2 && mulipv == 1) {
-                        yield return scoreList.OrderByDescending(x => x.score * turn).ToArray();
+                        yield return handleScores(scoreList);
                         max = scoreList.Count;
                         scoreList.Clear();
                     }
@@ -92,7 +105,7 @@ namespace ChessEngine
                     scoreList.Add(r);
 
                     if (mulipv == max) {
-                        yield return scoreList.OrderByDescending(x => x.score * turn).ToArray();
+                        yield return handleScores(scoreList);
                         scoreList.Clear();
                     }
                 }
@@ -102,7 +115,7 @@ namespace ChessEngine
             } while (!Regex.IsMatch(str, "^bestmove"));
 
             if (i == 1) {
-                yield return scoreList.OrderByDescending(x => x.score * turn).ToArray();
+                yield return handleScores(scoreList);
             }
         }
 
