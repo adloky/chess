@@ -135,8 +135,8 @@
           }
 
           function getD(move) {
-              var x = move.split("~").filter(x => Number.isInteger(x));
-              return (x.length == 1) ? 0 : Number(x[1]) - 5;
+              var x = move.split("~").slice(1).filter(x => Number.isInteger(Number(x)));
+              return (x.length === 0) ? 0 : Number(x[0]) - 5;
           }
 
           function getArrowsSvg(arrows) {
@@ -202,7 +202,7 @@
                   $(".s" + fstUci.substring(2, 4)).addClass("square-move");
               }
               applyFen(moves[0].fen);
-              var arrows = moves.slice(1,100).map(x => x.uci);
+              var arrows = moves.slice(1).map(x => x.uci);
               applyArrows(arrows);
           }
 

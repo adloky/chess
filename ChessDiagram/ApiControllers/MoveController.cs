@@ -24,6 +24,9 @@ namespace ChessDiagram.ApiControllers
                 mi.move = move;
                 var clearMove = move.Split('~')[0];
                 mi.uci = board.ParseSanMove(clearMove).ToString();
+                if (clearMove != move) {
+                    mi.uci += move.Substring(clearMove.Length);
+                }
                 board.Move(clearMove);
                 mi.fen = board.GetFEN();
                 moveInfoList.Add(mi);
