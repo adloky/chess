@@ -115,31 +115,17 @@ namespace ChessCon {
         }
 
         static void Main(string[] args) {
-            var board = Board.Load("4k3/8/8/8/8/8/8/R3K2r w Q - 0 1");
-            var r = board[Square.E1].GetValidMove(Square.C1);
-            Console.WriteLine(r);
-            Console.ReadLine();
-
-            /*
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
             nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
 
-            var wns = EnumerateNodes("e4 c5 d4", 150).ToList();
-
-            var i = 1;
-            do {
-                if (wns[i].moves.Contains(wns[i-1].moves)) { wns.RemoveAt(i-1); } else { i++; }
-            } while (i < wns.Count); 
-
-            foreach (var wn in wns) {
-                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score}; {wn.node.count}");
+            foreach (var wn in EnumerateNodes("e4 c5 d4 cxd4 c3 dxc3 Nxc3").Where(x => x.node.score - x.parentNode.score > 90 && x.parentNode.score > -50 && x.node.count >= 15)) {
+                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
             }
 
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
                 File.WriteAllLines(nodesPath, nodeDic.Select(x => JsonConvert.SerializeObject(x.Value)).ToArray());
             }
-            */
         }
     }
 }
