@@ -33,8 +33,8 @@ namespace ChessEngineHub {
     public class EngineHub : Hub {
         private static Engine engine { get { return engines[engineNum]; } }
         private static int engineNum = 0;
-        private static Engine[] engines = { Engine.Open(@"d:/Distribs/lc0/lc0.exe"), Engine.Open(@"d:/Distribs/stockfish_13_win_x64/stockfish_13_win_x64.exe") };
-        private static int[] nodeCounts = { 20000, 20000000 };
+        private static Engine[] engines = { Engine.Open(@"d:/Distribs/lc0/lc0.exe"), Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe") };
+        private static int[] nodeCounts = { 20000, 50000000 };
         private static int nodeCount { get { return nodeCounts[engineNum]; } }
         private static object calcSyncRoot = new object();
         private static AutoResetEvent startCalcWaiter = new AutoResetEvent(true);

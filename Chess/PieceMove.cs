@@ -30,6 +30,9 @@ namespace Chess
         {
             this.Source = source;
             this.Target = target;
+            if (promotePawnTo != null) {
+                this.HasPromotion = true;
+            }
             this.PawnPromotedTo = promotePawnTo;
         }
 

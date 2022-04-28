@@ -106,7 +106,7 @@
           }
 
           function getArrowsSvg(crs) {
-              var as = crs.map(x => { return { move: x.move, width: 30 - Math.abs(crs[0].score - x.score) * (20 / 30) }; }).filter(x => x.width >= 10 && x.move !== null);
+              var as = crs.map(x => { return { move: x.move, width: 30 - Math.abs(crs[0].score - x.score) * (20 / (0.5 * 100)) }; }).filter(x => x.width >= 10 && x.move !== null);
               var s = as.map(x => "<polygon points=\"" + getArrowCoords(x.move, x.width) + "\" style=\"fill: #028; fill-opacity: 0.3\"/>").join("");
               return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"800\">" + s + "</svg>";
           }

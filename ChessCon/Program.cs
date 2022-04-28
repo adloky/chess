@@ -84,12 +84,126 @@ namespace ChessCon {
             return result;
         }
 
+        public static void ShrinkSubMoves(IList<WalkNode> wns) {
+            if (wns.Count < 2) return;
+            var i = 1;
+            do {
+                if (wns[i].moves.Contains(wns[i-1].moves)) { wns.RemoveAt(i-1); } else { i++; }
+            } while (i < wns.Count); 
+        }
+
         private static string nodesPath = "d:/lichess.json";
 
         private static Dictionary<string,OpeningNode> nodeDic;
 
         private static volatile bool ctrlC = false;
 
+        public static IEnumerable<PieceMove> PromoteProcessed(PieceMove move) {
+            if (!move.HasPromotion) {
+                return Enumerable.Repeat(move, 1);
+            }
+
+            return (new Type[] { typeof(Knight), typeof(Bishop), typeof(Rook), typeof(Queen) })
+                .Select(x => new PieceMove(move.Source, move.Target, x));
+        }
+
+        public static IEnumerable<string> GetPieceMoves(string fen) {
+            var board = Board.Load(fen);
+
+            return board[board.Turn]
+                .SelectMany(x => x.GetValidMoves())
+                .SelectMany(x => PromoteProcessed(x))
+                .Select(x => x.ToUciString());
+        }
+
+        public static string pushMove(string moves, string move) {
+            if (moves == null) {
+                return move;
+            }
+
+            var mSplit = moves.Split(' ');
+            if (mSplit.Contains(move)) {
+                return moves;
+            }
+
+            return moves + " " + move;
+        }
+
+        static void Main(string[] args) {
+            Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
+            nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
+
+            var i = 0;
+            foreach (var node in nodeDic.Values) {
+                var board = Board.Load(node.fen);
+                foreach (var move in GetPieceMoves(node.fen)) {
+                    string fen = null;
+                    try {
+                        fen = FEN.Move(node.fen, move);
+                    } catch { }
+
+                    if (fen == null || !nodeDic.ContainsKey(fen)) {
+                        continue;
+                    }
+
+
+                    node.moves = pushMove(node.moves, board.UciToSan(move));
+                }
+
+                i++;
+                if (i % 100 == 0) {
+                    Console.WriteLine(i);
+                }
+            }
+            
+            Console.WriteLine("Save? (y/n)");
+            if (Console.ReadLine() == "y") {
+                File.WriteAllLines(nodesPath, nodeDic.Select(x => JsonConvert.SerializeObject(x.Value)).ToArray());
+            }
+        }
+    }
+}
+
+/*
+            var wns = EnumerateNodes("e4 c5 d4 cxd4 c3 dxc3 Nxc3 Nc6 Nf3 e6", 0).ToList();
+
+            ShrinkSubMoves(wns);
+
+            foreach (var wn in wns) {
+                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score}; {wn.node.count}");
+            }
+ 
+ */
+
+
+/*
+            foreach (var wn in EnumerateNodes("d4 d5 Bf4").Where(x => x.node.score - x.parentNode.score > 30 && x.parentNode.score > -10 && x.node.count >= 0)) {
+                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
+            }
+ 
+ */
+
+/*
+           using (var engine = Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe")) {
+                var nodes = EnumerateNodes("d4 d5 Bf4").ToArray();
+                var nullCount = nodes.Where(x => x.node.score == null).Count();
+                foreach (var wn in nodes) {
+                    if (ctrlC) break;
+                    foreach (var node in new OpeningNode[] { wn.parentNode, wn.node }) {
+                        if (node.score == null) {
+                            try {
+                                node.score = engine.CalcScore(node.fen, 2000000);
+                            } catch {}
+                            nullCount--;
+                            Console.WriteLine($"{node.fen}, Score: {node.score}, {nullCount}");
+                        }
+                    }
+                }
+            }
+ */
+
+
+/*
         public static string GetArrow(int x1, int y1, int x2, int y2, int width) {
             var dx = x1 - x2;
             var dy = y1 - y2;
@@ -113,59 +227,4 @@ namespace ChessCon {
 
             return string.Join(" ", ps.Select(p => $"{p.Item1},{p.Item2}"));
         }
-
-        static void Main(string[] args) {
-            Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
-            nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
-
-            foreach (var wn in EnumerateNodes("e4 c5 d4 cxd4 c3 dxc3 Nxc3").Where(x => x.node.score - x.parentNode.score > 90 && x.parentNode.score > -50 && x.node.count >= 15)) {
-                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
-            }
-
-            Console.WriteLine("Save? (y/n)");
-            if (Console.ReadLine() == "y") {
-                File.WriteAllLines(nodesPath, nodeDic.Select(x => JsonConvert.SerializeObject(x.Value)).ToArray());
-            }
-        }
-    }
-}
-
-/*
-            var wns = EnumerateNodes("e4 c5 d4", 150).ToList();
-
-            var i = 1;
-            do {
-                if (wns[i].moves.Contains(wns[i-1].moves)) { wns.RemoveAt(i-1); } else { i++; }
-            } while (i < wns.Count); 
-
-            foreach (var wn in wns) {
-                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score}; {wn.node.count}");
-            }
- */
-
-
-/*
-            foreach (var wn in EnumerateNodes("d4 d5 Bf4").Where(x => x.node.score - x.parentNode.score > 30 && x.parentNode.score > -10 && x.node.count >= 0)) {
-                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
-            }
- 
- */
-
-/*
-           using (var engine = Engine.Open("d:/Distribs/stockfish_13_win_x64/stockfish_13_win_x64.exe")) {
-                var nodes = EnumerateNodes("d4 d5 Bf4").ToArray();
-                var nullCount = nodes.Where(x => x.node.score == null).Count();
-                foreach (var wn in nodes) {
-                    if (ctrlC) break;
-                    foreach (var node in new OpeningNode[] { wn.parentNode, wn.node }) {
-                        if (node.score == null) {
-                            try {
-                                node.score = engine.CalcScore(node.fen, 2000000);
-                            } catch {}
-                            nullCount--;
-                            Console.WriteLine($"{node.fen}, Score: {node.score}, {nullCount}");
-                        }
-                    }
-                }
-            }
- */
+*/
