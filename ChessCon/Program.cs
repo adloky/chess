@@ -133,29 +133,41 @@ namespace ChessCon {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
             nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
 
-            var i = 0;
-            foreach (var node in nodeDic.Values) {
-                var board = Board.Load(node.fen);
-                foreach (var move in GetPieceMoves(node.fen)) {
-                    string fen = null;
-                    try {
-                        fen = FEN.Move(node.fen, move);
-                    } catch { }
+            //var wns = EnumerateNodes("", 0).ToList();
+            //var a = wns.ToArray();
 
-                    if (fen == null || !nodeDic.ContainsKey(fen)) {
-                        continue;
-                    }
-
-
-                    node.moves = pushMove(node.moves, board.UciToSan(move));
-                }
-
-                i++;
+            var nodes = nodeDic.Values.ToArray();
+            var i = nodes.Length;
+            foreach (var node in nodes) {
+                i--;
                 if (i % 100 == 0) {
                     Console.WriteLine(i);
                 }
+
+                var moves = (node.moves ?? "").Split(new char[] { ' ' },StringSplitOptions.RemoveEmptyEntries);
+                if (moves.Length < 2) {
+                    continue;
+                }
+
+                var ons = new List<OpeningNode>();
+                foreach (var move in moves) {
+                    var on = new OpeningNode() { moves = move };
+                    var nextFen = FEN.Move(node.fen, move);
+                    on.count = (!nodeDic.ContainsKey(nextFen)) ? 0 : nodeDic[nextFen].count;
+                    ons.Add(on);
+                }
+
+                node.moves = String.Join(" ", ons.OrderByDescending(x => x.count).Select(x => x.moves).ToArray());
             }
-            
+
+
+            /*
+            ShrinkSubMoves(wns);
+
+            foreach (var wn in wns) {
+                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score}; {wn.node.count}");
+            }
+            */
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
                 File.WriteAllLines(nodesPath, nodeDic.Select(x => JsonConvert.SerializeObject(x.Value)).ToArray());
@@ -228,3 +240,29 @@ namespace ChessCon {
             return string.Join(" ", ps.Select(p => $"{p.Item1},{p.Item2}"));
         }
 */
+
+/*
+            var i = 0;
+            foreach (var node in nodeDic.Values) {
+                var board = Board.Load(node.fen);
+                foreach (var move in GetPieceMoves(node.fen)) {
+                    string fen = null;
+                    try {
+                        fen = FEN.Move(node.fen, move);
+                    } catch { }
+
+                    if (fen == null || !nodeDic.ContainsKey(fen)) {
+                        continue;
+                    }
+
+
+                    node.moves = pushMove(node.moves, board.UciToSan(move));
+                }
+
+                i++;
+                if (i % 100 == 0) {
+                    Console.WriteLine(i);
+                }
+            }
+
+ */
