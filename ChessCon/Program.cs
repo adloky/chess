@@ -62,6 +62,8 @@ namespace ChessCon {
         }
 
         public static IEnumerable<WalkNode> EnumerateNodes(string moves = "", int minCount = 0) {
+            moves = Regex.Replace(moves ?? "", @"\d+\.\s+", "");
+
             var fen = Board.DEFAULT_STARTING_FEN;
             foreach (var move in (moves ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)) {
                 fen = FEN.Move(fen, move);
@@ -98,76 +100,23 @@ namespace ChessCon {
 
         private static volatile bool ctrlC = false;
 
-        public static IEnumerable<PieceMove> PromoteProcessed(PieceMove move) {
-            if (!move.HasPromotion) {
-                return Enumerable.Repeat(move, 1);
-            }
-
-            return (new Type[] { typeof(Knight), typeof(Bishop), typeof(Rook), typeof(Queen) })
-                .Select(x => new PieceMove(move.Source, move.Target, x));
-        }
-
-        public static IEnumerable<string> GetPieceMoves(string fen) {
-            var board = Board.Load(fen);
-
-            return board[board.Turn]
-                .SelectMany(x => x.GetValidMoves())
-                .SelectMany(x => PromoteProcessed(x))
-                .Select(x => x.ToUciString());
-        }
-
-        public static string pushMove(string moves, string move) {
-            if (moves == null) {
-                return move;
-            }
-
-            var mSplit = moves.Split(' ');
-            if (mSplit.Contains(move)) {
-                return moves;
-            }
-
-            return moves + " " + move;
-        }
-
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
-            nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
+            nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).Take(0).ToDictionary(x => x.fen, x => x);
 
-            //var wns = EnumerateNodes("", 0).ToList();
-            //var a = wns.ToArray();
-
-            var nodes = nodeDic.Values.ToArray();
-            var i = nodes.Length;
-            foreach (var node in nodes) {
-                i--;
-                if (i % 100 == 0) {
-                    Console.WriteLine(i);
-                }
-
-                var moves = (node.moves ?? "").Split(new char[] { ' ' },StringSplitOptions.RemoveEmptyEntries);
-                if (moves.Length < 2) {
-                    continue;
-                }
-
-                var ons = new List<OpeningNode>();
-                foreach (var move in moves) {
-                    var on = new OpeningNode() { moves = move };
-                    var nextFen = FEN.Move(node.fen, move);
-                    on.count = (!nodeDic.ContainsKey(nextFen)) ? 0 : nodeDic[nextFen].count;
-                    ons.Add(on);
-                }
-
-                node.moves = String.Join(" ", ons.OrderByDescending(x => x.count).Select(x => x.moves).ToArray());
-            }
-
+            var board = Board.Load("8/8/8/8/8/4k3/3P4/K7 w - - 0 1");
+            var piece = board[Square.D2];
+            Console.WriteLine(piece.IsAttack(Square.C3));
 
             /*
-            ShrinkSubMoves(wns);
-
-            foreach (var wn in wns) {
-                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score}; {wn.node.count}");
+            foreach (var node in nodeDic.Values) {
+                var moves = (node.moves ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var move in moves) {
+                    FEN.Move(node.fen, move);
+                }
             }
             */
+
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
                 File.WriteAllLines(nodesPath, nodeDic.Select(x => JsonConvert.SerializeObject(x.Value)).ToArray());

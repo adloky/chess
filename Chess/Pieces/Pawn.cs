@@ -100,5 +100,21 @@ namespace Chess.Pieces
         {
             return attacker == PlayerColor.White ? MoveDirection.Down : MoveDirection.Up;
         }
+
+        public override bool IsAttack(Square square) {
+            if (Square == square) {
+                throw new Exception();
+            }
+
+            var dx = Math.Abs(square.GetColumn() - Square.GetColumn());
+            var dy = square.GetColumn() - Square.GetColumn();
+            var dc = (this.Player == PlayerColor.White) ? 1 : -1;
+
+            if (dx != 1 && dy != dc) {
+                return false;
+            }
+
+            return true;
+        }
     }
 }

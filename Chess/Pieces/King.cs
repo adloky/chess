@@ -48,6 +48,20 @@ namespace Chess.Pieces
 
             return true;
         }
+
+        public override bool IsAttack(Square square) {
+            if (Square == square) {
+                throw new Exception();
+            }
+            var dx = Math.Abs(square.GetColumn() - Square.GetColumn());
+            var dy = Math.Abs(square.GetRank() - Square.GetRank());
+
+            if (Math.Max(dx,dy) > 1) {
+                return false;
+            }
+
+            return true;
+        }
     }
 
     internal class KingCastleMove : PieceMove

@@ -23,5 +23,23 @@ namespace Chess.Pieces
                 if (dir.HasFlag(MoveDirection.Right)) yield return this.Square.Move(dir).Move(MoveDirection.Right);
             }
         }
+
+        public override bool IsAttack(Square square) {
+            if (Square == square) {
+                throw new Exception();
+            }
+            var d1 = Math.Abs(square.GetColumn() - Square.GetColumn());
+            var d2 = Math.Abs(square.GetRank() - Square.GetRank());
+
+            if (d1 > d2) {
+                var dt = d1; d1 = d2; d2 = dt;
+            }
+
+            if (d1 != 1 || d2 != 2) {
+                return false;
+            }
+
+            return true;
+        }
     }
 }

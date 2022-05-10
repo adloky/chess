@@ -153,12 +153,12 @@ namespace System
 
         public static int GetRank(this Square square)
         {
-            return 1 + (int)square / 8;
+            return 1 + (int)square >> 3;
         }
 
         public static int GetColumn(this Square square)
         {
-            return 1 + (int)square % 8;
+            return 1 + (int)square & 7;
         }
 
         public static SquareColor GetSquareColor(this Square square)
@@ -205,6 +205,13 @@ namespace System
         public static Square ReplaceColumn(this Square square, int newColumn) {
             return (Square)(((short)square & 0x38) | (newColumn-1));
 
+        }
+
+        public static Square Move(this Square square, int dx, int dy) {
+            var newSquare = (int)square;
+            newSquare += dx;
+            newSquare += dy << 3;
+            return (Square)newSquare;
         }
 
         public static bool IsAdjacent(this Square source, Square target)

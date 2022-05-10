@@ -108,5 +108,7 @@ namespace Chess
         }
 
         #endregion Aux
+
+        public abstract bool IsAttack(Square square);
     }
 }
