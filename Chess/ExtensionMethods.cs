@@ -177,19 +177,19 @@ namespace System
 
         public static Square? Move(this Square square, MoveDirection direction)
         {
-            int rank = square.GetRank();
-            int column = square.GetColumn();
+            int rank = square.GetRank() - 1;
+            int column = square.GetColumn() - 1;
 
             if (direction.HasFlag(MoveDirection.Up)) rank++;
             if (direction.HasFlag(MoveDirection.Down)) rank--;
             if (direction.HasFlag(MoveDirection.Left)) column--;
             if (direction.HasFlag(MoveDirection.Right)) column++;
 
-            string ret = ((char)('A' + (column - 1))).ToString() + (char)('1' + (rank - 1));
-            if (!Enum.IsDefined(typeof(Square), ret))
+            if (rank < 0 || rank > 7 || column < 0 || column > 7) {
                 return null;
+            }
 
-            return (Square)Enum.Parse(typeof(Square), ret);
+            return (Square)((rank << 3) + column);
         }
 
         public static Square ToggleEnPassed(this Square square) {
