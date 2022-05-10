@@ -346,25 +346,7 @@ namespace Chess
 
         public IList<Piece> GetAttackers(Square square, PlayerColor attacker)
         {
-            var ret = new List<Piece>();
-
-            //Find adjacent king
-            if (this[attacker].First(i => i is King).Square.IsAdjacent(square))
-                ret.Add(this[attacker].First(i => i is King));
-
-            //Find attacking Pawn
-            foreach (var dir in Pawn.GetAttackingDirection(attacker).GetDiagonals())
-            {
-                var pawn = this[square.Move(dir)] as Pawn;
-                if (pawn != null && pawn.Player == attacker)
-                    ret.Add(pawn);
-            }
-
-            var opponents = this[attacker].Where(i => !(i is King));
-            var moves = opponents.Where(i => !(i is King || i is Pawn)).SelectMany(o => o.GetValidMoves().Where(i => i.Target == square && i.CanCapture));
-
-            ret.AddRange(moves.Select(i => i.Piece));
-            return ret;
+            return this[attacker].Where(x => x.Square != square && x.IsAttack(square)).ToList();
         }
 
         public bool IsUnderAttack(Square square, PlayerColor attacker)

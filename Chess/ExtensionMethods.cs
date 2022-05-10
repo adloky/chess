@@ -153,12 +153,12 @@ namespace System
 
         public static int GetRank(this Square square)
         {
-            return 1 + (int)square >> 3;
+            return 1 + ((int)square >> 3);
         }
 
         public static int GetColumn(this Square square)
         {
-            return 1 + (int)square & 7;
+            return 1 + ((int)square & 7);
         }
 
         public static SquareColor GetSquareColor(this Square square)

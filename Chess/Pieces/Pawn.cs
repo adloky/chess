@@ -107,10 +107,10 @@ namespace Chess.Pieces
             }
 
             var dx = Math.Abs(square.GetColumn() - Square.GetColumn());
-            var dy = square.GetColumn() - Square.GetColumn();
+            var dy = square.GetRank() - Square.GetRank();
             var dc = (this.Player == PlayerColor.White) ? 1 : -1;
 
-            if (dx != 1 && dy != dc) {
+            if (dx != 1 || dy != dc) {
                 return false;
             }
 

@@ -102,20 +102,20 @@ namespace ChessCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
-            nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).Take(0).ToDictionary(x => x.fen, x => x);
+            nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
 
-            var board = Board.Load("8/8/8/8/8/4k3/3P4/K7 w - - 0 1");
-            var piece = board[Square.D2];
-            Console.WriteLine(piece.IsAttack(Square.C3));
+            // FEN.Move("r1bNk2r/pp1pppbp/6p1/8/2P1P3/8/PP3PPP/R2NKB1R b KQkq - 0 10", "Kxd8");
+            //var board = Board.Load("rn2kb1r/ppp1pppp/5n2/q7/2P3b1/5N2/PP1PBPPP/RNBQK2R w KQkq - 1 6");
+            //var piece = board[Square.A5];
+            //Console.WriteLine(piece.IsAttack(Square.E1));
 
-            /*
             foreach (var node in nodeDic.Values) {
                 var moves = (node.moves ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var move in moves) {
+                    // Console.WriteLine($"{node.fen}; {move}");
                     FEN.Move(node.fen, move);
                 }
             }
-            */
 
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
