@@ -3,13 +3,16 @@
     <style>
       .z0 { background-color: #eddcbe; }
       .z1 { background-color: #c2a480; }
-      .square-sel { background-color: #99bdd8; }
-      .board td { width: 12.5%; height: 12.5%; background-repeat: no-repeat; background-position: center center; background-size: cover; }
-      .arrows { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-repeat: no-repeat; background-position: center center; background-size: cover; pointer-events: none; }
+      .square-sel { background-color: #447788; opacity: 0.5; }
+      .board td { width: 12.5%; height: 12.5%; }
+      .arrows { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+      .board td, .drag-piece, .arrows { background-repeat: no-repeat; background-position: center center; background-size: cover; }
       .move { display: inline-block; font-size: 16pt; padding: 2pt 5pt; cursor: pointer; border-radius: 2pt; }
       .move-sel { background-color: #c8daed; }
       .pgn-box { display: none; }
       .pgn-box.visible { display: block; }
+      .draggable { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 0; margin: 0; }
+      .hidden { visibility: collapse; }
       
       .pbr { background-image: url(img/br.svg); }
       .pbn { background-image: url(img/bn.svg); }
@@ -27,6 +30,8 @@
     </style>
 
     <script src="jquery-3.3.1.js"></script>
+    <script src="jquery-ui.js"></script>
+    <script src="jquery.ui.touch-punch.js"></script>
     <script src="Scripts/jquery.signalR-2.4.2.js"></script>
     <script src="http://192.168.0.2:8080/signalr/hubs"></script>
   </head>
@@ -45,6 +50,10 @@
           
           <div class="arrows">
               &nbsp;
+          </div>
+
+          <div class="draggable">
+              <div class="drag-piece pzz hidden" style=" position: absolute; top: 0; left: 0; width: 50pt; height: 50pt; ">&nbsp;</div>
           </div>
       </div>
 
@@ -179,6 +188,18 @@
                   + mf.fen + "\" data-index=\"" + (index + i + 1) + "\">" + mf.move + "</div>").join(""));
           }
 
+          function getSquare(ev) {
+              var boardElem = $(".board");
+              var squareSize = boardElem.width() / 8;
+              var boardPos = boardElem.offset();
+              r = {};
+              r.x = Math.floor((ev.pageX - boardPos.left) / squareSize);
+              r.y = Math.floor((ev.pageY - boardPos.top) / squareSize);
+              r.name = "abcdefgh".charAt(r.x) + "87654321".charAt(r.y);
+              r.pieceClass = $(".board .s" + r.name).attr("class").match(/p(zz|[bw][prnbqk])/)[0];
+              return r;
+          }
+
           $(document).ready(function () {
               applyFen(startFen);
 
@@ -251,6 +272,49 @@
                   engine.server.engineNumber($(".engine-num").val()).done(function () {
                       applyFenNCalc(curFen, true);
                   });
+              });
+
+              $(".draggable").draggable({
+                  start: function (ev) {
+                      var s = getSquare(ev);
+                      $(".draggable").css({ width: ((s.x + 1) * 12.5) + "%", height: ((s.y + 1) * 12.5) + "%" });
+
+                      var turn = curFen.split(" ")[1];
+                      if (s.pieceClass.charAt(1) !== turn) {
+                          return;
+                      }
+                      
+                      var pieceElem = $(".drag-piece");
+                      pieceElem.css({ left: (s.x * 50) + "pt", top: (s.y * 50) + "pt" });
+                      pieceClass(pieceElem, s.pieceClass);
+                      pieceElem.removeClass("hidden");
+                      $(".s" + s.name).addClass("square-sel");
+                  },
+                  stop: function (ev) {
+                      var curSel = $(".square-sel");
+                      curSel.removeClass("square-sel");
+                      $(".drag-piece").addClass("hidden");
+                      $(".draggable").css({ left: "0%", top: "0%", width: "100%", height: "100%" });
+
+                      if (curSel.length == 0) {
+                          return;
+                      }
+
+                      var srcSquare = curSel.attr("class").match(/s[a-h][1-8]/)[0].substring(1);
+                      var dstSquare = getSquare(ev).name;
+                      var move = srcSquare + dstSquare;
+
+                      if (pieceClass(curSel).charAt(2) === "p" && (dstSquare.charAt(1) === "1" || dstSquare.charAt(1) === "8")) {
+                          move += "q";
+                      }
+
+                      engine.server.move(curFen, move).done(function (mf) {
+                          if (mf.fen === null) return;
+
+                          applyFenNCalc(mf.fen);
+                          addMoves(mf);
+                      });
+                  }
               });
 
               engine = $.connection.engineHub;

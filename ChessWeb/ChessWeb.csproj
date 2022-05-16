@@ -82,6 +82,8 @@
     <Content Include="img\wr.svg" />
     <Content Include="jquery-3.3.1.js" />
     <None Include="Scripts\jquery-1.6.4-vsdoc.js" />
+    <Content Include="jquery-ui.js" />
+    <Content Include="jquery.ui.touch-punch.js" />
     <Content Include="Scripts\jquery-1.6.4.js" />
     <Content Include="Scripts\jquery-1.6.4.min.js" />
     <Content Include="Scripts\jquery.signalR-2.4.2.js" />
