@@ -239,14 +239,14 @@
               });
 
               $(".pgn-ok").click(function () {
-                  engine.server.getMoves($(".pgn-text").val()).done(moveFens => {
+                  engine.server.getMoves($(".pgn-text").val()).done(pgn => {
                       $(".pgn-box").removeClass("visible");
                       $(".pgn-text").val("");
 
                       $(".move-sel").removeClass("move-sel");
-                      addMoves(moveFens);
+                      addMoves(pgn.moveFens);
                       $(".move-sel").removeClass("move-sel");
-                      applyFenNCalc(startFen);
+                      applyFenNCalc(pgn.fen);
                   });
               });
 

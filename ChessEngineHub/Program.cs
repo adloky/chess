@@ -53,17 +53,18 @@ namespace ChessEngineHub {
             return mf;
         }
 
-        public IList<MoveFen> getMoves(string pgn) {
-            var moveStr = Pgn.GetMoves(pgn);
-            var moves = moveStr.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            var moveFenList = new List<MoveFen>();
-            var fen = Board.DEFAULT_STARTING_FEN;
+        public PgnDto getMoves(string pgnStr) {
+            var pgnDto = new PgnDto();
+            var pgn = Pgn.Load(pgnStr);
+            var moves = pgn.Moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            pgnDto.fen = pgn.Fen;
+            var fen = pgn.Fen;
             foreach (var move in moves) {
                 fen = FEN.Move(fen, move);
-                moveFenList.Add(new MoveFen { fen = fen, move = move });
+                pgnDto.moveFens.Add(new MoveFen { fen = fen, move = move });
             }
 
-            return moveFenList;
+            return pgnDto;
         }
 
         private static void Stop() {
@@ -126,6 +127,11 @@ namespace ChessEngineHub {
                 };
             }
             return engineNum;
+        }
+
+        public class PgnDto {
+            public string fen { get; set; }
+            public List<MoveFen> moveFens { get; set; } = new List<MoveFen>();
         }
 
         public class MoveFen {

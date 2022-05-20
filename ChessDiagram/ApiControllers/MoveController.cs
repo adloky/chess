@@ -15,7 +15,7 @@ namespace ChessDiagram.ApiControllers
         [HttpGet]
         public IEnumerable<MoveInfo> Info(string pgn = "")
         {
-            var moves = Pgn.GetMoves(pgn).Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+            var moves = Pgn.Load(pgn).Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
             var moveInfoList = new List<MoveInfo>();
             var board = Board.Load();
 

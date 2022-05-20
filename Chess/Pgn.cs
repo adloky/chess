@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 namespace Chess {
     public class Pgn {
 
+        public string Fen { get; private set; } = Board.DEFAULT_STARTING_FEN;
+        public string Moves { get; private set; } = "";
+
         #region GetMoves
 
         private enum ParseState {
@@ -24,7 +27,7 @@ namespace Chess {
              public readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);
              public readonly static Regex ScoreRegex = new Regex(@"[!?]", RegexOptions.Compiled);
              public readonly static Regex SpaceRegex = new Regex(@"\s+", RegexOptions.Compiled);
-            public readonly static Regex ResultRegex = new Regex(@" ?(1-0|0-1|1/2-1/2|\*)$", RegexOptions.Compiled);
+             public readonly static Regex ResultRegex = new Regex(@" ?(1-0|0-1|1/2-1/2|\*)$", RegexOptions.Compiled);
  
              public Dictionary<string, string> Params { get; private set; } = new Dictionary<string, string>();
  
@@ -53,8 +56,8 @@ namespace Chess {
             return sb.ToString();
         }
 
-        public static string GetMoves(string pgn) {
-            var result = "";
+        public static Pgn Load(string pgn) {
+            var pgnResult = new Pgn();
             using (var memStream = new MemoryStream()) {
                 var pgnBytes = Encoding.UTF8.GetBytes(pgn + "\n\n");
                 memStream.Write(pgnBytes, 0, pgnBytes.Length);
@@ -92,13 +95,18 @@ namespace Chess {
                             game.Moves = Game.SpaceRegex.Replace(game.Moves, " ");
                             game.Moves = Game.ResultRegex.Replace(game.Moves, "");
                             game.Moves = game.Moves.Trim();
-
-                            result = game.Moves;
                         }
+                    }
+
+                    pgnResult.Moves = game.Moves;
+
+                    if (game.Params.ContainsKey("FEN")) {
+                        pgnResult.Fen = game.Params["FEN"];
                     }
                 }
             }
-            return result;
+
+            return pgnResult;
         }
 
         #endregion GetMoves
