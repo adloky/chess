@@ -65,7 +65,9 @@
               <select class="engine-num" style="font-size: 12pt; margin-left: 5pt; ">
                   <option value="0">Lc0</option>
                   <option value="1">SF</option>
+                  <option value="2">Cld</option>
               </select>
+              <button class="skip-btn" style="font-size: 12pt; margin-left: 5pt; ">&nbsp;&nbsp;-&nbsp;&nbsp;</button>
           </div>
           <div class="move-var" style="padding-top: 5pt; ">&nbsp;</div>
           <div class="pgn-box">
@@ -115,7 +117,7 @@
           }
 
           function getArrowsSvg(crs) {
-              var as = crs.map(x => { return { move: x.move, width: 30 - Math.abs(crs[0].score - x.score) * (20 / (0.5 * 100)) }; }).filter(x => x.width >= 10 && x.move !== null);
+              var as = crs.map(x => { return { move: x.uci1st, width: 30 - Math.abs(crs[0].score - x.score) * (20 / (0.5 * 100)) }; }).filter(x => x.width >= 10 && x.move !== null);
               var s = as.map(x => "<polygon points=\"" + getArrowCoords(x.move, x.width) + "\" style=\"fill: #028; fill-opacity: 0.3\"/>").join("");
               return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"800\">" + s + "</svg>";
           }
@@ -234,14 +236,38 @@
                   }
               });
 
+              function prettyPgn(pgn) {
+                  if (!pgn) {
+                      return pgn;
+                  }
+
+                  var result = "";
+
+                  var split = pgn.split(" ");
+                  for (var i = 0; i < split.length; i++) {
+                      if (i % 2 === 0) {
+                          result += (Math.floor(i/2) + 1) + ". ";
+                      }
+                      result += split[i] + " ";
+                  }
+                  if (result !== "") { result = result.substring(0, result.length - 1); }
+
+                  return result;
+              }
+
               $(".pgn-btn").click(function () {
-                  $(".pgn-box").toggleClass("visible");
+                  var pgnBox = $(".pgn-box");
+                  pgnBox.toggleClass("visible");
+                  if (pgnBox.attr("class").indexOf("visible") > -1) {
+                      var moves = $(".move").toArray().map(x => $(x).text());
+                      $(".pgn-text").val(prettyPgn(moves.join(" ")));
+                      $(".pgn-text").select();
+                  }
               });
 
               $(".pgn-ok").click(function () {
                   engine.server.getMoves($(".pgn-text").val()).done(pgn => {
                       $(".pgn-box").removeClass("visible");
-                      $(".pgn-text").val("");
 
                       $(".move-sel").removeClass("move-sel");
                       addMoves(pgn.moveFens);
@@ -273,6 +299,15 @@
                       applyFenNCalc(curFen, true);
                   });
               });
+
+              $(".skip-btn").click(function () {
+                  var splitFen = curFen.split(" ");
+                  splitFen[1] = splitFen[1] === "w" ? "b" : "w";
+                  var mf = { fen: splitFen.join(" "), move: "-" }
+                  addMoves(mf);
+                  applyFenNCalc(mf.fen, true);
+              });
+
 
               $(".draggable").draggable({
                   start: function (ev) {
@@ -322,7 +357,7 @@
               engine.client.applyScores = function (crs) {
                   applyArrows(crs);
                   $(".score").text(crs[0].score / 100);
-                  $(".move-var").html(crs.filter(x => x.san).slice(0, 3).map(x => (x.score / 100) + " <b>" + x.san + "</b>").join(" &nbsp;") + "&nbsp;");
+                  $(".move-var").html(crs.filter(x => x.san1st).slice(0, 3).map(x => (x.score / 100) + " <b>" + x.san1st + "</b>").join(" &nbsp;") + "&nbsp;");
               }
 
               $.connection.hub.start().done(function () {

@@ -79,6 +79,10 @@
               if (!Number.isInteger(n)) { n = 0; }
               if (!Number.isInteger(d)) { d = 0; }
 
+              if (move === "a1a1") {
+                  return "";
+              }
+
               var x1 = (move.charCodeAt(0) - "a".charCodeAt(0)) * 100 + 50;
               var y1 = ("8".charCodeAt(0) - move.charCodeAt(1)) * 100 + 50;
               var x2 = (move.charCodeAt(2) - "a".charCodeAt(0)) * 100 + 50;
@@ -197,7 +201,7 @@
               moves = getMoveInterval(moveInfos, n);
               $(".square-move").removeClass("square-move");
               var fstUci = moves[0].uci;
-              if (fstUci) {
+              if (fstUci && fstUci.substring(0,4) !== "a1a1") {
                   $(".s" + fstUci.substring(0, 2)).addClass("square-move");
                   $(".s" + fstUci.substring(2, 4)).addClass("square-move");
               }

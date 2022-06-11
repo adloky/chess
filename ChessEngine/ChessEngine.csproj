@@ -41,6 +41,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="LichessEngine.cs" />
+    <Compile Include="EngineCalcResult.cs" />
+    <Compile Include="BaseEngine.cs" />
     <Compile Include="Engine.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -48,6 +51,10 @@
     <ProjectReference Include="..\Chess\Chess.csproj">
       <Project>{cb0ffbf8-54d2-4eb1-b28a-fedfb7b8c960}</Project>
       <Name>Chess</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Lichess\Lichess.csproj">
+      <Project>{7d39f388-e1d2-4246-a95e-c63ef0ab13cb}</Project>
+      <Name>Lichess</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

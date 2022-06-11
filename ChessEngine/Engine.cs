@@ -10,7 +10,7 @@ using Chess;
 
 namespace ChessEngine
 {
-    public class Engine : IDisposable {
+    public class Engine : BaseEngine {
 
         private Process process;
         private StreamWriter input;
@@ -48,24 +48,23 @@ namespace ChessEngine
             input.WriteLine($"setoption name {name} value {value}");
         }
 
-        public IEnumerable<IList<CalcResult>> CalcScores(string fen, int nodes) {
+        public override IEnumerable<IList<EngineCalcResult>> CalcScores(string fen, int? nodes = null, int? depth = null) {
             while (output.Peek() >= 0) { output.ReadLine(); }
 
             var mateState = FEN.GetMateState(fen);
             if (mateState != null) {
-                yield return new CalcResult[] { new CalcResult() { score = mateState.Value * 30000 } };
+                yield return new EngineCalcResult[] { new EngineCalcResult() { score = mateState.Value * 30000 } };
                 yield break;
             }
 
-            var scoreList = new List<CalcResult>();
+            var calcResultList = new List<EngineCalcResult>();
             var turn = (fen.Split(' ')[1] == "w") ? 1 : -1;
 
-            Func<IList<CalcResult>, IList<CalcResult>> handleScores = sl => {
+            Func<IList<EngineCalcResult>, IList<EngineCalcResult>> handleScores = sl => {
                 sl = sl.OrderByDescending(x => x.score * turn).ToArray();
 
-                var board = Board.Load(fen);
                 foreach (var s in sl) {
-                    s.san = board.UciToSan(s.move);
+                    s.san = FEN.Uci2San(fen,s.uci);
                 }
 
                 return sl;
@@ -74,19 +73,22 @@ namespace ChessEngine
 
             input.WriteLine("ucinewgame");
             input.WriteLine($"position fen {fen}");
-            input.WriteLine($"go nodes {nodes}");
+            var goStr = "go";
+            goStr += nodes == null ? "" : $" nodes {nodes.Value}";
+            goStr += depth == null ? "" : $" depth {depth.Value}";
+            input.WriteLine(goStr);
 
             string str = "";
             var i = 0;
             var max = 0;
             do {
                 str = output.ReadLine();
-                var m = Regex.Match(str, "^info.* score (?<scoreName>cp|mate) (?<scoreValue>-?\\d+).* pv (?<move>([a-h][1-8]){2,2}[qrbn]?)");
+                var m = Regex.Match(str, "^info.* score (?<scoreName>cp|mate) (?<scoreValue>-?\\d+).* pv(?<uci>(\\s([a-h][1-8]){2,2}[qrbn]?)+)");
                 if (m.Success) {
-                    var r = new CalcResult();
+                    var r = new EngineCalcResult();
                     var scoreValue = int.Parse(m.Groups["scoreValue"].Value);
                     r.score = (m.Groups["scoreName"].Value == "cp") ? scoreValue * turn : (Math.Sign(scoreValue) * 30000 - scoreValue * 100) * turn;
-                    r.move = m.Groups["move"].Value;
+                    r.uci = m.Groups["uci"].Value.Trim();
 
                     var multipvMatch = Regex.Match(str, " multipv (\\d+)");
                     var mulipv = 1;
@@ -97,16 +99,16 @@ namespace ChessEngine
                     if (mulipv == 1) i++;
 
                     if (i == 2 && mulipv == 1) {
-                        yield return handleScores(scoreList);
-                        max = scoreList.Count;
-                        scoreList.Clear();
+                        yield return handleScores(calcResultList);
+                        max = calcResultList.Count;
+                        calcResultList.Clear();
                     }
 
-                    scoreList.Add(r);
+                    calcResultList.Add(r);
 
                     if (mulipv == max) {
-                        yield return handleScores(scoreList);
-                        scoreList.Clear();
+                        yield return handleScores(calcResultList);
+                        calcResultList.Clear();
                     }
                 }
                 else if (Regex.IsMatch(str, "^error")) {
@@ -115,31 +117,21 @@ namespace ChessEngine
             } while (!Regex.IsMatch(str, "^bestmove"));
 
             if (i == 1) {
-                yield return handleScores(scoreList);
+                yield return handleScores(calcResultList);
             }
         }
 
-        public int CalcScore(string fen, int nodes) {
-            return CalcScores(fen, nodes).Last()[0].score;
+        public int CalcScore(string fen, int? nodes = null, int? depth = null) {
+            return CalcScores(fen, nodes, depth).Last()[0].score;
         }
 
-        public void Stop() {
+        public override void Stop() {
             input.WriteLine("stop");
         }
 
-        public void Close() {
+        public override void Close() {
             input.WriteLine("quit");
             process.Dispose();
-        }
-
-        public void Dispose() {
-            Close();
-        }
-
-        public class CalcResult {
-            public int score { get; set; }
-            public string move { get; set; }
-            public string san { get; set; }
         }
     }
 }

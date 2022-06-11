@@ -33,6 +33,9 @@ namespace ChessCon {
 
             public string moves { get; set; }
 
+            public int status { get; set; }
+
+            public int nodes { get; set; }
         }
 
         public struct WalkNode {
@@ -61,7 +64,7 @@ namespace ChessCon {
             }
         }
 
-        public static IEnumerable<WalkNode> EnumerateNodes(string moves = "", int minCount = 0) {
+        public static IEnumerable<WalkNode> EnumerateNodes(string moves = null, int minCount = 0) {
             moves = Regex.Replace(moves ?? "", @"\d+\.\s+", "");
 
             var fen = Board.DEFAULT_STARTING_FEN;
@@ -94,6 +97,79 @@ namespace ChessCon {
             } while (i < wns.Count); 
         }
 
+        public static void Calc(string moves = "") {
+           using (var engine = Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe")) {
+                var nodes = EnumerateNodes(moves).ToArray();
+                var nullCount = nodes.Where(x => x.node.score == null).Count();
+                foreach (var wn in nodes) {
+                    if (ctrlC) break;
+                    foreach (var node in new OpeningNode[] { wn.parentNode, wn.node }) {
+                        if (node.score == null) {
+                            try {
+                                node.score = engine.CalcScore(node.fen, 2000000);
+                            } catch {}
+                            nullCount--;
+                            Console.WriteLine($"{node.fen}, Score: {node.score}, {nullCount}");
+                        }
+                    }
+                }
+            }
+        }
+
+        public static int? GetScore(string fen) {
+            fen = FEN.StrictEnPassed(fen);
+
+            var mateState = FEN.GetMateState(fen);
+            if (mateState != null) {
+                return mateState.Value * 30000;
+            }
+
+            var request = WebRequest.Create($"https://lichess.org/api/cloud-eval?fen={Uri.EscapeUriString(fen)}");
+            WebResponse response;
+            try {
+                response = request.GetResponse();
+            } catch (WebException e) {
+                if (((HttpWebResponse)e.Response).StatusCode == HttpStatusCode.NotFound) {
+                    Console.WriteLine(fen);
+                    return null;
+                }
+                throw;
+            }
+
+            var result = "";
+            
+            using (Stream dataStream = response.GetResponseStream()) {
+                var reader = new StreamReader(dataStream);
+                result = reader.ReadToEnd();
+            }
+            response.Close();
+
+            var xml = JsonHelper.JsonToXml(result);
+            var depth = int.Parse(xml.XPathSelectElement("depth").Value);
+
+            if (depth < 22) {
+                return null;
+            }
+
+            // Console.WriteLine(depth);
+
+
+            var xmlMate = xml.XPathSelectElement("pvs/mate");
+            if (xmlMate != null) {
+                var mate = int.Parse(xmlMate.Value);
+                return (300 * Math.Sign(mate) - mate) * 100;
+            }
+
+            var cp = int.Parse(xml.XPathSelectElement("pvs/cp").Value);
+
+            return cp;
+        }
+
+        public class MoveFen {
+            public string fen { get; set; }
+            public string move { get; set; }
+        }
+
         private static string nodesPath = "d:/lichess.json";
 
         private static Dictionary<string,OpeningNode> nodeDic;
@@ -104,14 +180,39 @@ namespace ChessCon {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
             nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
 
-            foreach (var wn in EnumerateNodes("1. e4 e6").Where(x => x.node.score - x.parentNode.score > 80 && x.parentNode.score > -30 && x.node.count >= 0)) {
-                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
+            // foreach (var node in nodeDic.Values) { node.status = 0; }
+
+            Console.WriteLine(FEN.StrictEnPassed("r1bqkb1r/ppp2ppp/2n2n2/3pP3/2Bp4/5N2/PPP2PPP/RNBQK2R w KQkq d6 0 6"));
+            var nodes = nodeDic.Values.Where(x => x.fen.Split()[3] != "-").ToArray();
+            foreach (var node in nodes) {
+                var fenStrong = FEN.StrictEnPassed(node.fen);
+                if (node.fen != fenStrong && nodeDic.ContainsKey(fenStrong)) {
+                    Console.WriteLine(fenStrong);
+                }
             }
+
+            /*
+            var nodes = nodeDic.Values.Where(x => x.nodes < int.MaxValue).ToArray();
+            var nodeCount = nodes.Length;
+            using (var engine = Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe")) {
+                engine.SetOption("MultiPV", 1);
+                foreach (var node in nodes) {
+                    if (ctrlC) break;
+                    try {
+                        node.score = engine.CalcScore(node.fen, depth: 22);
+                        node.nodes = int.MaxValue;
+                    } catch { }
+                    nodeCount--;
+                    Console.WriteLine($"{node.fen}, Score: {node.score}, {nodeCount}");
+                }
+            }
+            */
 
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
                 File.WriteAllLines(nodesPath, nodeDic.Select(x => JsonConvert.SerializeObject(x.Value)).ToArray());
             }
+
         }
     }
 }
@@ -206,3 +307,22 @@ namespace ChessCon {
             }
 
  */
+
+/*
+var nodes = nodeDic.Values.Where(x => x.status == 0 && x.nodes < int.MaxValue).ToArray();
+var nodeCount = nodes.Length;
+foreach (var node in nodes) {
+    if (ctrlC) { break; }
+    var cp = GetScore(node.fen);
+    Thread.Sleep(400);
+    node.status = 1;
+    nodeCount--;
+    Console.WriteLine(nodeCount);
+    if (cp == null) {
+        continue;
+    }
+
+    node.score = cp.Value;
+    node.nodes = int.MaxValue;
+}
+*/

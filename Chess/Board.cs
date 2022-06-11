@@ -291,7 +291,7 @@ namespace Chess
             }
         }
 
-        private bool IsValid(PieceMove move)
+        public bool IsValid(PieceMove move)
         {
             MoveCore(move, false);
             bool ret = !this.IsInCheck();
@@ -373,7 +373,6 @@ namespace Chess
 
             if (this.Checkmate != null)
                 this.Checkmate(this.Turn);
-            this.Turn = (PlayerColor)(-(int)this.Turn);
         }
 
         public void OnStalemate(StalemateReason reason)
@@ -385,7 +384,6 @@ namespace Chess
 
             if (this.Stalemate != null)
                 this.Stalemate(reason);
-            this.Turn = (PlayerColor)(-(int)this.Turn);
         }
 
         private void OnSquareChanged(Square square)
@@ -537,8 +535,12 @@ namespace Chess
 
             if (!match.Success) { return null; }
 
-            var piece = this[(Square)Enum.Parse(typeof(Square), match.Groups[1].Value.ToUpper())];
-            var move = piece.GetValidMove((Square)Enum.Parse(typeof(Square), match.Groups[2].Value.ToUpper()));
+            var source = (Square)Enum.Parse(typeof(Square), match.Groups[1].Value.ToUpper());
+            var target = (Square)Enum.Parse(typeof(Square), match.Groups[2].Value.ToUpper());
+            target = CorrectCastleTarget(source, target);
+
+            var piece = this[source];
+            var move = piece.GetValidMove(target);
 
             if (match.Groups[3].Value != "") {
                 move.PawnPromotedTo = Piece.GetPieceType(match.Groups[3].Value);
@@ -557,10 +559,8 @@ namespace Chess
             return Move(move.Source, move.Target, move.PawnPromotedTo);
         }
 
-        public string UciToSan(string uci) {
+        public string Uci2San(string uci) {
             var move = ParseUciMove(uci);
-
-            move.Target = CorrectCastleTarget(move.Source, move.Target);
 
             var san = (string)null;
 

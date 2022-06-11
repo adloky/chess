@@ -143,7 +143,7 @@ namespace Chess
                     sb.Append('/');
             }
 
-            sb.Append(' ').Append(((PlayerColor)Math.Abs((int)board.Turn) == PlayerColor.White ? "w" : "b"));
+            sb.Append(' ').Append(board.Turn == PlayerColor.White ? "w" : "b");
 
             sb.Append(' ');
             string castle = GetNotation(board.GetCastleAvailabity(PlayerColor.White), PlayerColor.White) + GetNotation(board.GetCastleAvailabity(PlayerColor.Black), PlayerColor.Black);
@@ -193,7 +193,6 @@ namespace Chess
         }
         public static string Move(string fen, string move) {
             var board = Board.Load(fen);
-            board.Start();
 
             if (!board.Move(move)) throw new Exception($"Invalid move (FEN: {fen}; Move: {move})");
 
@@ -202,14 +201,64 @@ namespace Chess
 
         public static string Correct(string fen) {
             var board = Board.Load(fen);
-            board.Start();
             return board.GetFEN();
         }
 
         public static int? GetMateState(string fen) {
             var board = Board.Load(fen);
-            board.Start();
             return board.GetMateState();
+        }
+
+        public static string San2Uci(string fen, string sans) {
+            if (sans == null) {
+                return null;
+            }
+            var board = Board.Load(fen);
+            var sanSplit = sans.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var uciList = new List<string>();
+            foreach (var san in sanSplit) {
+                uciList.Add(board.ParseSanMove(san).ToUciString());
+                board.Move(san);
+            }
+
+            return string.Join(" ", uciList);
+        }
+
+        public static string Uci2San(string fen, string ucis) {
+            if (ucis == null) {
+                return null;
+            }
+            var board = Board.Load(fen);
+            var uciSplit = ucis.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var sanList = new List<string>();
+            foreach (var uci in uciSplit) {
+                sanList.Add(board.Uci2San(uci));
+                board.Move(uci);
+            }
+
+            return string.Join(" ", sanList);
+        }
+
+        public static string StrictEnPassed(string fen) {
+            var board = Board.Load(fen);
+            var fenSplit = fen.Split(' ');
+            var targetStr = fenSplit[3].ToUpper();
+            if (targetStr == "-") {
+                return fen;
+            }
+
+            var target = (Square)Enum.Parse(typeof(Square), targetStr);
+            var dy = target.GetRank() == 3 ? 1 : -1;
+            var hasMove = (new int[] { 1, -1 })
+                .Select(dx => target.Move(dx, dy)).Where(s => s != null)
+                .Select(s => board[s.Value]).Where(p => p != null && p is Pawn && p.Player == board.Turn)
+                .Select(p => p.GetValidMove(target)).Any(m => m != null && board.IsValid(m));
+
+            if (!hasMove) {
+                fenSplit[3] = "-";
+            }
+
+            return string.Join(" ", fenSplit);
         }
     }
 }

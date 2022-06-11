@@ -26,14 +26,14 @@ namespace Chess.Pieces
             var sx = Math.Sign(dx);
             var sy = Math.Sign(dy);
 
-            var iSquare = Square.Move(sx,sy);
+            var iSquare = Square.Move(sx,sy).Value;
 
             while (iSquare != square) {
                 if (Board[iSquare] != null) {
                     return false;
                 }
 
-                iSquare = iSquare.Move(sx, sy);
+                iSquare = iSquare.Move(sx, sy).Value;
             }
 
             return true;

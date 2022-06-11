@@ -207,11 +207,17 @@ namespace System
 
         }
 
-        public static Square Move(this Square square, int dx, int dy) {
-            var newSquare = (int)square;
-            newSquare += dx;
-            newSquare += dy << 3;
-            return (Square)newSquare;
+        public static Square? Move(this Square square, int dx, int dy) {
+            int x = square.GetColumn() - 1 + dx;
+            int y = square.GetRank() - 1 + dy;
+            
+            if (x < 0 || x > 7 || y < 0 || y > 7) {
+                return null;
+            }
+
+            var newSquare = (Square)(x + (y << 3));
+
+            return newSquare;
         }
 
         public static bool IsAdjacent(this Square source, Square target)

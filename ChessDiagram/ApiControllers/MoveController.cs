@@ -12,23 +12,27 @@ namespace ChessDiagram.ApiControllers
 {
     public class MoveController : ApiController
     {
+        private string GetSkipFen(string fen) {
+            return fen.IndexOf(" w ") > -1 ? fen.Replace(" w ", " b ") : fen.Replace(" b ", " w ");
+        }
+
         [HttpGet]
         public IEnumerable<MoveInfo> Info(string pgn = "")
         {
-            var moves = Pgn.Load(pgn).Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+            var moves = Pgn.Load(pgn).Moves.Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
             var moveInfoList = new List<MoveInfo>();
-            var board = Board.Load();
+            var fen = Board.DEFAULT_STARTING_FEN;
 
             foreach (var move in moves) {
                 var mi = new MoveInfo();
                 mi.move = move;
-                var clearMove = move.Split('~')[0];
-                mi.uci = board.ParseSanMove(clearMove).ToString();
-                if (clearMove != move) {
-                    mi.uci += move.Substring(clearMove.Length);
+                var cleanMove = move.Split('~')[0];
+                mi.uci = cleanMove == "-" ? "a1a1" : FEN.San2Uci(fen, cleanMove);
+                if (cleanMove != move) {
+                    mi.uci += move.Substring(cleanMove.Length);
                 }
-                board.Move(clearMove);
-                mi.fen = board.GetFEN();
+                fen = cleanMove == "-" ? GetSkipFen(fen) : FEN.Move(fen, cleanMove);
+                mi.fen = fen;
                 moveInfoList.Add(mi);
             }
 

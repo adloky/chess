@@ -11,7 +11,6 @@ using Chess;
 using ChessEngine;
 using System.Diagnostics;
 using System.Threading;
-using static ChessEngine.Engine;
 
 namespace ChessEngineHub {
     class Program {
@@ -31,10 +30,14 @@ namespace ChessEngineHub {
     }
 
     public class EngineHub : Hub {
-        private static Engine engine { get { return engines[engineNum]; } }
+        private static BaseEngine engine { get { return engines[engineNum]; } }
         private static int engineNum = 0;
-        private static Engine[] engines = { Engine.Open(@"d:/Distribs/lc0/lc0.exe"), Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe") };
-        private static int[] nodeCounts = { 20000, 50000000 };
+        private static BaseEngine[] engines = {
+            Engine.Open(@"d:/Distribs/lc0/lc0.exe"),
+            Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe"),
+            new LichessEngine()
+        };
+        private static int[] nodeCounts = { 20000, 50000000, 0 };
         private static int nodeCount { get { return nodeCounts[engineNum]; } }
         private static object calcSyncRoot = new object();
         private static AutoResetEvent startCalcWaiter = new AutoResetEvent(true);
@@ -44,7 +47,7 @@ namespace ChessEngineHub {
             var mf = new MoveFen();
             try {
                 var board = Board.Load(fen);
-                mf.move = board.UciToSan(move);
+                mf.move = board.Uci2San(move);
                 if (board.Move(move)) {
                     mf.fen = board.GetFEN();
                 }
@@ -85,7 +88,7 @@ namespace ChessEngineHub {
                         calcStopped = false;
                         var sw = new Stopwatch();
                         sw.Start();
-                        IList<CalcResult> lastSkipped = null;
+                        IList<EngineCalcResult> lastSkipped = null;
                     
                         foreach (var crs in engine.CalcScores(fen, nodeCount)) {
                             if (isLock) {
