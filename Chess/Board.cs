@@ -545,6 +545,9 @@ namespace Chess
             if (match.Groups[3].Value != "") {
                 move.PawnPromotedTo = Piece.GetPieceType(match.Groups[3].Value);
             }
+            else if (piece is Pawn && (target.GetRank() == 1 || target.GetRank() == 8)) {
+                move.PawnPromotedTo = typeof(Queen);
+            }
 
             return move;
         }

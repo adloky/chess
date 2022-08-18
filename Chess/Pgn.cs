@@ -11,6 +11,7 @@ namespace Chess {
 
         public string Fen { get; private set; } = Board.DEFAULT_STARTING_FEN;
         public string Moves { get; private set; } = "";
+        public string Site { get; private set; }
 
         #region GetMoves
 
@@ -102,6 +103,10 @@ namespace Chess {
 
                     if (game.Params.ContainsKey("FEN")) {
                         pgnResult.Fen = game.Params["FEN"];
+                    }
+
+                    if (game.Params.ContainsKey("Site")) {
+                        pgnResult.Site = game.Params["Site"];
                     }
                 }
             }
