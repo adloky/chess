@@ -6,6 +6,7 @@
       .square-sel { background-color: #447788; opacity: 0.5; }
       .board td { width: 12.5%; height: 12.5%; }
       .arrows { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+      .arrows.black-side { transform: rotate(180deg); }
       .board td, .drag-piece, .arrows { background-repeat: no-repeat; background-position: center center; background-size: cover; }
       .move { display: inline-block; font-size: 16pt; padding: 2pt 5pt; cursor: pointer; border-radius: 2pt; }
       .move-sel { background-color: #c8daed; }
@@ -69,6 +70,7 @@
                   <option value="3">Kmd</option>
               </select>
               <button class="skip-btn" style="font-size: 12pt; margin-left: 5pt; ">&nbsp;&nbsp;-&nbsp;&nbsp;</button>
+              <button class="flip-btn" style="font-size: 12pt; margin-left: 5pt; ">Flip</button>
           </div>
           <div class="move-var" style="padding-top: 5pt; ">&nbsp;</div>
           <div class="pgn-box">
@@ -191,14 +193,22 @@
                   + mf.fen + "\" data-index=\"" + (index + i + 1) + "\">" + mf.move + "</div>").join(""));
           }
 
+          function getSide() {
+              return $(".board td:first").attr("class").indexOf("sa8") > -1 ? 1 : -1;
+          }
+
           function getSquare(ev) {
+              var side = getSide();
+              var cols = side === 1 ? "abcdefgh" : "hgfedcba";
+              var rows = side === 1 ? "87654321" : "12345678";
+
               var boardElem = $(".board");
               var squareSize = boardElem.width() / 8;
               var boardPos = boardElem.offset();
               r = {};
               r.x = Math.floor((ev.pageX - boardPos.left) / squareSize);
               r.y = Math.floor((ev.pageY - boardPos.top) / squareSize);
-              r.name = "abcdefgh".charAt(r.x) + "87654321".charAt(r.y);
+              r.name = cols.charAt(r.x) + rows.charAt(r.y);
               r.pieceClass = $(".board .s" + r.name).attr("class").match(/p(zz|[bw][prnbqk])/)[0];
               return r;
           }
@@ -206,6 +216,24 @@
           $(document).ready(function () {
               applyFen(startFen);
 
+              var whiteSide = [];
+              var blackSide = [];
+
+              (function () {
+                  for (var j = 0; j < 8; j++) {
+                      for (var i = 0; i < 8; i++) {
+                          whiteSide.push("abcdefgh".charAt(i) + "87654321".charAt(j));
+                      }
+                  }
+
+                  for (var j = 0; j < 8; j++) {
+                      for (var i = 0; i < 8; i++) {
+                          blackSide.push("hgfedcba".charAt(i) + "12345678".charAt(j));
+                      }
+                  }
+              })();
+
+              /*
               $(".board td").click(function () {
                   var turn = curFen.split(" ")[1];
                   var pClass = pieceClass(this);
@@ -236,6 +264,7 @@
                       });
                   }
               });
+              */
 
               function prettyPgn(pgn) {
                   if (!pgn) {
@@ -309,6 +338,22 @@
                   applyFenNCalc(mf.fen, true);
               });
 
+              $(".flip-btn").click(function () {
+                  var sideN = getSide();
+                  if (sideN === 1) {
+                      $(".arrows").addClass("black-side");
+                  }
+                  else {
+                      $(".arrows").removeClass("black-side");
+                  }
+
+                  var side = sideN === 1 ? blackSide : whiteSide;
+                  $(".board td").toArray().forEach((e, i) => {
+                      var newClass = $(e).attr("class").replace(/s[a-h][1-8]/, "s" + side[i]);
+                      $(e).attr("class", newClass);
+                  });
+                  applyFen(curFen);
+              });
 
               $(".draggable").draggable({
                   start: function (ev) {

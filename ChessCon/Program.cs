@@ -134,14 +134,19 @@ namespace ChessCon {
 
             // foreach (var node in nodeDic.Values) { node.status = 0; }
 
-            var wns = EnumerateNodes("1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5", 200).ToList();
+            foreach (var wn in EnumerateNodes("1. e4 e6 2. d4 d5 3. e5 c5", 20).Where(x => (x.node.score - x.parentNode.score) * x.node.turn > 80 && x.parentNode.score * x.node.turn > -30 && x.node.turn == -1)) {
+                Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
+            }
+
+            /*
+            var wns = EnumerateNodes("1. e4 e6 2. d4 d5 3. e5 c5", 200).ToList();
 
             ShrinkSubMoves(wns);
 
             foreach (var wn in wns) {
                 Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score}");
             }
-            
+            */
             Console.Write("Press ENTER");
             Console.ReadLine();
             /*
