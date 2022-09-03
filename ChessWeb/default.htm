@@ -4,6 +4,8 @@
       .z0 { background-color: #eddcbe; }
       .z1 { background-color: #c2a480; }
       .square-sel { background-color: #447788; opacity: 0.5; }
+      .z0.last-move { background-color: #e3df6d; }
+      .z1.last-move { background-color: #dace40; }
       .board td { width: 12.5%; height: 12.5%; }
       .arrows { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
       .arrows.black-side { transform: rotate(180deg); }
@@ -155,6 +157,16 @@
           }
 
           function applyFen(fen) {
+              // last move
+              var fenCommaSplit = fen.split(",");
+              var lastMove = fenCommaSplit.length > 1 ? fenCommaSplit[1] : false;
+              $(".last-move").removeClass("last-move");
+              if (lastMove) {
+                  $(".s" + lastMove.substring(0, 2)).addClass("last-move");
+                  $(".s" + lastMove.substring(2, 4)).addClass("last-move");
+              }
+
+              // main
               var fen0 = fen.split(" ")[0];
               fen0 = fen0.replaceAll("1", "z",).replaceAll("2", "zz").replaceAll("3", "zzz").replaceAll("4", "zzzz")
                   .replaceAll("5", "zzzzz").replaceAll("6", "zzzzzz").replaceAll("7", "zzzzzzz").replaceAll("8", "zzzzzzzz");

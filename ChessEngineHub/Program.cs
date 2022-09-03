@@ -46,12 +46,13 @@ namespace ChessEngineHub {
         private static volatile bool calcStopped;
 
         public MoveFen move(string fen, string move) {
+            fen = fen.Split(',')[0];
             var mf = new MoveFen();
             try {
                 var board = Board.Load(fen);
                 mf.move = board.Uci2San(move);
                 if (board.Move(move)) {
-                    mf.fen = board.GetFEN();
+                    mf.fen = board.GetFEN() + "," + move;
                 }
             } catch { }
 
@@ -65,8 +66,9 @@ namespace ChessEngineHub {
             pgnDto.fen = pgn.Fen;
             var fen = pgn.Fen;
             foreach (var move in moves) {
+                var uci = FEN.San2Uci(fen, move);
                 fen = FEN.Move(fen, move);
-                pgnDto.moveFens.Add(new MoveFen { fen = fen, move = move });
+                pgnDto.moveFens.Add(new MoveFen { fen = fen + "," + uci, move = move });
             }
 
             return pgnDto;
@@ -79,6 +81,7 @@ namespace ChessEngineHub {
         }
 
         public void calcScores(string fen, bool isPlayMode) {
+            fen = fen.Split(',')[0];
             var caller = Clients.Caller;
             calcStopped = true;
             Stop();
