@@ -7,6 +7,7 @@
       .board td { width: 12.5%; height: 12.5%; }
       .arrows { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
       .arrows.black-side { transform: rotate(180deg); }
+      .arrows.hidden { display: none; }
       .board td, .drag-piece, .arrows { background-repeat: no-repeat; background-position: center center; background-size: cover; }
       .move { display: inline-block; font-size: 16pt; padding: 2pt 5pt; cursor: pointer; border-radius: 2pt; }
       .move-sel { background-color: #c8daed; }
@@ -71,6 +72,7 @@
               </select>
               <button class="skip-btn" style="font-size: 12pt; margin-left: 5pt; ">&nbsp;&nbsp;-&nbsp;&nbsp;</button>
               <button class="flip-btn" style="font-size: 12pt; margin-left: 5pt; ">Flip</button>
+              <button class="mode-btn" style="font-size: 12pt; margin-left: 5pt; padding-left: 10pt; padding-right: 10pt; ">A</button>
           </div>
           <div class="move-var" style="padding-top: 5pt; ">&nbsp;</div>
           <div class="pgn-box">
@@ -83,9 +85,21 @@
           var startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
           var pieceClassMap = new Map([["P", "pwp"], ["R", "pwr"], ["N", "pwn"], ["B", "pwb"], ["Q", "pwq"], ["K", "pwk"],
                                        ["p", "pbp"], ["r", "pbr"], ["n", "pbn"], ["b", "pbb"], ["q", "pbq"], ["k", "pbk"], ["z", "pzz"]]);
+
+          var whiteSide = ["a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8", "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
+                           "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6", "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
+                           "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4", "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
+                           "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2", "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1"];
+          var blackSide = ["h1", "g1", "f1", "e1", "d1", "c1", "b1", "a1", "h2", "g2", "f2", "e2", "d2", "c2", "b2", "a2",
+                           "h3", "g3", "f3", "e3", "d3", "c3", "b3", "a3", "h4", "g4", "f4", "e4", "d4", "c4", "b4", "a4",
+                           "h5", "g5", "f5", "e5", "d5", "c5", "b5", "a5", "h6", "g6", "f6", "e6", "d6", "c6", "b6", "a6",
+                           "h7", "g7", "f7", "e7", "d7", "c7", "b7", "a7", "h8", "g8", "f8", "e8", "d8", "c8", "b8", "a8"];
+
           var curFen;
 
           var engine;
+
+          var isPlayMode = false;
 
           function getArrowCoords(move, width) {
               var x1 = (move.charCodeAt(0) - "a".charCodeAt(0)) * 100 + 50;
@@ -165,7 +179,16 @@
                   applyArrows([]);
                   $(".score").html("&nbsp;");
                   $(".move-var").html("&nbsp;");
-                  engine.server.calcScores(curFen);
+                  if (!isPlayMode) {
+                      engine.server.calcScores(curFen, isPlayMode);
+                  }
+                  else {
+                      var side = getSide();
+                      var turn = curFen.indexOf(" w ") > -1 ? 1 : -1;
+                      if (side !== turn) {
+                          engine.server.calcScores(curFen, isPlayMode);
+                      }
+                  }
               }
           }
 
@@ -215,23 +238,6 @@
 
           $(document).ready(function () {
               applyFen(startFen);
-
-              var whiteSide = [];
-              var blackSide = [];
-
-              (function () {
-                  for (var j = 0; j < 8; j++) {
-                      for (var i = 0; i < 8; i++) {
-                          whiteSide.push("abcdefgh".charAt(i) + "87654321".charAt(j));
-                      }
-                  }
-
-                  for (var j = 0; j < 8; j++) {
-                      for (var i = 0; i < 8; i++) {
-                          blackSide.push("hgfedcba".charAt(i) + "12345678".charAt(j));
-                      }
-                  }
-              })();
 
               /*
               $(".board td").click(function () {
@@ -288,7 +294,7 @@
               $(".pgn-btn").click(function () {
                   var pgnBox = $(".pgn-box");
                   pgnBox.toggleClass("visible");
-                  if (pgnBox.attr("class").indexOf("visible") > -1) {
+                  if (pgnBox.hasClass("visible")) {
                       var moves = $(".move").toArray().map(x => $(x).text());
                       $(".pgn-text").val(prettyPgn(moves.join(" ")));
                       $(".pgn-text").select();
@@ -355,6 +361,18 @@
                   applyFen(curFen);
               });
 
+              $(".mode-btn").click(function () {
+                  isPlayMode = !isPlayMode;
+                  $(".mode-btn").text(isPlayMode ? "P" : "A");
+                  if (isPlayMode) {
+                      $(".arrows").addClass("hidden");
+                  }
+                  else {
+                      $(".arrows").removeClass("hidden");
+                  }
+                  applyFenNCalc(curFen, true);
+              });
+
               $(".draggable").draggable({
                   start: function (ev) {
                       var s = getSquare(ev);
@@ -401,9 +419,21 @@
               engine = $.connection.engineHub;
               $.connection.hub.url = "http://192.168.0.2:8080/signalr";
               engine.client.applyScores = function (crs) {
+                  if (isPlayMode) {
+                      return;
+                  }
                   applyArrows(crs);
                   $(".score").text(crs[0].score / 100);
                   $(".move-var").html(crs.filter(x => x.san1st).slice(0, 3).map(x => (x.score / 100) + " <b>" + x.san1st + "</b>").join(" &nbsp;") + "&nbsp;");
+              }
+
+              engine.client.applyMove = function (cr) {
+                  engine.server.move(curFen, cr.uci1st).done(function (mf) {
+                      if (mf.fen === null) return;
+
+                      applyFen(mf.fen);
+                      addMoves(mf);
+                  });
               }
 
               $.connection.hub.start().done(function () {

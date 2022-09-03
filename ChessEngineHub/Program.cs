@@ -30,6 +30,7 @@ namespace ChessEngineHub {
     }
 
     public class EngineHub : Hub {
+        private static Random rnd = new Random((int)DateTime.Now.Ticks);
         private static BaseEngine engine { get { return engines[engineNum]; } }
         private static int engineNum = 0;
         private static BaseEngine[] engines = {
@@ -39,7 +40,7 @@ namespace ChessEngineHub {
             Engine.Open(@"d:\Distribs\komodo-dragon-3\dragon-3-64bit.exe")
         };
         private static int[] nodeCounts = { 0, 20000, 50000000, 50000000 };
-        private static int nodeCount { get { return nodeCounts[engineNum]; } }
+        private static int[] nodePlayCounts = { 0, 2000, 2000000, 2000000 };
         private static object calcSyncRoot = new object();
         private static AutoResetEvent startCalcWaiter = new AutoResetEvent(true);
         private static volatile bool calcStopped;
@@ -77,7 +78,7 @@ namespace ChessEngineHub {
             startCalcWaiter.Set();
         }
 
-        public void calcScores(string fen) {
+        public void calcScores(string fen, bool isPlayMode) {
             var caller = Clients.Caller;
             calcStopped = true;
             Stop();
@@ -90,7 +91,10 @@ namespace ChessEngineHub {
                         var sw = new Stopwatch();
                         sw.Start();
                         IList<EngineCalcResult> lastSkipped = null;
-                    
+
+                        var nodeCount = isPlayMode ? nodePlayCounts[engineNum] : nodeCounts[engineNum];
+                        var interval = isPlayMode ? 60000 : 500;
+
                         foreach (var crs in engine.CalcScores(fen, nodeCount)) {
                             if (isLock) {
                                 startCalcWaiter.Set();
@@ -98,7 +102,7 @@ namespace ChessEngineHub {
                             }
 
                             if (calcStopped) { continue; }
-                            if (sw.ElapsedMilliseconds >= 500) {
+                            if (sw.ElapsedMilliseconds >= interval) {
                                 sw.Restart();
                             } else {
                                 lastSkipped = crs;
@@ -110,7 +114,14 @@ namespace ChessEngineHub {
                         }
 
                         if (lastSkipped != null && !calcStopped) {
-                            caller.applyScores(lastSkipped);
+                            if (!isPlayMode) {
+                                caller.applyScores(lastSkipped);
+                            }
+                            else {
+                                var goodMoves = lastSkipped.Where(x => Math.Abs(lastSkipped[0].score - x.score) <= 30).ToArray();
+                                var goodRndMove = goodMoves[rnd.Next(goodMoves.Length)];
+                                caller.applyMove(goodRndMove);
+                            }
                         }
                     }
                 }
