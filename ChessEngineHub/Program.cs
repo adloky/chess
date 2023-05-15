@@ -40,7 +40,7 @@ namespace ChessEngineHub {
             Engine.Open(@"d:\Distribs\komodo-dragon-3\dragon-3-64bit.exe")
         };
         private static int[] nodeCounts = { 0, 20000, 50000000, 50000000 };
-        private static int[] nodePlayCounts = { 0, 2000, 2000000, 2000000 };
+        private static int[] nodePlayCounts = { 0, 2000, 1000000, 1000000 };
         private static object calcSyncRoot = new object();
         private static AutoResetEvent startCalcWaiter = new AutoResetEvent(true);
         private static volatile bool calcStopped;
@@ -121,7 +121,7 @@ namespace ChessEngineHub {
                                 caller.applyScores(lastSkipped);
                             }
                             else {
-                                var goodMoves = lastSkipped.Where(x => Math.Abs(lastSkipped[0].score - x.score) <= 30).ToArray();
+                                var goodMoves = lastSkipped.Where(x => Math.Abs(lastSkipped[0].score - x.score) <= 20).ToArray();
                                 var goodRndMove = goodMoves[rnd.Next(goodMoves.Length)];
                                 caller.applyMove(goodRndMove);
                             }

@@ -125,6 +125,29 @@ namespace ChessEngine
             return CalcScores(fen, nodes, depth).Last()[0].score;
         }
 
+        public int Eval(string fen, string param) {
+            input.WriteLine("ucinewgame");
+            input.WriteLine($"position fen {fen}");
+            input.WriteLine($"eval");
+            var result = 0;
+            var s = (string)null;
+            do {
+                s = output.ReadLine();
+                if (s.IndexOf("Final evaluation: none") > -1) return 0;
+                if (s.Length == 0 || s[0] != '|' || s.IndexOf(param) < 0) continue;
+
+                var split = s.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                var floatStr = split[3].Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)[0];
+                result = int.Parse(floatStr.Replace(".",""));
+            } while (s.IndexOf("|      Total |") < 0);
+
+            do {
+                s = output.ReadLine();
+            } while (s.IndexOf("Final evaluation") < 0);
+
+            return result;
+        }
+
         public override void Stop() {
             input.WriteLine("stop");
         }

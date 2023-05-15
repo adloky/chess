@@ -121,6 +121,21 @@ namespace ChessCon {
             }
         }
 
+        public static Dictionary<char, int> pieceValue = new Dictionary<char, int> { { 'p', -1 }, { 'b', -3 }, { 'n', -3 }, { 'r', -5 }, { 'q', -9 },
+            { 'P', 1 }, { 'B', 3 }, { 'N', 3 }, { 'R', 5 }, { 'Q', 9 } };
+
+        public static int balance(string fen) {
+            var fen0 = fen.Split(' ')[0];
+            var result = 0;
+            foreach (var p in fen0) {
+                if (!pieceValue.ContainsKey(p)) continue;
+
+                result += pieceValue[p];
+            }
+
+            return result;
+        }
+
 
         private static string nodesPath = "d:/lichess.json";
 
@@ -134,12 +149,50 @@ namespace ChessCon {
 
             // foreach (var node in nodeDic.Values) { node.status = 0; }
 
-            foreach (var wn in EnumerateNodes("1. e4 e6 2. d4 d5 3. e5 c5", 20).Where(x => (x.node.score - x.parentNode.score) * x.node.turn > 80 && x.parentNode.score * x.node.turn > -30 && x.node.turn == -1)) {
+            /*
+            var moves = new List<string>() {
+                "1. e4 c5 2. d4 e6 3. d5 d6 4. c4",
+                "1. e4 e5 2. Nf3 Nc6 3. d4 d6 4. d5 Nce7 5. c4",
+                "1. e4 e5 2. d4 Nc6 3. d5 Nce7 4. c4 d6",
+                "1. e4 c6 2. d4 d6 3. c4 Qc7 4. Nc3 e5 5. d5",
+                "1. e4 d6 2. d4 Nd7 3. c4 e5 4. d5",
+                "1. d4 Nf6 2. c4 e6 3. Nc3 c5 4. d5 d6 5. e4",
+                "1. d4 Nf6 2. c4 c5 3. d5 e5 4. Nc3 d6 5. e4",
+                "1. d4 Nf6 2. c4 d6 3. Nc3 Nbd7 4. e4 e5 5. d5",
+                "1. d4 e6 2. c4 c5 3. d5 d6 4. e4",
+                "1. d4 c5 2. d5 d6 3. c4 e5 4. Nc3 f5 5. e4",
+                "1. d4 c5 2. d5 d6 3. c4 e5 4. e4",
+                "1. d4 c5 2. d5 d6 3. e4 e5 4. c4"
+            };
+            
+
+
+            foreach (var m in moves) {
+                foreach (var wn in EnumerateNodes(m, 20).Where(x => (x.node.score - x.parentNode.score) * x.node.turn >= 80 && x.parentNode.score * x.node.turn >= -30 && x.node.turn == 1)) {
+                    Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
+                }
+            }
+            */
+
+            /*
+            var pat = "8/8/3p4/3P4/2P1P3/8/8/8 w - - 0 1";
+            var moves = new List<string>();
+
+            foreach (var wn in EnumerateNodes(minCount:200).Where(x => FEN.Like(x.node.fen, pat))) {
+                if (!moves.Any(m => wn.moves.IndexOf(m) == 0)) {
+                    moves.Add(wn.moves);
+                    Console.WriteLine(PrettyPgn(wn.moves));
+                }
+            }
+            */
+
+
+            foreach (var wn in EnumerateNodes("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 Bc5", 0).Where(x => (x.node.score - x.parentNode.score) * x.node.turn >= 80 && x.parentNode.score * x.node.turn >= -30 && x.node.turn == 1)) {
                 Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
             }
 
             /*
-            var wns = EnumerateNodes("1. e4 e6 2. d4 d5 3. e5 c5", 200).ToList();
+            var wns = EnumerateNodes("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. Qe2 b5 6. Bb3 Bc5", 10).ToList();
 
             ShrinkSubMoves(wns);
 
@@ -147,6 +200,8 @@ namespace ChessCon {
                 Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score}");
             }
             */
+
+
             Console.Write("Press ENTER");
             Console.ReadLine();
             /*
@@ -158,6 +213,24 @@ namespace ChessCon {
         }
     }
 }
+
+/*
+            using (var engine = Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe")) {
+                foreach (var node in nodeDic.Values) {
+                    var fen = node.fen;
+                    var split = fen.Split(' ');
+                    var mn = int.Parse(split[5]);
+                    if (mn < 13 || Math.Abs(node.score.Value) > 1000) continue;
+                    // if (balance(fen) != 0) continue;
+
+                    var r = engine.Eval(fen, "Winnable");
+                    if (r < 10) continue;
+
+                    Console.WriteLine(fen + ", " + r.ToString());
+                }
+            }
+
+ */
 
 /*
             var wns = EnumerateNodes("e4 c5 d4 cxd4 c3 dxc3 Nxc3 Nc6 Nf3 e6").ToList();

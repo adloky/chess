@@ -21,8 +21,7 @@ namespace Chess {
              Moves
          }
 
-        private class Game
-        {
+        private class Game {
              public readonly static Regex ParamRegex = new Regex(@"^\[([^ ]+) ""([^""]*)""\]$", RegexOptions.Compiled);
              public readonly static Regex CommentRegex = new Regex(@" \{[^}]*\}", RegexOptions.Compiled);
              public readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);

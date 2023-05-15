@@ -260,5 +260,12 @@ namespace Chess
 
             return string.Join(" ", fenSplit);
         }
+
+        public static bool Like(string fen, string pat) {
+            var board = Board.Load(fen);
+            var patBoard = Board.Load(pat);
+            var patSquares = Enumerable.Range(0, 64).Select(x => (Square)x).Where(x => patBoard[x] != null).ToArray();
+            return !patSquares.Where(s => board[s] == null || board[s].GetType() != patBoard[s].GetType() || board[s].Player != patBoard[s].Player).Any();
+        }
     }
 }
