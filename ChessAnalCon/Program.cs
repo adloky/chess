@@ -3,11 +3,38 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace ChessAnalCon {
+
+    public class BString : IComparable {
+        private byte[] bytes;
+
+        public BString(string s) {
+            bytes = Encoding.ASCII.GetBytes(s);
+        }
+
+        public int CompareTo(object obj) {
+            var yBytes = ((BString)obj).bytes;
+
+            var l = Math.Min(bytes.Length, yBytes.Length);
+
+            for (int i = 0; i < l; i++) {
+                int result = bytes[i].CompareTo(yBytes[i]);
+                if (result != 0) return result;
+            }
+
+            return bytes.Length == yBytes.Length ? 0
+                : bytes.Length < yBytes.Length ? -1 : 1;
+        }
+
+        public override string ToString() {
+            return Encoding.ASCII.GetString(bytes);
+        }
+    }
 
     public static class StreamReaderExtenstions {
         readonly static FieldInfo charPosField = typeof(StreamReader).GetField("charPos", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
@@ -23,106 +50,105 @@ namespace ChessAnalCon {
         }
     }
 
-
-    public enum ParseState {
-        Empty,
-        Param,
-        Moves
-    }
-
-    public enum GameType {
-        None,
-        Blitz,
-        Rapid
-    }
-
-
-    public class Game {
-        public readonly static Regex ParamRegex = new Regex(@"^\[([^ ]+) ""([^""]*)""\]$", RegexOptions.Compiled);
-        public readonly static Regex CommentRegex = new Regex(@" \{[^}]*\}", RegexOptions.Compiled);
-        public readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);
-        public readonly static Regex ScoreRegex = new Regex(@"[!?]", RegexOptions.Compiled);
-        public readonly static Regex SpaceRegex = new Regex(@"\s+", RegexOptions.Compiled);
-        public readonly static Regex ResultRegex = new Regex(@" ?(1-0|0-1|1/2-1/2|\*)$", RegexOptions.Compiled);
-
-        public Dictionary<string, string> Params { get; private set; } = new Dictionary<string, string>();
-
-        public string Moves { get; set; } = "";
-    }
-
-
     class Program {
-        static void Main(string[] args) {
-            using (var readStream = File.OpenRead("e:/lichess_db_standard_rated_2023-04.pgn"))
-            using (var reader = new StreamReader(readStream))
-            using (var writeStream = File.Open("e:/lichess_2023-04.csv", FileMode.Create))
-            using (var writer = new StreamWriter(writeStream))
-            {
-                var prevState = ParseState.Empty;
-                var state = ParseState.Empty;
-                var game = new Game();
-                var count = 0;
-                while (!reader.EndOfStream) {
-                    prevState = state;
-                    var s = reader.ReadLine();
+        public static string PrettyPgn(string pgn) {
+            var result = "";
+            var split = pgn.Split(' ');
+            for (var i = 0; i < split.Length; i++) {
+                if (i % 2 == 0) {
+                    result += $"{i/2+1}. ";
+                }
+                result += $"{split[i]} ";
+            }
+            if (result != "") { result = result.Substring(0, result.Length - 1); }
 
-                    state = (s == "") ? ParseState.Empty
-                                      : (s[0] == '[') ? ParseState.Param
-                                      : ParseState.Moves;
+            return result;
+        }
 
-                    Match match = null;
-
-                    if (state == ParseState.Param) {
-                        match = Game.ParamRegex.Match(s);
-                        if (!match.Success) throw new Exception($"Invalid param: {s}");
-                        game.Params.Add(match.Groups[1].Value, match.Groups[2].Value);
-                    }
-
-                    if (state == ParseState.Moves) {
-                        game.Moves = $"{game.Moves}{(game.Moves == "" ? "" : " ")}{s}";
-                    }
-
-                    if (state == ParseState.Empty && prevState == ParseState.Moves) {
-                        game.Moves = Game.CommentRegex.Replace(game.Moves, "");
-                        game.Moves = Game.NumberRegex.Replace(game.Moves, "");
-                        game.Moves = Game.ScoreRegex.Replace(game.Moves, "");
-                        game.Moves = Game.SpaceRegex.Replace(game.Moves, " ");
-                        game.Moves = Game.ResultRegex.Replace(game.Moves, "");
-                        game.Moves = game.Moves.Trim();
-
-                        // handle
-
-                        var moveCount = game.Moves.Count(x => x == ' ') + 1;
-                        var evnt = game.Params["Event"];
-                        var type = evnt.Contains("Blitz") ? GameType.Blitz
-                            : evnt.Contains("Rapid") ? GameType.Rapid
-                            : GameType.None;
-
-                        var typeMinElo = (type == GameType.Blitz) ? 1700
-                            : (type == GameType.Rapid) ? 1850
-                            : int.MaxValue;
-
-                        var result = game.Params["Result"];
-                        var whiteElo = int.Parse(game.Params["WhiteElo"]);
-                        var blackElo = int.Parse(game.Params["BlackElo"]);
-
-                        var minElo = Math.Min(whiteElo, blackElo);
-
-                        if (minElo >= typeMinElo && moveCount >= 10) {
-                            writer.WriteLine($"{game.Moves},{type.ToString().ToLower()},{whiteElo} {blackElo},{result}");
-                            count++;
-                            if (count % 1000 == 0) {
-                                Console.WriteLine(reader.GetVirtualPosition() / 1024 / 1024);
-                            }
-                        }
-
-                        game = new Game();
+        public static string ShrinkMovesNSalt(string s, int count) {
+            var i = 0;
+            var j = 0;
+            for (; s[i] != ','; i++) {
+                if (s[i] == ' ') {
+                    j++;
+                    if (j == count) {
+                        break;
                     }
                 }
-                Console.WriteLine($"games: {count}");
             }
 
+            if (s[i] != ',') {
+                s = s.Substring(0, i) + s.Substring(s.IndexOf(','));
+            }
+
+            s = $"{s},{Guid.NewGuid().ToString("N")}";
+
+            return s;
+        }
+
+        public static string RemoveSalt(string s) {
+            return s.Substring(0, s.Length - 33);
+        }
+
+        static void Main(string[] args) {
+            var dic = new SortedDictionary<BString, object>();
+            using (var readStream = File.OpenRead("d:/lichess_2023-04.csv"))
+            using (var reader = new StreamReader(readStream))
+            using (var writeStream = File.Open("d:/lichess_2023-04-sorted.csv", FileMode.Create))
+            using (var writer = new StreamWriter(writeStream))
+            {
+                var count = 0;
+                while (!reader.EndOfStream) {
+                    var s = reader.ReadLine();
+                    var bs = new BString(ShrinkMovesNSalt(s,40));
+                    dic.Add(bs,null);
+                    count++;
+                    if (count % 1000 == 0) {
+                        Console.WriteLine(count);
+                    }
+                }
+
+                foreach (var s in dic.Keys.Select(x => RemoveSalt(x.ToString()))) {
+                    writer.WriteLine(s);
+                }
+            }
+            Console.WriteLine("Finish");
             Console.ReadLine();
         }
     }
 }
+/*
+            using (var readStream = File.OpenRead("d:/lichess_2023-04.csv"))
+            using (var reader = new StreamReader(readStream))
+            //using (var writeStream = File.Open("e:/lichess_2023-04.csv", FileMode.Create))
+            //using (var writer = new StreamWriter(writeStream))
+            {
+                var count = 0;
+                while (!reader.EndOfStream) {
+                    var s = reader.ReadLine();
+                    var split = s.Split(',');
+                    var moves = split[0];
+                    var moveCount = moves.Count(x => x == ' ') + 1;
+                    var isBlitz = split[1] == "blitz";
+                    var elos = split[2].Split(' ').Select(x => int.Parse(x)).ToArray();
+                    var is10 = split[3] == "1-0";
+                    var isRl = moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 Nf6 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 d6 c3 Nf6 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 d6 c3 a6 Ba4 Nf6 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 Bc5 c3 Nf6 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 c3 Nf6 d3") == 0;
+
+                    if (!isBlitz || moveCount > 32 * 2 || !is10 || !isRl || elos[0] < 2200 || elos[1] > 1900) {
+                        continue;
+                    }
+
+                    count++;
+                    Console.WriteLine(PrettyPgn(moves));
+                }
+            }
+            Console.WriteLine("Finish");
+            Console.ReadLine();
+
+ */
