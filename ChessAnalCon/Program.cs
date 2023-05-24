@@ -145,6 +145,16 @@ namespace ChessAnalCon {
         }
     }
 
+    public class FenLast {
+        public static string GetKey(string fen, string last) {
+            if (last == null) {
+                return fen;
+            }
+
+            return $"{fen} {last}";
+        }
+    }
+
     class Program {
         public static string PrettyPgn(string pgn) {
             var result = "";
@@ -215,50 +225,36 @@ namespace ChessAnalCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
-            using (var readStream = File.OpenRead("d:/lichess_2023-04-sorted.csv"))
+            using (var readStream = File.OpenRead("d:/lichess.txt"))
             using (var reader = new StreamReader(readStream))
             //using (var writeStream = File.Open("d:/lichess_2023-04-sorted.csv", FileMode.Create))
             //using (var writer = new StreamWriter(writeStream))
             {
-                var storage = new StatStorage();
-                storage.Load(reader, "d:/lichess-pos.txt", "d:/lichess.txt", "d:/lichess-loc.txt");
-
+                var dic = new Dictionary<string, OpeningNode>();
                 var count = 0;
                 while (!reader.EndOfStream && !ctrlC) {
                     var s = reader.ReadLine();
-                    var board = Board.Load();
-
-                    var split = s.Split(',');
-                    var moves = split[0];
-                    var isBlitz = split[1] == "blitz";
-                    var elos = split[2].Split(' ').Select(x => int.Parse(x)).ToArray();
-                    var maxElo = Math.Max(elos[0], elos[1]);
-                    var isMid = isBlitz ? maxElo <= 2000 : maxElo <= 2150;
-                    var midCount = isMid ? 1 : 0;
-                    var bytes = Encoding.ASCII.GetBytes(moves);
-
-                    var pis = new List<PosInfo>();
-                    pis.Add(new PosInfo() { Fen = Board.DEFAULT_STARTING_FEN, Last = null, Hash = BytesToGuid(bytes, 0) });
-                    foreach (var m in EnumMoves(moves)) {
-                        var move = moves.Substring(m.Item1, m.Item2);
-                        if (!board.Move(move)) {
-                            throw new Exception("Bad move");
-                        }
-
-                        pis.Add(new PosInfo() { Fen = board.GetFEN(), Last = move, Hash = BytesToGuid(bytes, m.Item1 + m.Item2) });
+                    var json = s.Substring(s.IndexOf(';') + 1);
+                    var node = JsonConvert.DeserializeObject<OpeningNode>(json);
+                    var key = FenLast.GetKey(node.fen, node.last);
+                    OpeningNode existNode;
+                    if (dic.TryGetValue(key, out existNode)) {
+                        existNode.count += node.count;
+                        existNode.midCount += node.midCount;
                     }
-
-                    storage.Handle(pis, 5, midCount);
+                    else {
+                        dic.Add(key, node);
+                    }
 
                     count++;
                     if (count % 1000 == 0) {
-                        Console.WriteLine($"{reader.GetVirtualPosition() / 1024 / 1024}/{storage.Count}");
+                        Console.WriteLine($"{count}");
                     }
                 }
 
                 Console.WriteLine("Save? (y/n)");
                 if (Console.ReadLine() == "y") {
-                    storage.Save(reader);
+                    File.WriteAllLines("d:/lichess-big.json", dic.Select(x => JsonConvert.SerializeObject(x.Value)));
                 }
             }
 
