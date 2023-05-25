@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Chess;
+using Chess.Pieces;
 using Newtonsoft.Json;
 
 namespace ChessAnalCon {
@@ -72,6 +73,13 @@ namespace ChessAnalCon {
         public int turn {
             get {
                 return fen.IndexOf(" w ") > -1 ? 1 : -1;
+            }
+        }
+
+        [JsonIgnore]
+        public string key {
+            get {
+                return FenLast.GetKey(fen,last);
             }
         }
     }
@@ -146,6 +154,11 @@ namespace ChessAnalCon {
     }
 
     public class FenLast {
+
+        public string Fen { get; set; }
+
+        public string Last { get; set; }
+
         public static string GetKey(string fen, string last) {
             if (last == null) {
                 return fen;
@@ -153,6 +166,8 @@ namespace ChessAnalCon {
 
             return $"{fen} {last}";
         }
+
+        public string Key { get { return GetKey(Fen, Last); } }
     }
 
     class Program {
@@ -221,44 +236,77 @@ namespace ChessAnalCon {
             return guid;
         }
 
+        public static IEnumerable<PieceMove> PromoteProcessed(PieceMove move) {
+            if (!move.HasPromotion) {
+                 return Enumerable.Repeat(move, 1);
+            }
+
+            return (new Type[] { typeof(Knight), typeof(Bishop), typeof(Rook), typeof(Queen) })
+               .Select(x => new PieceMove(move.Source, move.Target, x));
+        }
+
+        public static IEnumerable<string> GetPieceMoves(string fen) {
+            var board = Board.Load(fen);
+ 
+            return board[board.Turn]
+                .SelectMany(x => x.GetValidMoves())
+                .SelectMany(x => PromoteProcessed(x))
+                .Select(x => x.ToUciString())
+                .Select(x => board.Uci2San(x));
+        }
+
+        public static IEnumerable<FenLast> GetFenLasts(string fen) {
+            foreach (var move in GetPieceMoves(fen)) {
+                FenLast fenLast = null;
+
+                try {
+                    fenLast = new FenLast() { Fen = FEN.Move(fen, move), Last = move };
+                }
+                catch { }
+
+                if (fenLast != null) {
+                    yield return fenLast;
+                }
+            }
+        }
+
         private static volatile bool ctrlC = false;
+
+        private static string nodesPath = "d:/lichess-big.json";
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
-            using (var readStream = File.OpenRead("d:/lichess.txt"))
-            using (var reader = new StreamReader(readStream))
-            //using (var writeStream = File.Open("d:/lichess_2023-04-sorted.csv", FileMode.Create))
-            //using (var writer = new StreamWriter(writeStream))
-            {
-                var dic = new Dictionary<string, OpeningNode>();
-                var count = 0;
-                while (!reader.EndOfStream && !ctrlC) {
-                    var s = reader.ReadLine();
-                    var json = s.Substring(s.IndexOf(';') + 1);
-                    var node = JsonConvert.DeserializeObject<OpeningNode>(json);
-                    var key = FenLast.GetKey(node.fen, node.last);
-                    OpeningNode existNode;
-                    if (dic.TryGetValue(key, out existNode)) {
-                        existNode.count += node.count;
-                        existNode.midCount += node.midCount;
-                    }
-                    else {
-                        dic.Add(key, node);
-                    }
 
-                    count++;
-                    if (count % 1000 == 0) {
-                        Console.WriteLine($"{count}");
-                    }
+            var dic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+            var count = dic.Values.Count(x => x.status == 0);
+            foreach (var node in dic.Values.Where(x => x.status == 0)) {
+                if (ctrlC) {
+                    break;
                 }
 
-                Console.WriteLine("Save? (y/n)");
-                if (Console.ReadLine() == "y") {
-                    File.WriteAllLines("d:/lichess-big.json", dic.Select(x => JsonConvert.SerializeObject(x.Value)));
+                var nextNodes = GetFenLasts(node.fen)
+                    .Where(x => dic.ContainsKey(x.Key))
+                    .Select(x => dic[x.Key])
+                    .OrderByDescending(x => x.count).ToArray();
+
+                node.status = 1;
+                count--;
+
+                if (nextNodes.Length == 0) {
+                    continue;
+                }
+
+                node.moves = string.Join(" ", nextNodes.Select(x => x.last));
+
+                if (count % 1000 == 0) {
+                    Console.WriteLine(count);
                 }
             }
 
-//            Console.ReadLine();
+            Console.WriteLine("Save? (y/n)");
+            if (Console.ReadLine() == "y") {
+                File.WriteAllLines(nodesPath, dic.Select(x => JsonConvert.SerializeObject(x.Value)));
+            }
         }
     }
 }
