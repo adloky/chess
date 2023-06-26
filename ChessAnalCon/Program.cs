@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Chess;
 using Chess.Pieces;
 using Newtonsoft.Json;
+using Markdig;
 
 namespace ChessAnalCon {
 
@@ -170,6 +171,165 @@ namespace ChessAnalCon {
         public string Key { get { return GetKey(Fen, Last); } }
     }
 
+    public class MoveInfo {
+        public string id { get; set; }
+
+        public string moveSan { get; set; }
+
+        public string moveUci { get; set; }
+
+        public string fen { get; set; }
+    }
+
+    public class MoveInfoList : IList<MoveInfo>
+    {
+        private int delta;
+
+        private List<MoveInfo> moveInfos = new List<MoveInfo>();
+
+        public MoveInfo this[int index] {
+            get {
+                index = index - delta;
+                if (index < 0 || index >= moveInfos.Count) {
+                    return null;
+                }
+
+                return moveInfos[index];
+            }
+            set {
+                if (moveInfos.Count == 0) {
+                    delta = index;
+                }
+                else {
+                    index = index - delta;
+                    moveInfos.RemoveRange(index, moveInfos.Count - index);
+                }
+
+                moveInfos.Add(value);
+            }
+        }
+
+        public MoveInfoList(int delta) {
+            this.delta = delta;
+        }
+
+        #region Not Implemented
+        public int Count => throw new NotImplementedException();
+
+        public bool IsReadOnly => throw new NotImplementedException();
+
+        public void Add(MoveInfo item)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Clear()
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool Contains(MoveInfo item)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CopyTo(MoveInfo[] array, int arrayIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        public IEnumerator<MoveInfo> GetEnumerator()
+        {
+            throw new NotImplementedException();
+        }
+
+        public int IndexOf(MoveInfo item)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Insert(int index, MoveInfo item)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool Remove(MoveInfo item)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RemoveAt(int index)
+        {
+            throw new NotImplementedException();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            throw new NotImplementedException();
+        }
+
+        #endregion
+    }
+
+    public class MoveInfoHub {
+
+        private Regex re;
+
+        private static MoveInfo start = new MoveInfo() { fen = Board.DEFAULT_STARTING_FEN };
+
+        private List<MoveInfoList> list { get; } = new List<MoveInfoList>();
+
+        private MoveInfo getPrev(int level, int index) {
+            if (index == 0) return start;
+
+            for (; list[level][index - 1] == null; level--) ;
+
+            return list[level][index - 1];
+        }
+
+        public MoveInfo Push(int level, int index, string move) {
+            var prev = getPrev(level, index);
+            var mi = new MoveInfo() { fen = FEN.Move(prev.fen, move), moveSan = move };
+            this[level, index] = mi;
+
+            return mi;
+        }
+
+        public string Push(int level, string moves) {
+            var index = 0;
+            return Program.handleString(moves, re, (x, m) => {
+                var move = m.Groups["move"].Value + m.Groups["ccm"].Value;
+                var num = m.Groups["num"].Value;
+                if (num != "") {
+                    index = (int.Parse(num.Replace(".", "")) - 1) * 2 + (num.IndexOf("...") > -1 ? 1 : 0);
+                }
+                else {
+                    index++;
+                }
+                var mi = Push(level, index, move);
+                return $"<span class='move' fen='{mi.fen}'>{x}</span>";
+            });
+        }
+
+        public MoveInfo this[int level, int index] {
+            set {
+                while (level > list.Count - 1) {
+                    list.Add(new MoveInfoList(index));
+                }
+
+                if (level < list.Count - 1) {
+                    list.RemoveRange(level + 1, list.Count - level - 1);
+                }
+
+                list[level][index] = value;
+            }
+        }
+
+        public MoveInfoHub(Regex re) {
+            this.re = re;
+        }
+    }
+
     class Program {
         public static string PrettyPgn(string pgn) {
             var result = "";
@@ -270,46 +430,172 @@ namespace ChessAnalCon {
             }
         }
 
+        public static string pushMove(string moves, string move) {
+            if (moves == null) {
+                return move;
+            }
+
+            return $"{moves} {move}";
+        }
+
         private static volatile bool ctrlC = false;
 
         private static string nodesPath = "d:/lichess-big.json";
 
+        private static void renameFiles() {
+            var prefix = "Aspose.Words.87de280c-dfc0-448b-960a-33bcf0583fb7.";
+            var files = Directory.EnumerateFiles("d:/nimzo-lysyy").Where(x => x.IndexOf(prefix) >= 0);
+            
+            foreach (var file in files) {
+                File.Move(file, file.Replace(prefix, ""));
+//                Console.WriteLine(file);
+            }
+        }
+
+        public static string handleString(string s, Regex re, Func<string, Match, string> handler) {
+            var m = re.Match(s);
+            var i = 0;
+            var sb = new StringBuilder();
+
+            while (m.Success) {
+                var ls = s.Substring(i, m.Index - i);
+                sb.Append(ls);
+                ls = s.Substring(m.Index, m.Length);
+                ls = handler(ls, m);
+                sb.Append(ls);
+                i = m.Index + m.Length;
+                m = m.NextMatch();
+            }
+            var ls2 = s.Substring(i, s.Length - i);
+            sb.Append(ls2);
+
+            return sb.ToString();
+        }
+
+        private static string norm(string s) {
+            s = s.Replace("х", "x");
+            s = s.Replace("а", "a");
+            s = s.Replace("с", "c");
+            s = s.Replace("е", "e");
+            return s;
+        }
+
+        private static int countBrackets(string s) {
+            var x = 0;
+            foreach (var c in s) {
+                if (c == '(') x++;
+                if (c == ')' && x > 0) x--;
+            }
+            return x;
+        }
+
+        private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
+
+        private static string mdPath = "d:/Projects/smalls/nimzo-lysyy.md";
+        private static string md2Path = "d:/Projects/smalls/nimzo-lysyy-2.md";
+        private static string htmlPath = "d:/nimzo-lysyy.html";
+
+        private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?";
+        //private static Regex moveRe = new Regex(moveReS);
+        private static string moveEvalReS = $"({moveReS})(?<eval>[^ ,\\.\\*;:)]*)";
+        //private static Regex moveEvalRe = new Regex(moveEvalReS);
+        private static string evalLongReS = $"(?<ccm>\\+)−\\+|(?<ccm>\\+)\\+−|\\+−|−\\+|(?<ccm>\\+)|(?<ccm>#)";
+        private static string evalReS = $"({evalLongReS}|[!?⩱⩲∓±↻=∞⇄↑→N])*";
+        private static string moveNEvalReS = $"(?<move>{moveReS})(?<eval>{evalReS})";
+        private static string moveSeq1stReS = $"\\d+\\.{moveNEvalReS}( {moveNEvalReS} \\d+\\.{moveNEvalReS})*( {moveNEvalReS})?";
+        private static string moveSeq2ndReS = $"\\d+\\.\\.\\.{moveNEvalReS}( \\d+\\.{moveNEvalReS} {moveNEvalReS})*( \\d+\\.{moveNEvalReS})?";
+        private static string moveSeqFullReS = $"{moveSeq1stReS}|{moveSeq2ndReS}";
+        private static Regex moveSeqRe = new Regex(moveSeqFullReS);
+        private static Regex moveRe = new Regex($"(?<num>\\d+\\.(\\.\\.)?)?{moveNEvalReS}");
+
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
-            var dic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
-            var count = dic.Values.Count(x => x.status == 0);
-            foreach (var node in dic.Values.Where(x => x.status == 0)) {
+            var hub = new MoveInfoHub(moveRe);
+            Console.WriteLine(hub.Push(0, "1.e4 e5"));
+
+            /*
+            var ss = File.ReadAllLines(mdPath);
+            ss = ss.Select(s => handleString(s, moveSeqRe, (x, m) => {
+                return $"<span class='moves'>{x}</span>";
+            })).ToArray();
+            
+            var html = ss.Where(x => x != "").Select(x => Markdown.ToHtml(x)).ToArray();
+            
+            File.WriteAllLines(htmlPath, html);
+            */
+            // renameFiles();
+            //var dic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+            //foreach (var node in dic.Values) { node.status = 0; }
+            /*
+            var ss = File.ReadAllLines("d:/lichess-unreach.json");
+            foreach (var s in ss) {
+                var split = s.Split(',');
+                var move = split[0];
+                var key = split[1];
+                var node = dic[key];
+                node.moves = pushMove(node.moves, move);
+            }
+            */
+            /*
+            var count = dic.Values.Count();
+            foreach (var node in dic.Values) {
                 if (ctrlC) {
                     break;
                 }
 
-                var nextNodes = GetFenLasts(node.fen)
-                    .Where(x => dic.ContainsKey(x.Key))
-                    .Select(x => dic[x.Key])
-                    .OrderByDescending(x => x.count).ToArray();
-
-                node.status = 1;
                 count--;
-
-                if (nextNodes.Length == 0) {
-                    continue;
-                }
-
-                node.moves = string.Join(" ", nextNodes.Select(x => x.last));
-
                 if (count % 1000 == 0) {
                     Console.WriteLine(count);
                 }
-            }
 
+                if (node.moves == null) {
+                    continue;
+                }
+
+                var moves = node.moves.Split(' ');
+
+                foreach (var move in moves) {
+                    var nextFen = FEN.Move(node.fen, move);
+                    var key = FenLast.GetKey(nextFen, move);
+                    dic[key].status = 1;
+                }
+            }
+            */
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
-                File.WriteAllLines(nodesPath, dic.Select(x => JsonConvert.SerializeObject(x.Value)));
+                // File.WriteAllLines(nodesPath, dic.Select(x => JsonConvert.SerializeObject(x.Value)));
             }
         }
     }
 }
+/*
+    // Eval notes
+    var set = new HashSet<string>();
+    var ss = File.ReadAllLines(mdPath);
+    ss = ss.Select(s => handleString(s, moveEvalRe, (x,m) => {
+        var eval = m.Groups["eval"].Value;
+                
+        //x = x.Replace("", "");
+        if (eval != "" && !set.Contains(eval) && !moveEvalRe.Match(eval).Success) {
+            set.Add(eval);
+        }
+                
+        return x;
+    })).ToArray();
+
+    foreach (var s in set) { Console.WriteLine(s); }
+            
+    File.WriteAllLines(mdPath, ss);
+ */
+
+/*
+            var ss = File.ReadAllLines(mdPath);
+            ss = ss.Select(s => handleString(s, moveRe, x => norm(x))).ToArray();
+            File.WriteAllLines(mdPath, ss);
+
+ */
+
 /*
             using (var readStream = File.OpenRead("d:/lichess_2023-04.csv"))
             using (var reader = new StreamReader(readStream))
