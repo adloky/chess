@@ -200,6 +200,10 @@ namespace ChessAnalCon {
                 if (moveInfos.Count == 0) {
                     delta = index;
                 }
+                else if (index - delta < 0) {
+                    moveInfos.Clear();
+                    delta = index;
+                }
                 else {
                     index = index - delta;
                     moveInfos.RemoveRange(index, moveInfos.Count - index);
@@ -207,10 +211,6 @@ namespace ChessAnalCon {
 
                 moveInfos.Add(value);
             }
-        }
-
-        public MoveInfoList(int delta) {
-            this.delta = delta;
         }
 
         #region Not Implemented
@@ -273,6 +273,8 @@ namespace ChessAnalCon {
 
     public class MoveInfoHub {
 
+        private int id = 0;
+
         private Regex re;
 
         private static MoveInfo start = new MoveInfo() { fen = Board.DEFAULT_STARTING_FEN };
@@ -282,22 +284,39 @@ namespace ChessAnalCon {
         private MoveInfo getPrev(int level, int index) {
             if (index == 0) return start;
 
-            for (; list[level][index - 1] == null; level--) ;
+            for (; list.Count - 1 < level || list[level][index - 1] == null; level--) ;
 
             return list[level][index - 1];
         }
 
+        private string fenMove(string fen, string move) {
+            if (move == "XX") {
+                var split = fen.Split(' ');
+                var turn = (split[1] == "b") ? "w" : "b";
+                var num = int.Parse(split[5]) + (turn == "w" ? 1 : 0);
+                var num50 = int.Parse(split[4]) + 1;
+                return $"{split[0]} {turn} {split[2]} - {num50} {num}";
+            }
+
+            return FEN.Move(fen, move);
+        }
+
         public MoveInfo Push(int level, int index, string move) {
             var prev = getPrev(level, index);
-            var mi = new MoveInfo() { fen = FEN.Move(prev.fen, move), moveSan = move };
+            var mi = new MoveInfo() { fen = fenMove(prev.fen, move), moveSan = move, moveUci = move == "XX" ? null : FEN.San2Uci(prev.fen, move) };
             this[level, index] = mi;
 
             return mi;
         }
 
-        public string Push(int level, string moves) {
+        public string Push(int level, string moves, bool skipInc = false) {
             var index = 0;
+            var isEx = false;
             return Program.handleString(moves, re, (x, m) => {
+                if (isEx) {
+                    return x;
+                }
+
                 var move = m.Groups["move"].Value + m.Groups["ccm"].Value;
                 var num = m.Groups["num"].Value;
                 if (num != "") {
@@ -306,15 +325,27 @@ namespace ChessAnalCon {
                 else {
                     index++;
                 }
-                var mi = Push(level, index, move);
-                return $"<span class='move' fen='{mi.fen}'>{x}</span>";
+
+                var mi = (MoveInfo)null;
+                try {
+                    mi = Push(level, index, move);
+                }
+                catch {}
+
+                if (mi == null) {
+                    isEx = true;
+                    return $"=>{x}";
+                }
+
+                if (!skipInc) id++;
+                return $"<span id='move{id}' class='move' fen='{mi.fen}' uci='{mi.moveUci}'>{x}</span>";
             });
         }
 
         public MoveInfo this[int level, int index] {
             set {
                 while (level > list.Count - 1) {
-                    list.Add(new MoveInfoList(index));
+                    list.Add(new MoveInfoList());
                 }
 
                 if (level < list.Count - 1) {
@@ -327,6 +358,36 @@ namespace ChessAnalCon {
 
         public MoveInfoHub(Regex re) {
             this.re = re;
+        }
+    }
+
+    public class Tag {
+        private static Regex tagRe = new Regex("<(?<name>[^/ ]+)[^/]*/>");
+        private static Regex attrRe = new Regex(" +(?<attr>[^=]+)=\"(?<value>[^\"]*)\"");
+
+        public string name { get; set; }
+
+        public Dictionary<string, string> attr { get; } = new Dictionary<string, string>();
+
+        public static Tag[] Parse(string s) {
+            var r = new List<Tag>();
+            var m = tagRe.Match(s);
+            while (m.Success) {
+                var tag = new Tag();
+                tag.name = m.Groups["name"].Value;
+                var m2 = attrRe.Match(m.Value);
+                while (m2.Success) {
+                    tag.attr.Add(m2.Groups["attr"].Value, m2.Groups["value"].Value);
+                    m2 = m2.NextMatch();
+                }
+                r.Add(tag);
+                m = m.NextMatch();
+            }
+            return r.ToArray();
+        }
+
+        public static string Clear(string s) {
+            return tagRe.Replace(s, "");
         }
     }
 
@@ -489,13 +550,33 @@ namespace ChessAnalCon {
             return x;
         }
 
+        private static List<Tuple<int, int>> getLevels(string s, int level = 1) {
+            var r = new List<Tuple<int, int>>();
+            r.Add(new Tuple<int, int>(-1, level));
+            var bold = false;
+            for (var i = 0; i < s.Length; i++) {
+                var c = s[i];
+                if (c == '*' && i > 0 && s[i - 1] == '*') {
+                    bold = !bold;
+                    level = bold ? 0 : 1;
+                    r.Add(new Tuple<int, int>(i, level));
+                }
+
+                if (c == '(') { level++; r.Add(new Tuple<int, int>(i, level)); }
+                else if (c == ')' && level > 1) { level--; r.Add(new Tuple<int, int>(i, level)); }
+            }
+
+            return r;
+        }
+
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
 
         private static string mdPath = "d:/Projects/smalls/nimzo-lysyy.md";
         private static string md2Path = "d:/Projects/smalls/nimzo-lysyy-2.md";
         private static string htmlPath = "d:/nimzo-lysyy.html";
+        private static string bookPath = "d:/Projects/smalls/book.html";
 
-        private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?";
+        private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|XX";
         //private static Regex moveRe = new Regex(moveReS);
         private static string moveEvalReS = $"({moveReS})(?<eval>[^ ,\\.\\*;:)]*)";
         //private static Regex moveEvalRe = new Regex(moveEvalReS);
@@ -510,20 +591,72 @@ namespace ChessAnalCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
-
+            var book = File.ReadAllLines(bookPath);
             var hub = new MoveInfoHub(moveRe);
-            Console.WriteLine(hub.Push(0, "1.e4 e5"));
+            //Console.WriteLine(hub.Push(0, "1.e4 e5"));
 
-            /*
+            var rss = new List<string>();
             var ss = File.ReadAllLines(mdPath);
-            ss = ss.Select(s => handleString(s, moveSeqRe, (x, m) => {
-                return $"<span class='moves'>{x}</span>";
-            })).ToArray();
+            var lastLevel = 1;
+            foreach (var s in ss) {
+                if (s.Length > 0 && s[0] == '#') {
+                    rss.Add(s);
+                    continue;
+                }
+
+                var tags = Tag.Parse(s);
+                var s2 = Tag.Clear(s);
+                var skipStarts = tags
+                    .Where(x => x.name == "skip" && x.attr.ContainsKey("start"))
+                    .Select(x => x.attr["start"])
+                    .ToArray();
+
+                var adds = tags
+                    .Where(x => x.name == "add" && x.attr.ContainsKey("start") && x.attr.ContainsKey("value"))
+                    .Select(x => new Tuple<string, string>(x.attr["start"], x.attr["value"]))
+                    .ToArray();
+
+                var levelTags = tags
+                    .Where(x => x.name == "level" && x.attr.ContainsKey("start") && x.attr.ContainsKey("value"))
+                    .Select(x => new Tuple<string, int>(x.attr["start"], int.Parse(x.attr["value"])))
+                    .ToArray();
+
+                var levels = getLevels(s, lastLevel);
+                lastLevel = tags.Any(x => x.name == "continue") ? levels.Last().Item2 : 1;
+
+                var breakHandle = false;
+                var rs = handleString(s2, moveSeqRe, (x, m) => {
+                    if (skipStarts.Any(y => x.IndexOf(y) == 0) || breakHandle) {
+                        return x;
+                    }
+
+                    var level = levels.TakeWhile(y => y.Item1 < m.Index).Last().Item2;
+                    var levelTag = levelTags.Where(y => x.IndexOf(y.Item1) == 0).Select(y => (int?)y.Item2).FirstOrDefault();
+                    if (levelTag != null) {
+                        level += levelTag.Value;
+                    }
+
+                    var add = adds.Where(y => x.IndexOf(y.Item1) == 0).Select(y => y.Item2).FirstOrDefault();
+                    if (add != null) {
+                        hub.Push(level, add, false);
+                    }
+
+                    var r = hub.Push(level, x);
+                    breakHandle = r.IndexOf("=>") >= 0;
+                    return r;
+                });
+
+                rss.Add(rs);
+
+                if (rs.IndexOf("=>") >= 0) {
+                    break;
+                }
+            }
+
+            var html = rss.Where(x => x != "").Select(x => Markdown.ToHtml(x)).ToArray();
             
-            var html = ss.Where(x => x != "").Select(x => Markdown.ToHtml(x)).ToArray();
+            File.WriteAllLines(htmlPath, book.Concat(html));
             
-            File.WriteAllLines(htmlPath, html);
-            */
             // renameFiles();
             //var dic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
             //foreach (var node in dic.Values) { node.status = 0; }
