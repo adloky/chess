@@ -599,6 +599,11 @@ namespace ChessAnalCon {
             var ss = File.ReadAllLines(mdPath);
             var lastLevel = 1;
             foreach (var s in ss) {
+                if (s.Length == 0 || s.IndexOf("![](") == 0) {
+                    rss.Add(s);
+                    continue;
+                }
+
                 if (s.Length > 0 && s[0] == '#') {
                     rss.Add(s);
                     continue;
@@ -614,14 +619,19 @@ namespace ChessAnalCon {
                 var adds = tags
                     .Where(x => x.name == "add" && x.attr.ContainsKey("start") && x.attr.ContainsKey("value"))
                     .Select(x => new Tuple<string, string>(x.attr["start"], x.attr["value"]))
-                    .ToArray();
+                    .ToList();
 
                 var levelTags = tags
                     .Where(x => x.name == "level" && x.attr.ContainsKey("start") && x.attr.ContainsKey("value"))
                     .Select(x => new Tuple<string, int>(x.attr["start"], int.Parse(x.attr["value"])))
-                    .ToArray();
+                    .ToList();
 
-                var levels = getLevels(s, lastLevel);
+                var levelAll = tags
+                    .Where(x => x.name == "level" && !x.attr.ContainsKey("start") && x.attr.ContainsKey("value"))
+                    .Select(x => int.Parse(x.attr["value"]))
+                    .FirstOrDefault();
+
+                var levels = getLevels(s2, lastLevel);
                 lastLevel = tags.Any(x => x.name == "continue") ? levels.Last().Item2 : 1;
 
                 var breakHandle = false;
@@ -631,14 +641,19 @@ namespace ChessAnalCon {
                     }
 
                     var level = levels.TakeWhile(y => y.Item1 < m.Index).Last().Item2;
-                    var levelTag = levelTags.Where(y => x.IndexOf(y.Item1) == 0).Select(y => (int?)y.Item2).FirstOrDefault();
+                    level += levelAll;
+                    var levelTagTuple = levelTags.Where(y => x.IndexOf(y.Item1) == 0).FirstOrDefault();
+                    var levelTag = levelTagTuple?.Item2;
                     if (levelTag != null) {
                         level += levelTag.Value;
+                        levelTags.Remove(levelTagTuple);
                     }
 
-                    var add = adds.Where(y => x.IndexOf(y.Item1) == 0).Select(y => y.Item2).FirstOrDefault();
+                    var addTuple = adds.Where(y => x.IndexOf(y.Item1) == 0).FirstOrDefault();
+                    var add = addTuple?.Item2;
                     if (add != null) {
                         hub.Push(level, add, false);
+                        adds.Remove(addTuple);
                     }
 
                     var r = hub.Push(level, x);
@@ -696,9 +711,9 @@ namespace ChessAnalCon {
             }
             */
             Console.WriteLine("Save? (y/n)");
-            if (Console.ReadLine() == "y") {
+            //if (Console.ReadLine() == "y") {
                 // File.WriteAllLines(nodesPath, dic.Select(x => JsonConvert.SerializeObject(x.Value)));
-            }
+            //}
         }
     }
 }
