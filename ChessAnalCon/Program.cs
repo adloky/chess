@@ -12,6 +12,7 @@ using Chess;
 using Chess.Pieces;
 using Newtonsoft.Json;
 using Markdig;
+using System.Globalization;
 
 namespace ChessAnalCon {
 
@@ -404,6 +405,21 @@ namespace ChessAnalCon {
         public int? score { get; set; }
     }
 
+    public enum ParseState {
+        Empty,
+        Param,
+        Moves
+    }
+
+    public class Game {
+        public readonly static Regex ParamRegex = new Regex(@"^\[([^ ]+) ""([^""]*)""\]$", RegexOptions.Compiled);
+        public readonly static Regex CommentRegex = new Regex(@" \{[^}]*\}", RegexOptions.Compiled);
+        public readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);
+        public readonly static Regex ScoreRegex = new Regex(@"[!?]", RegexOptions.Compiled);
+        public readonly static Regex SpaceRegex = new Regex(@"\s+", RegexOptions.Compiled);
+        public readonly static Regex ResultRegex = new Regex(@" ?(1-0|0-1|1/2-1/2|\*)$", RegexOptions.Compiled);
+    }
+
     class Program {
         public static string PrettyPgn(string pgn) {
             var result = "";
@@ -700,6 +716,46 @@ namespace ChessAnalCon {
             File.WriteAllLines(htmlPath, book.Concat(html));
         }
 
+        private static IEnumerable<string> GetPgnBodies(StreamReader reader) {
+            var prevState = ParseState.Empty;
+            var state = ParseState.Empty;
+            var body = "";
+            while (!reader.EndOfStream) {
+                prevState = state;
+                var s = reader.ReadLine();
+
+                state = (s == "") ? ParseState.Empty
+                    : (s[0] == '[') ? ParseState.Param
+                    : ParseState.Moves;
+
+                if (state == ParseState.Moves) {
+                    body = $"{body}{(body == "" ? "" : " ")}{s}";
+                }
+
+                if (state == ParseState.Empty && prevState == ParseState.Moves) {
+                    yield return body;
+                    body = "";
+                }
+            }
+        }
+
+        private static Regex evalRe = new Regex("%eval (?<eval>[^\\]]+)", RegexOptions.Compiled);
+
+        private static string normMovesBody(string body) {
+            body = handleString(body, Game.CommentRegex, (s,x) => {
+                var m = evalRe.Match(s);
+                var eval = m.Groups["eval"].Value;
+                return eval == "" ? "" : " $" + eval;
+            });
+            //body = Game.CommentRegex.Replace(body, "");
+            body = Game.NumberRegex.Replace(body, "");
+            body = Game.ScoreRegex.Replace(body, "");
+            body = Game.SpaceRegex.Replace(body, " ");
+            body = Game.ResultRegex.Replace(body, "");
+            body = body.Trim();
+            return body;
+        }
+
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
 
         private static string mdPath = "d:/Projects/smalls/nimzo-lysyy.md";
@@ -722,11 +778,52 @@ namespace ChessAnalCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
-            var dic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<FenScore>(x)).ToDictionary(x => x.fen, x => x);
- 
+            var dic = File.ReadAllLines("d:/lichess-fens.json").Select(x => JsonConvert.DeserializeObject<FenScore>(x)).ToDictionary(x => x.fen, x => x);
+
+            long pos = 0;
+            using (var readStream = File.OpenRead("e:/lichess_23-06.pgn"))
+            using (var reader = new StreamReader(readStream))
+            {
+                reader.BaseStream.Position = long.Parse(File.ReadAllText("d:/lichess-pos.txt"));
+                var count = 0;
+                foreach (var body in GetPgnBodies(reader)) {
+                    count++;
+                    if (count % 1000 == 0) {
+                        Console.WriteLine(reader.GetVirtualPosition() / 1000000);
+                    }
+                    if (body.IndexOf("[%eval ") >= 0) {
+                        var s = normMovesBody(body);
+                        var xs = s.Split(' ').Take(100).ToArray();
+                        var board = Board.Load();
+                        var fen = board.GetFEN();
+                        foreach (var x in xs) {
+                            if (x[0] != '$') {
+                                fen = FEN.Move(fen, x);
+                            }
+                            else {
+                                FenScore node;
+                                if (dic.TryGetValue(fen, out node) && node.score == null) {
+                                    var val = (int)(float.Parse(x.Replace("#", "").Replace("$", ""), CultureInfo.InvariantCulture) * 100);
+                                    if (x[1] == '#') {
+                                        val = Math.Sign(val) * 30000 - val;
+                                    }
+                                    node.score = val;
+                                }
+                            }
+                        }
+                    }
+
+                    if (ctrlC) {
+                        break;
+                    }
+                }
+                pos = reader.GetVirtualPosition();
+            }
+
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
-                 File.WriteAllLines("d:/lichess-fens.json", dic.Select(x => JsonConvert.SerializeObject(x.Value)));
+                File.WriteAllText("d:/lichess-pos.txt", pos.ToString());
+                File.WriteAllLines("d:/lichess-fens.json", dic.Select(x => JsonConvert.SerializeObject(x.Value)));
             }
         }
     }
