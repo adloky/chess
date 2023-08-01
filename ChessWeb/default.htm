@@ -434,6 +434,11 @@
                   if (isPlayMode) {
                       return;
                   }
+
+                  if (crs[0] === null) {
+                      $(".score").text("NF");
+                      return;
+                  }
                   applyArrows(crs);
                   $(".score").text(crs[0].score / 100);
                   $(".move-var").html(crs.filter(x => x.san1st).slice(0, 3).map(x => (x.score / 100) + " <b>" + x.san1st + "</b>").join(" &nbsp;") + "&nbsp;");

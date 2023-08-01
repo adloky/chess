@@ -35,7 +35,7 @@ namespace ChessEngine
             }
 
             if (response == null) {
-                yield return new EngineCalcResult[] { new EngineCalcResult() { san = "NotFound" } };
+                yield return new EngineCalcResult[] { null };
                 yield break;
             }
 

@@ -80,7 +80,7 @@ namespace ChessAnalCon {
         [JsonIgnore]
         public string key {
             get {
-                return FenLast.GetKey(fen,last);
+                return FenLast.GetKey(fen, last);
             }
         }
     }
@@ -179,6 +179,8 @@ namespace ChessAnalCon {
         public string moveUci { get; set; }
 
         public string fen { get; set; }
+
+        public bool err { get; set; }
     }
 
     public class MoveInfoList : IList<MoveInfo>
@@ -303,7 +305,13 @@ namespace ChessAnalCon {
 
         public MoveInfo Push(int level, int index, string move) {
             var prev = getPrev(level, index);
-            var mi = new MoveInfo() { fen = fenMove(prev.fen, move), moveSan = move, moveUci = move == "XX" ? null : FEN.San2Uci(prev.fen, move) };
+            var err = false;
+            if (move.IndexOf("+") >= 0) {
+                var uci = FEN.San2Uci(prev.fen, move);
+                var san = FEN.Uci2San(prev.fen, uci);
+                err = move != san;
+            }
+            var mi = new MoveInfo() { fen = fenMove(prev.fen, move), moveSan = move, moveUci = move == "XX" ? null : FEN.San2Uci(prev.fen, move), err = err };
             this[level, index] = mi;
 
             return mi;
@@ -330,7 +338,7 @@ namespace ChessAnalCon {
                 try {
                     mi = Push(level, index, move);
                 }
-                catch {}
+                catch { }
 
                 if (mi == null) {
                     isEx = true;
@@ -338,7 +346,7 @@ namespace ChessAnalCon {
                 }
 
                 if (!skipInc) id++;
-                return $"<span id='move{id}' class='move' fen='{mi.fen}' uci='{mi.moveUci}'>{x}</span>";
+                return $"<span id='move{id}' class='move' fen='{mi.fen}' uci='{mi.moveUci}'>{x}{(mi.err ? "ERR" : "")}</span>";
             });
         }
 
@@ -391,13 +399,18 @@ namespace ChessAnalCon {
         }
     }
 
+    public class FenScore {
+        public string fen { get; set; }
+        public int? score { get; set; }
+    }
+
     class Program {
         public static string PrettyPgn(string pgn) {
             var result = "";
             var split = pgn.Split(' ');
             for (var i = 0; i < split.Length; i++) {
                 if (i % 2 == 0) {
-                    result += $"{i/2+1}. ";
+                    result += $"{i / 2 + 1}. ";
                 }
                 result += $"{split[i]} ";
             }
@@ -438,7 +451,7 @@ namespace ChessAnalCon {
             for (; i < s.Length; i++) {
                 if (s[i] == ' ') {
                     yield return new Tuple<int, int>(j, i - j);
-                    j = i + 1; 
+                    j = i + 1;
                 }
             }
             yield return new Tuple<int, int>(j, i - j);
@@ -451,15 +464,15 @@ namespace ChessAnalCon {
             if (sha == null) {
                 sha = SHA256.Create();
             }
-            
-            var hash = sha.ComputeHash(bytes,0,len);
+
+            var hash = sha.ComputeHash(bytes, 0, len);
             var guid = new Guid(hash.Take(16).ToArray());
             return guid;
         }
 
         public static IEnumerable<PieceMove> PromoteProcessed(PieceMove move) {
             if (!move.HasPromotion) {
-                 return Enumerable.Repeat(move, 1);
+                return Enumerable.Repeat(move, 1);
             }
 
             return (new Type[] { typeof(Knight), typeof(Bishop), typeof(Rook), typeof(Queen) })
@@ -468,7 +481,7 @@ namespace ChessAnalCon {
 
         public static IEnumerable<string> GetPieceMoves(string fen) {
             var board = Board.Load(fen);
- 
+
             return board[board.Turn]
                 .SelectMany(x => x.GetValidMoves())
                 .SelectMany(x => PromoteProcessed(x))
@@ -506,10 +519,10 @@ namespace ChessAnalCon {
         private static void renameFiles() {
             var prefix = "Aspose.Words.87de280c-dfc0-448b-960a-33bcf0583fb7.";
             var files = Directory.EnumerateFiles("d:/nimzo-lysyy").Where(x => x.IndexOf(prefix) >= 0);
-            
+
             foreach (var file in files) {
                 File.Move(file, file.Replace(prefix, ""));
-//                Console.WriteLine(file);
+                //                Console.WriteLine(file);
             }
         }
 
@@ -569,42 +582,56 @@ namespace ChessAnalCon {
             return r;
         }
 
-        private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
+        private static void findGames() {
+            using (var readStream = File.OpenRead("d:/lichess_2023-04.csv"))
+            using (var reader = new StreamReader(readStream))
+            {
+                var r = new List<string>();
+                var count = 0;
+                var rCount = 0;
+                while (!reader.EndOfStream) {
+                    var s = reader.ReadLine();
+                    var split = s.Split(',');
+                    var moves = split[0];
+                    var moveCount = moves.Count(x => x == ' ') + 1;
+                    var isBlitz = split[1] == "blitz";
+                    var elos = split[2].Split(' ').Select(x => int.Parse(x)).ToArray();
+                    var isWin = split[3] == "1-0";
+                    var isRl = moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 Nf6 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 d6 c3 Nf6 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 d6 c3 a6 Ba4 Nf6 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 Bc5 c3 Nf6 d3") == 0
+                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 c3 Nf6 d3") == 0;
 
-        private static string mdPath = "d:/Projects/smalls/nimzo-lysyy.md";
-        private static string md2Path = "d:/Projects/smalls/nimzo-lysyy-2.md";
-        private static string htmlPath = "d:/nimzo-lysyy.html";
-        private static string bookPath = "d:/Projects/smalls/book.html";
+                    count++;
+                    
+                    if (count % 10000 == 0) {
+                        Console.WriteLine($"{rCount}/{count}");
+                    }
 
-        private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|XX";
-        //private static Regex moveRe = new Regex(moveReS);
-        private static string moveEvalReS = $"({moveReS})(?<eval>[^ ,\\.\\*;:)]*)";
-        //private static Regex moveEvalRe = new Regex(moveEvalReS);
-        private static string evalLongReS = $"(?<ccm>\\+)−\\+|(?<ccm>\\+)\\+−|\\+−|−\\+|(?<ccm>\\+)|(?<ccm>#)";
-        private static string evalReS = $"({evalLongReS}|[!?⩱⩲∓±↻=∞⇄↑→N])*";
-        private static string moveNEvalReS = $"(?<move>{moveReS})(?<eval>{evalReS})";
-        private static string moveSeq1stReS = $"\\d+\\.{moveNEvalReS}( {moveNEvalReS} \\d+\\.{moveNEvalReS})*( {moveNEvalReS})?";
-        private static string moveSeq2ndReS = $"\\d+\\.\\.\\.{moveNEvalReS}( \\d+\\.{moveNEvalReS} {moveNEvalReS})*( \\d+\\.{moveNEvalReS})?";
-        private static string moveSeqFullReS = $"{moveSeq1stReS}|{moveSeq2ndReS}";
-        private static Regex moveSeqRe = new Regex(moveSeqFullReS);
-        private static Regex moveRe = new Regex($"(?<num>\\d+\\.(\\.\\.)?)?{moveNEvalReS}");
+                    if (!isBlitz || moveCount > 202 * 2 || !isWin || !isRl || elos[1] >= 1900 || elos[0] - elos[1] < 200) {
+                        continue;
+                    }
 
-        static void Main(string[] args) {
-            Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
+                    rCount++;
+                    r.Add(PrettyPgn(moves));
+                    r.Add("");
+                }
+                File.WriteAllLines("d:/spanish-vs-noobs.txt", r);
+            }
+        }
+
+        private static void processBook() {
             var book = File.ReadAllLines(bookPath);
             var hub = new MoveInfoHub(moveRe);
-            //Console.WriteLine(hub.Push(0, "1.e4 e5"));
 
             var rss = new List<string>();
             var ss = File.ReadAllLines(mdPath);
             var lastLevel = 1;
             foreach (var s in ss) {
-                if (s.Length == 0 || s.IndexOf("![](") == 0) {
-                    rss.Add(s);
-                    continue;
-                }
-
-                if (s.Length > 0 && s[0] == '#') {
+                if (s == "" || s.IndexOf("![](") == 0 || s.IndexOf("#") == 0) {
                     rss.Add(s);
                     continue;
                 }
@@ -671,49 +698,36 @@ namespace ChessAnalCon {
             var html = rss.Where(x => x != "").Select(x => Markdown.ToHtml(x)).ToArray();
             
             File.WriteAllLines(htmlPath, book.Concat(html));
-            
-            // renameFiles();
-            //var dic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
-            //foreach (var node in dic.Values) { node.status = 0; }
-            /*
-            var ss = File.ReadAllLines("d:/lichess-unreach.json");
-            foreach (var s in ss) {
-                var split = s.Split(',');
-                var move = split[0];
-                var key = split[1];
-                var node = dic[key];
-                node.moves = pushMove(node.moves, move);
-            }
-            */
-            /*
-            var count = dic.Values.Count();
-            foreach (var node in dic.Values) {
-                if (ctrlC) {
-                    break;
-                }
+        }
 
-                count--;
-                if (count % 1000 == 0) {
-                    Console.WriteLine(count);
-                }
+        private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
 
-                if (node.moves == null) {
-                    continue;
-                }
+        private static string mdPath = "d:/Projects/smalls/nimzo-lysyy.md";
+        private static string md2Path = "d:/Projects/smalls/nimzo-lysyy-2.md";
+        private static string htmlPath = "d:/nimzo-lysyy.html";
+        private static string bookPath = "d:/Projects/smalls/book.html";
 
-                var moves = node.moves.Split(' ');
+        private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|XX";
+        //private static Regex moveRe = new Regex(moveReS);
+        private static string moveEvalReS = $"({moveReS})(?<eval>[^ ,\\.\\*;:)]*)";
+        //private static Regex moveEvalRe = new Regex(moveEvalReS);
+        private static string evalLongReS = $"(?<ccm>\\+)−\\+|(?<ccm>\\+)\\+−|\\+−|−\\+|(?<ccm>\\+)|(?<ccm>#)";
+        private static string evalReS = $"({evalLongReS}|[!?⩱⩲∓±↻=∞⇄↑→N])*";
+        private static string moveNEvalReS = $"(?<move>{moveReS})(?<eval>{evalReS})";
+        private static string moveSeq1stReS = $"\\d+\\.{moveNEvalReS}( {moveNEvalReS} \\d+\\.{moveNEvalReS})*( {moveNEvalReS})?";
+        private static string moveSeq2ndReS = $"\\d+\\.\\.\\.{moveNEvalReS}( \\d+\\.{moveNEvalReS} {moveNEvalReS})*( \\d+\\.{moveNEvalReS})?";
+        private static string moveSeqFullReS = $"{moveSeq1stReS}|{moveSeq2ndReS}";
+        private static Regex moveSeqRe = new Regex(moveSeqFullReS);
+        private static Regex moveRe = new Regex($"(?<num>\\d+\\.(\\.\\.)?)?{moveNEvalReS}");
 
-                foreach (var move in moves) {
-                    var nextFen = FEN.Move(node.fen, move);
-                    var key = FenLast.GetKey(nextFen, move);
-                    dic[key].status = 1;
-                }
-            }
-            */
+        static void Main(string[] args) {
+            Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
+            var dic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<FenScore>(x)).ToDictionary(x => x.fen, x => x);
+ 
             Console.WriteLine("Save? (y/n)");
-            //if (Console.ReadLine() == "y") {
-                // File.WriteAllLines(nodesPath, dic.Select(x => JsonConvert.SerializeObject(x.Value)));
-            //}
+            if (Console.ReadLine() == "y") {
+                 File.WriteAllLines("d:/lichess-fens.json", dic.Select(x => JsonConvert.SerializeObject(x.Value)));
+            }
         }
     }
 }
