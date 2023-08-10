@@ -22,26 +22,49 @@ using System.Security.Cryptography;
 
 namespace ChessCon {
 
-    class Program {
+    public class OpeningNode {
 
-        public class OpeningNode {
-            public string fen { get; set; }
+        public string fen { get; set; }
 
-            public int count { get; set; }
+        public int count { get; set; }
 
-            public int? score { get; set; }
+        public int midCount { get; set; }
 
-            public string moves { get; set; }
+        public string last { get; set; }
 
-            public int status { get; set; }
+        public int? score { get; set; }
 
-            [JsonIgnore]
-            public int turn {
-                get {
-                    return fen.IndexOf(" w ") > -1 ? 1 : -1;
-                }
+        public string moves { get; set; }
+
+        public int status { get; set; }
+
+        public string tags { get; set; }
+
+        [JsonIgnore]
+        public int turn {
+            get {
+                return fen.IndexOf(" w ") > -1 ? 1 : -1;
             }
         }
+
+        [JsonIgnore]
+        public string key {
+            get {
+                return GetKey(fen, last);
+            }
+        }
+
+        public static string GetKey(string fen, string last) {
+            if (last == null) {
+                return fen;
+            }
+
+            return $"{fen} {last}";
+        }
+    }
+
+
+    class Program {
 
         public struct WalkNode {
             public OpeningNode node { get; set; }
@@ -49,35 +72,46 @@ namespace ChessCon {
             public string moves { get; set; }
         }
 
-        public static IEnumerable<WalkNode> EnumerateNodesRecurse(string fen, string moves, int minCount = 0, OpeningNode parent = null, HashSet<string> hashs = null) {
+        public static IEnumerable<WalkNode> EnumerateNodesRecurse(string fen, string last, string moves, int minCount = 0, OpeningNode parent = null, HashSet<string> hashs = null) {
             if (hashs == null) hashs = new HashSet<string>();
-            if (nodeDic.ContainsKey(fen) && !hashs.Contains(fen) ) {
-                var node = nodeDic[fen];
+            var key = OpeningNode.GetKey(fen, last);
+            var r = Enumerable.Empty<WalkNode>();
+            if (nodeDic.ContainsKey(key) && !hashs.Contains(key)) {
+                var node = nodeDic[key];
                 if (node.count >= minCount) {
-                    hashs.Add(fen);
-                    if (parent != null) {
-                        yield return new WalkNode() { parentNode = parent, node = node, moves = moves };
-                    }
-                
-                    foreach (var move in (node.moves ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)) {
-                        var childs = EnumerateNodesRecurse(FEN.Move(fen,move), $"{moves}{(moves == "" ? "" : " ")}{move}", minCount, node, hashs);
-                        foreach (var child in childs) {
-                            yield return child;
-                        }
-                    }
+                    hashs.Add(key);
+                    var parentSel = parent == null
+                        ? Enumerable.Empty<WalkNode>()
+                        : Enumerable.Repeat(new WalkNode() { parentNode = parent, node = node, moves = moves }, 1);
+
+                    var moveArr = (node.moves ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    var childSel = moveArr.SelectMany(m => EnumerateNodesRecurse(FEN.Move(fen, m), m, $"{moves}{(moves == "" ? "" : " ")}{m}", minCount, node, hashs));
+                    r = parentSel.Concat(childSel);
                 }
             }
+
+            return r;
         }
 
         public static IEnumerable<WalkNode> EnumerateNodes(string moves = null, int minCount = 0) {
             moves = Regex.Replace(moves ?? "", @"\d+\.\s+", "");
 
             var fen = Board.DEFAULT_STARTING_FEN;
-            foreach (var move in (moves ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)) {
+            var ms = (moves ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var nodes = new List<WalkNode>();
+            var eMoves = "";
+            var parentNode = nodeDic[fen];
+            foreach (var move in ms) {
                 fen = FEN.Move(fen, move);
+                eMoves = $"{eMoves}{(eMoves == "" ? "" : " ")}{move}";
+                var node = nodeDic[OpeningNode.GetKey(fen, move)];
+                nodes.Add(new WalkNode() { node = node, parentNode = parentNode, moves = eMoves });
+                parentNode = node;
             }
 
-            return EnumerateNodesRecurse(fen, moves, minCount);
+            var last = ms.Length == 0 ? null : ms.Last();
+
+            return nodes.Concat(EnumerateNodesRecurse(fen, last, moves, minCount));
         }
 
         public static string PrettyPgn(string pgn) {
@@ -136,6 +170,14 @@ namespace ChessCon {
             return result;
         }
 
+        private static string pushTag(string tags, string tag) {
+            if (tags == null) {
+                return tag;
+            }
+
+            var s = $" {tags} ";
+            return s.IndexOf($" {tag} ") > -1 ? tags : $"{tags} {tag}";
+        }
 
         private static string nodesPath = "d:/lichess.json";
 
@@ -145,7 +187,7 @@ namespace ChessCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
-            nodeDic = File.ReadAllLines(nodesPath).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.fen, x => x);
+            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.IndexOf("#caro-kann") > -1).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
 
             // foreach (var node in nodeDic.Values) { node.status = 0; }
 
@@ -186,13 +228,26 @@ namespace ChessCon {
             }
             */
 
+            // var r = EnumerateNodes("1. e4 c6", 0).ToArray(); Console.WriteLine(r.Length);
+            /*
+            var tag = "#sicilian";
+            foreach (var wn in EnumerateNodes("1. e4 c5")) {
+                if (wn.parentNode.last == null) {
+                    wn.parentNode.tags = pushTag(wn.parentNode.tags, tag);
+                }
 
-            foreach (var wn in EnumerateNodes("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 Bc5", 0).Where(x => (x.node.score - x.parentNode.score) * x.node.turn >= 80 && x.parentNode.score * x.node.turn >= -30 && x.node.turn == 1)) {
+                wn.node.tags = pushTag(wn.node.tags, tag);
+            }
+            */
+
+            
+            foreach (var wn in EnumerateNodes("1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4", 0).Where(x => (x.node.score - x.parentNode.score) * x.node.turn >= 80 && x.parentNode.score * x.node.turn >= -30 && x.node.turn == 1)) {
                 Console.WriteLine($"{PrettyPgn(wn.moves)}; {wn.node.score - wn.parentNode.score}");
             }
-
+            
+            
             /*
-            var wns = EnumerateNodes("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. Qe2 b5 6. Bb3 Bc5", 10).ToList();
+            var wns = EnumerateNodes("", 100000).ToList();
 
             ShrinkSubMoves(wns);
 
@@ -204,10 +259,11 @@ namespace ChessCon {
 
             Console.Write("Press ENTER");
             Console.ReadLine();
+            
             /*
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
-                File.WriteAllLines(nodesPath, nodeDic.Select(x => JsonConvert.SerializeObject(x.Value)).ToArray());
+                File.WriteAllLines(nodesPath, nodeDic.Values.Select(x => JsonConvert.SerializeObject(x)));
             }
             */
         }

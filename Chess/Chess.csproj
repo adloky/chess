@@ -84,6 +84,7 @@
     <Compile Include="FEN.cs" />
     <Compile Include="Images.cs" />
     <Compile Include="MoveDirection.cs" />
+    <Compile Include="MoveOptions.cs" />
     <Compile Include="Pgn.cs" />
     <Compile Include="PieceMove.cs" />
     <Compile Include="Piece.cs" />

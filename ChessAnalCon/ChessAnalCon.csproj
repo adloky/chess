@@ -70,6 +70,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ChessEngine\ChessEngine.csproj">
+      <Project>{d4a265af-d65b-4d2e-974d-5ba411dbd3cf}</Project>
+      <Name>ChessEngine</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Chess\Chess.csproj">
       <Project>{cb0ffbf8-54d2-4eb1-b28a-fedfb7b8c960}</Project>
       <Name>Chess</Name>

@@ -13,6 +13,7 @@ using Chess.Pieces;
 using Newtonsoft.Json;
 using Markdig;
 using System.Globalization;
+using ChessEngine;
 
 namespace ChessAnalCon {
 
@@ -56,7 +57,9 @@ namespace ChessAnalCon {
         }
     }
 
+
     public class OpeningNode {
+
         public string fen { get; set; }
 
         public int count { get; set; }
@@ -778,56 +781,46 @@ namespace ChessAnalCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
-            var dic = File.ReadAllLines("d:/lichess-fens.json").Select(x => JsonConvert.DeserializeObject<FenScore>(x)).ToDictionary(x => x.fen, x => x);
-
-            long pos = 0;
-            using (var readStream = File.OpenRead("e:/lichess_23-06.pgn"))
-            using (var reader = new StreamReader(readStream))
-            {
-                reader.BaseStream.Position = long.Parse(File.ReadAllText("d:/lichess-pos.txt"));
-                var count = 0;
-                foreach (var body in GetPgnBodies(reader)) {
-                    count++;
-                    if (count % 1000 == 0) {
-                        Console.WriteLine(reader.GetVirtualPosition() / 1000000);
-                    }
-                    if (body.IndexOf("[%eval ") >= 0) {
-                        var s = normMovesBody(body);
-                        var xs = s.Split(' ').Take(100).ToArray();
-                        var board = Board.Load();
-                        var fen = board.GetFEN();
-                        foreach (var x in xs) {
-                            if (x[0] != '$') {
-                                fen = FEN.Move(fen, x);
-                            }
-                            else {
-                                FenScore node;
-                                if (dic.TryGetValue(fen, out node) && node.score == null) {
-                                    var val = (int)(float.Parse(x.Replace("#", "").Replace("$", ""), CultureInfo.InvariantCulture) * 100);
-                                    if (x[1] == '#') {
-                                        val = Math.Sign(val) * 30000 - val;
-                                    }
-                                    node.score = val;
-                                }
-                            }
-                        }
-                    }
-
+            // var dic = File.ReadAllLines("d:/lichess-fens.json").Select(x => JsonConvert.DeserializeObject<FenScore>(x)).ToDictionary(x => x.fen, x => x);
+            var nodes = File.ReadAllLines("d:/lichess-big.json").Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToArray();
+            /*
+            foreach (var node in nodes) {
+                node.score = dic[node.fen].score;
+            }
+            */
+            /*
+            var nullNodes = dic.Values.Where(x => x.score == null).ToArray();
+            using (var engine = Engine.Open(@"d:\Distribs\stockfish_15_x64_popcnt\stockfish_15_x64_popcnt.exe")) {
+                var count = nullNodes.Length;
+                foreach (var node in nullNodes) {
                     if (ctrlC) {
                         break;
                     }
+                    try {
+                        node.score = engine.CalcScore(node.fen, depth: 16);
+                    }
+                    catch { }
+                    count--;
+                    Console.WriteLine(count);
                 }
-                pos = reader.GetVirtualPosition();
             }
+            */
 
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
-                File.WriteAllText("d:/lichess-pos.txt", pos.ToString());
-                File.WriteAllLines("d:/lichess-fens.json", dic.Select(x => JsonConvert.SerializeObject(x.Value)));
+                // File.WriteAllLines("d:/lichess-fens.json", dic.Select(x => JsonConvert.SerializeObject(x.Value)));
+                File.WriteAllLines("d:/lichess-big.json", nodes.Select(x => JsonConvert.SerializeObject(x)));
             }
         }
     }
 }
+
+/*
+            var nullCount = dic.Values.Count(x => x.score == null);
+            Console.WriteLine($"left: {nullCount}");
+            Console.WriteLine($"{((float)(dic.Count - nullCount) * 100 / dic.Count).ToString("0.00")}%");
+*/
+
 /*
     // Eval notes
     var set = new HashSet<string>();

@@ -178,8 +178,15 @@ namespace Chess
             return target;
         }
 
-        public bool Move(Square source, Square target, Type promotePawnTo)
+        public bool Move(Square source, Square target, Type promotePawnTo, MoveOptions opt = null)
         {
+            if (opt == null) {
+                opt = MoveOptions.Default;
+            }
+            else {
+                opt = MoveOptions.Default.Merge(opt);
+            }
+
             var piece = this[source];
             if (this.Turn != piece.Player || !this.IsActive)
                 return false;
@@ -212,18 +219,23 @@ namespace Chess
             if (this.PieceMoved != null)
                 this.PieceMoved(move);
 
-            bool isInCheck = this.IsInCheck();
-            var mateState = GetMateState();
+            if (opt.SkipTestMate.Value) {
+                this.CurrentPlayer.OnTurn();
+            }
+            else {
+                bool isInCheck = this.IsInCheck();
+                var mateState = GetMateState();
 
-            if (isInCheck && mateState == null)
-                this.OnCheck();
+                if (isInCheck && mateState == null)
+                    this.OnCheck();
 
-            this.CurrentPlayer.OnTurn();
+                this.CurrentPlayer.OnTurn();
 
-            if (mateState == 1 || mateState == -1)
-                this.OnCheckmate();
-            else if (mateState == 0)
-                this.OnStalemate(StalemateReason.NoMoveAvailable);
+                if (mateState == 1 || mateState == -1)
+                    this.OnCheckmate();
+                else if (mateState == 0)
+                    this.OnStalemate(StalemateReason.NoMoveAvailable);
+            }
 
             // CorrectCastleAvailability();
 
@@ -552,14 +564,14 @@ namespace Chess
             return move;
         }
 
-        public bool Move(string s) {
+        public bool Move(string s, MoveOptions opt = null) {
             var move = ParseUciMove(s);
             if (move == null) {
                 move = ParseSanMove(s);
                 if (move == null) return false;
             }
 
-            return Move(move.Source, move.Target, move.PawnPromotedTo);
+            return Move(move.Source, move.Target, move.PawnPromotedTo, opt);
         }
 
         public string Uci2San(string uci) {
