@@ -642,12 +642,16 @@ namespace ChessAnalCon {
             }
         }
 
-        private static void processBook() {
+        private static void processBook(string srcPath, string dstPath, int side = 1) {
             var book = File.ReadAllLines(bookPath);
+            if (side == -1) {
+                book = book.Select(x => x.Replace("flip = false", "flip = true")).ToArray();
+            }
+
             var hub = new MoveInfoHub(moveRe);
 
             var rss = new List<string>();
-            var ss = File.ReadAllLines(mdPath);
+            var ss = File.ReadAllLines(srcPath);
             var lastLevel = 1;
             foreach (var s in ss) {
                 if (s == "" || s.IndexOf("![](") == 0 || s.IndexOf("#") == 0) {
@@ -716,7 +720,7 @@ namespace ChessAnalCon {
 
             var html = rss.Where(x => x != "").Select(x => Markdown.ToHtml(x)).ToArray();
             
-            File.WriteAllLines(htmlPath, book.Concat(html));
+            File.WriteAllLines(dstPath, book.Concat(html));
         }
 
         private static IEnumerable<string> GetPgnBodies(StreamReader reader) {
@@ -760,12 +764,7 @@ namespace ChessAnalCon {
         }
 
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
-
-        private static string mdPath = "d:/Projects/smalls/nimzo-lysyy.md";
-        private static string md2Path = "d:/Projects/smalls/nimzo-lysyy-2.md";
-        private static string htmlPath = "d:/nimzo-lysyy.html";
         private static string bookPath = "d:/Projects/smalls/book.html";
-
         private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|XX";
         //private static Regex moveRe = new Regex(moveReS);
         private static string moveEvalReS = $"({moveReS})(?<eval>[^ ,\\.\\*;:)]*)";
@@ -781,36 +780,13 @@ namespace ChessAnalCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
-            // var dic = File.ReadAllLines("d:/lichess-fens.json").Select(x => JsonConvert.DeserializeObject<FenScore>(x)).ToDictionary(x => x.fen, x => x);
-            var nodes = File.ReadAllLines("d:/lichess-big.json").Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToArray();
-            /*
-            foreach (var node in nodes) {
-                node.score = dic[node.fen].score;
-            }
-            */
-            /*
-            var nullNodes = dic.Values.Where(x => x.score == null).ToArray();
-            using (var engine = Engine.Open(@"d:\Distribs\stockfish_15_x64_popcnt\stockfish_15_x64_popcnt.exe")) {
-                var count = nullNodes.Length;
-                foreach (var node in nullNodes) {
-                    if (ctrlC) {
-                        break;
-                    }
-                    try {
-                        node.score = engine.CalcScore(node.fen, depth: 16);
-                    }
-                    catch { }
-                    count--;
-                    Console.WriteLine(count);
-                }
-            }
-            */
+
+            processBook("d:/Projects/smalls/french-classic-levitov.md", "d:/french-classic-levitov.html");
 
             Console.WriteLine("Save? (y/n)");
-            if (Console.ReadLine() == "y") {
-                // File.WriteAllLines("d:/lichess-fens.json", dic.Select(x => JsonConvert.SerializeObject(x.Value)));
-                File.WriteAllLines("d:/lichess-big.json", nodes.Select(x => JsonConvert.SerializeObject(x)));
-            }
+            //if (Console.ReadLine() == "y") {
+                // File.WriteAllLines("d:/lichess.json", nodes.Select(x => JsonConvert.SerializeObject(x)));
+            //}
         }
     }
 }
