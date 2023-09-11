@@ -14,6 +14,8 @@ using Newtonsoft.Json;
 using Markdig;
 using System.Globalization;
 using ChessEngine;
+using System.Net;
+using Lichess;
 
 namespace ChessAnalCon {
 
@@ -185,6 +187,18 @@ namespace ChessAnalCon {
         public string fen { get; set; }
 
         public bool err { get; set; }
+
+        [JsonIgnore]
+        public int eval { get; set; }
+
+        [JsonIgnore]
+        public int num { get; set; }
+
+        [JsonIgnore]
+        public string numStr { get { return $"{num / 2 + 1}.{(num % 2 == 0 ? "" : "..")}"; } }
+
+        [JsonIgnore]
+        public string evalStr { get { return ((float)eval / 100).ToString(CultureInfo.InvariantCulture); } }
     }
 
     public class MoveInfoList : IList<MoveInfo>
@@ -423,6 +437,11 @@ namespace ChessAnalCon {
         public readonly static Regex ResultRegex = new Regex(@" ?(1-0|0-1|1/2-1/2|\*)$", RegexOptions.Compiled);
     }
 
+    public class Config {
+        public string mdName { get; set; }
+        public int mdColor { get; set; }
+    }
+
     class Program {
         public static string PrettyPgn(string pgn) {
             var result = "";
@@ -616,13 +635,13 @@ namespace ChessAnalCon {
                     var isBlitz = split[1] == "blitz";
                     var elos = split[2].Split(' ').Select(x => int.Parse(x)).ToArray();
                     var isWin = split[3] == "1-0";
-                    var isRl = moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 d3") == 0
-                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 Nf6 d3") == 0
-                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 d6 c3 Nf6 d3") == 0
-                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 d6 c3 a6 Ba4 Nf6 d3") == 0
-                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 d3") == 0
-                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 Bc5 c3 Nf6 d3") == 0
-                            || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 c3 Nf6 d3") == 0;
+                    var isOpen = moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 d3") == 0
+                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 Nf6 d3") == 0
+                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 d6 c3 Nf6 d3") == 0
+                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 d6 c3 a6 Ba4 Nf6 d3") == 0
+                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 d3") == 0
+                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 Bc5 c3 Nf6 d3") == 0
+                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 c3 Nf6 d3") == 0;
 
                     count++;
                     
@@ -630,15 +649,15 @@ namespace ChessAnalCon {
                         Console.WriteLine($"{rCount}/{count}");
                     }
 
-                    if (!isBlitz || moveCount > 202 * 2 || !isWin || !isRl || elos[1] >= 1900 || elos[0] - elos[1] < 200) {
+                    if (!(isBlitz && moveCount <= 200 && isWin && isOpen && elos[1] < 10000 && elos[0] - elos[1] >= -1000 && elos.Min() > 2300)) {
                         continue;
                     }
 
                     rCount++;
-                    r.Add(PrettyPgn(moves));
-                    r.Add("");
+                    r.Add($"{elos.Min()},{PrettyPgn(moves)}");
+                    //r.Add("");
                 }
-                File.WriteAllLines("d:/spanish-vs-noobs.txt", r);
+                File.WriteAllLines("d:/spanish-top.txt", r.OrderByDescending(x => x));
             }
         }
 
@@ -763,6 +782,79 @@ namespace ChessAnalCon {
             return body;
         }
 
+        private static void handlePgn() {
+            using (var stream = File.OpenRead("d:/amin.pgn")) {
+                var rs = new List<string>();
+                foreach (var pgn in Pgn.LoadMany(stream)) {
+                    var isWhite = pgn.Params["White"] == "Dr-Bassem";
+                    var isWin = pgn.Params["Result"] == "1-0";
+                    var control = int.Parse(pgn.Params["TimeControl"].Split('/')[0].Split('+')[0]);
+                    var id = pgn.Params["Link"].Split('/').Last();
+                    var isOpen = pgn.Moves.IndexOf("e4 c6 d4 d5 exd5 cxd5 c4") == 0; //&& pgn.Moves.IndexOf(" d3") >= 0;
+
+                    if (!(isWhite && isWin && control >= 180 && isOpen)) {
+                        continue;
+                    }
+
+                    rs.Add($"[White \"Amin\"]");
+                    rs.Add($"[Black \"chess-com-{id}\"]");
+                    rs.Add($"");
+                    rs.Add(PrettyPgn(pgn.Moves));
+                    rs.Add($"");
+                }
+
+                File.WriteAllLines("d:/panov-amin.pgn", rs);
+            }
+        }
+
+        private static void evalPgn(string path) {
+            var engine = Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe");
+
+            Func<string, bool> forHandle = x => x != "" && x[0] != '[' && x.IndexOf("{") < 0;
+            var rs = File.ReadAllLines(path).ToArray();
+            var count = rs.Where(x => forHandle(x)).Sum(x => x.Split(' ').Where(y => y.IndexOf(".") < 0).Count());
+
+            for (var i = 0; i < rs.Length; i++) {
+                var s = rs[i];
+
+                if (!forHandle(s)) {
+                    continue;
+                }
+
+                var moves = Pgn.Load(s).Moves.Split(' ');
+                var fen = Board.DEFAULT_STARTING_FEN;
+                var infos = new List<MoveInfo>();
+                var num = 0;
+                foreach (var move in moves) {
+                    fen = FEN.Move(fen, move);
+                    infos.Add(new MoveInfo() { fen = fen, moveSan = move, num = num });
+                    num++;
+                }
+
+                foreach (var info in infos) {
+                    if (ctrlC) {
+                        break;
+                    }
+
+                    try {
+                        info.eval = engine.CalcScore(info.fen, depth: 18);
+                    } catch { ctrlC = true; }
+
+                    count--;
+                    Console.WriteLine(count);
+                }
+
+                if (ctrlC) {
+                    break;
+                }
+
+                rs[i] = string.Join(" ", infos.Select(x => $"{x.numStr} {x.moveSan} {{{x.evalStr}}}"));
+            }
+
+            File.WriteAllLines(path, rs);
+            engine.Dispose();
+        }
+
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
         private static string bookPath = "d:/Projects/smalls/book.html";
         private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|XX";
@@ -780,8 +872,12 @@ namespace ChessAnalCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
+            var config = JsonConvert.DeserializeObject<Config>(File.ReadAllText("d:/.chess-anal"));
 
-            processBook("d:/Projects/smalls/french-classic-levitov.md", "d:/french-classic-levitov.html");
+            //processBook($"d:/Projects/smalls/{config.mdName}.md", $"d:/{config.mdName}.html", config.mdColor);
+            //findGames();
+            evalPgn("d:/panov-amin.pgn");
+            //handlePgn();
 
             Console.WriteLine("Save? (y/n)");
             //if (Console.ReadLine() == "y") {

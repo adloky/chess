@@ -8,10 +8,18 @@ using System.Threading.Tasks;
 
 namespace Chess {
     public class Pgn {
+        private readonly static Regex ParamRegex = new Regex(@"^\[([^ ]+) ""([^""]*)""\]$", RegexOptions.Compiled);
+        private readonly static Regex CommentRegex = new Regex(@" \{[^}]*\}", RegexOptions.Compiled);
+        private readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);
+        private readonly static Regex ScoreRegex = new Regex(@"[!?]", RegexOptions.Compiled);
+        private readonly static Regex SpaceRegex = new Regex(@"\s+", RegexOptions.Compiled);
+        private readonly static Regex ResultRegex = new Regex(@" ?(1-0|0-1|1/2-1/2|\*)$", RegexOptions.Compiled);
 
         public string Fen { get; private set; } = Board.DEFAULT_STARTING_FEN;
         public string Moves { get; private set; } = "";
         public string Site { get; private set; }
+        public Dictionary<string, string> Params { get; private set; } = new Dictionary<string, string>();
+
 
         #region GetMoves
 
@@ -20,19 +28,6 @@ namespace Chess {
              Param,
              Moves
          }
-
-        private class Game {
-             public readonly static Regex ParamRegex = new Regex(@"^\[([^ ]+) ""([^""]*)""\]$", RegexOptions.Compiled);
-             public readonly static Regex CommentRegex = new Regex(@" \{[^}]*\}", RegexOptions.Compiled);
-             public readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);
-             public readonly static Regex ScoreRegex = new Regex(@"[!?]", RegexOptions.Compiled);
-             public readonly static Regex SpaceRegex = new Regex(@"\s+", RegexOptions.Compiled);
-             public readonly static Regex ResultRegex = new Regex(@" ?(1-0|0-1|1/2-1/2|\*)$", RegexOptions.Compiled);
- 
-             public Dictionary<string, string> Params { get; private set; } = new Dictionary<string, string>();
- 
-             public string Moves { get; set; } = "";
-        }
 
         private static string removeVariants(string s) {
             var level = 0;
@@ -56,61 +51,67 @@ namespace Chess {
             return sb.ToString();
         }
 
+        public static IEnumerable<Pgn> LoadMany(StreamReader reader) {
+            var prevState = ParseState.Empty;
+            var state = ParseState.Empty;
+            var pgn = new Pgn();
+            while (!reader.EndOfStream) {
+                prevState = state;
+                var s = reader.ReadLine();
+
+                state = (s == "") ? ParseState.Empty
+                                    : (s[0] == '[') ? ParseState.Param
+                                    : ParseState.Moves;
+
+                if (state == ParseState.Param) {
+                    var match = ParamRegex.Match(s);
+                    if (!match.Success) throw new Exception($"Invalid param: {s}");
+                    pgn.Params.Add(match.Groups[1].Value, match.Groups[2].Value);
+                }
+
+                if (state == ParseState.Moves) {
+                    pgn.Moves = $"{pgn.Moves} {s}";
+                }
+
+                if (state == ParseState.Empty && prevState == ParseState.Moves) {
+                    pgn.Moves = CommentRegex.Replace(pgn.Moves, "");
+                    pgn.Moves = NumberRegex.Replace(pgn.Moves, "");
+                    pgn.Moves = ScoreRegex.Replace(pgn.Moves, "");
+                    pgn.Moves = removeVariants(pgn.Moves);
+                    pgn.Moves = SpaceRegex.Replace(pgn.Moves, " ");
+                    pgn.Moves = ResultRegex.Replace(pgn.Moves, "");
+                    pgn.Moves = pgn.Moves.Trim();
+
+                    if (pgn.Params.ContainsKey("FEN")) {
+                        pgn.Fen = pgn.Params["FEN"];
+                    }
+
+                    if (pgn.Params.ContainsKey("Site")) {
+                        pgn.Site = pgn.Params["Site"];
+                    }
+
+                    yield return pgn;
+                    pgn = new Pgn();
+                }
+            }
+        }
+
+        public static IEnumerable<Pgn> LoadMany(Stream stream) {
+            using (var reader = new StreamReader(stream)) {
+                foreach (var pgn in LoadMany(reader)) {
+                    yield return pgn;
+                }
+            }
+        }
+
         public static Pgn Load(string pgn) {
-            var pgnResult = new Pgn();
             using (var memStream = new MemoryStream()) {
                 var pgnBytes = Encoding.UTF8.GetBytes(pgn + "\n\n");
                 memStream.Write(pgnBytes, 0, pgnBytes.Length);
                 memStream.Position = 0;
-
-                using (var reader = new StreamReader(memStream)) {
-                    var prevState = ParseState.Empty;
-                    var state = ParseState.Empty;
-                    var game = new Game();
-                    while (!reader.EndOfStream) {
-                        prevState = state;
-                        var s = reader.ReadLine();
-
-                        state = (s == "") ? ParseState.Empty
-                                          : (s[0] == '[') ? ParseState.Param
-                                          : ParseState.Moves;
-
-                        Match match = null;
-
-                        if (state == ParseState.Param) {
-                            match = Game.ParamRegex.Match(s);
-                            if (!match.Success) throw new Exception($"Invalid param: {s}");
-                            game.Params.Add(match.Groups[1].Value, match.Groups[2].Value);
-                        }
-
-                        if (state == ParseState.Moves) {
-                            game.Moves = $"{game.Moves} {s}";
-                        }
-
-                        if (state == ParseState.Empty && prevState == ParseState.Moves) {
-                            game.Moves = Game.CommentRegex.Replace(game.Moves, "");
-                            game.Moves = Game.NumberRegex.Replace(game.Moves, "");
-                            game.Moves = Game.ScoreRegex.Replace(game.Moves, "");
-                            game.Moves = removeVariants(game.Moves);
-                            game.Moves = Game.SpaceRegex.Replace(game.Moves, " ");
-                            game.Moves = Game.ResultRegex.Replace(game.Moves, "");
-                            game.Moves = game.Moves.Trim();
-                        }
-                    }
-
-                    pgnResult.Moves = game.Moves;
-
-                    if (game.Params.ContainsKey("FEN")) {
-                        pgnResult.Fen = game.Params["FEN"];
-                    }
-
-                    if (game.Params.ContainsKey("Site")) {
-                        pgnResult.Site = game.Params["Site"];
-                    }
-                }
+                var pgnResult = LoadMany(memStream).FirstOrDefault();
+                return pgnResult;
             }
-
-            return pgnResult;
         }
 
         #endregion GetMoves

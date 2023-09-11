@@ -188,7 +188,7 @@ namespace ChessCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
-            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.IndexOf("#sicilian") > -1).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.IndexOf("#spanish") > -1).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
 
             // foreach (var node in nodeDic.Values) { node.status = 0; }
 
@@ -243,8 +243,8 @@ namespace ChessCon {
             */
 
             
-            var wns = EnumerateNodes("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Bxc3 8. bxc3", n => n.count >= 5)
-                .Where(x => (x.node.score - x.parentNode.score) * x.node.turn >= 30 && x.parentNode.score * x.node.turn >= -15 && x.node.turn == 1)
+            var wns = EnumerateNodes("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3", n => n.count >= 5)
+                .Where(x => (x.node.score - x.parentNode.score) * x.node.turn >= 50 && x.parentNode.score * x.node.turn >= -20 && x.node.turn == 1)
                 .OrderByDescending(wn => wn.node.count);
                 
             foreach (var wn in wns) {
