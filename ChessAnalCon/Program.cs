@@ -438,8 +438,25 @@ namespace ChessAnalCon {
     }
 
     public class Config {
-        public string mdName { get; set; }
+        public string mdPath { get; set; }
+        public string mdDstDir { get; set; }
         public int mdColor { get; set; }
+        public string evalPath { get; set; }
+
+        public string enginePath { get; set; }
+
+        public int evalDepth { get; set; }
+
+        public string fn { get; set; }
+
+        private static Config _current;
+
+        public static Config current {
+            get {
+                return _current
+                    ?? (_current = JsonConvert.DeserializeObject<Config>(File.ReadAllText("d:/.chess-anal")));
+            }
+        }
     }
 
     class Program {
@@ -661,16 +678,24 @@ namespace ChessAnalCon {
             }
         }
 
-        private static void processBook(string srcPath, string dstPath, int side = 1) {
-            var book = File.ReadAllLines(bookPath);
-            if (side == -1) {
-                book = book.Select(x => x.Replace("flip = false", "flip = true")).ToArray();
-            }
+        private static void processMd() {
+            var srcPath = Config.current.mdPath;
+            var name = Path.GetFileNameWithoutExtension(srcPath);
+            var dstPath = Path.Combine(Config.current.mdDstDir, $"{name}.html");
 
+            var book = File.ReadAllLines(bookPath);
             var hub = new MoveInfoHub(moveRe);
 
             var rss = new List<string>();
             var ss = File.ReadAllLines(srcPath);
+
+            var configStr = ss.Take(10).Where(x => x.IndexOf("<config") >= 0).FirstOrDefault() ?? "<config/>";
+            var configTag = Tag.Parse(configStr).Where(x => x.name == "config").First();
+            var color = "";
+            if (configTag.attr.TryGetValue("color", out color) && color == "-1") {
+                book = book.Select(x => x.Replace("flip = false", "flip = true")).ToArray();
+            }
+
             var lastLevel = 1;
             foreach (var s in ss) {
                 if (s == "" || s.IndexOf("![](") == 0 || s.IndexOf("#") == 0) {
@@ -783,10 +808,10 @@ namespace ChessAnalCon {
         }
 
         private static void handlePgn() {
-            using (var stream = File.OpenRead("d:/amin.pgn")) {
+            using (var stream = File.OpenRead("d:/navara.pgn")) {
                 var rs = new List<string>();
                 foreach (var pgn in Pgn.LoadMany(stream)) {
-                    var isWhite = pgn.Params["White"] == "Dr-Bassem";
+                    var isWhite = pgn.Params["White"] == "FormerProdigy";
                     var isWin = pgn.Params["Result"] == "1-0";
                     var control = int.Parse(pgn.Params["TimeControl"].Split('/')[0].Split('+')[0]);
                     var id = pgn.Params["Link"].Split('/').Last();
@@ -796,19 +821,20 @@ namespace ChessAnalCon {
                         continue;
                     }
 
-                    rs.Add($"[White \"Amin\"]");
+                    rs.Add($"[White \"Navara\"]");
                     rs.Add($"[Black \"chess-com-{id}\"]");
                     rs.Add($"");
                     rs.Add(PrettyPgn(pgn.Moves));
                     rs.Add($"");
                 }
 
-                File.WriteAllLines("d:/panov-amin.pgn", rs);
+                File.WriteAllLines("d:/panov-navara.pgn", rs);
             }
         }
 
-        private static void evalPgn(string path) {
-            var engine = Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe");
+        private static void evalPgn() {
+            var path = Config.current.evalPath;
+            var engine = Engine.Open(Config.current.enginePath);
 
             Func<string, bool> forHandle = x => x != "" && x[0] != '[' && x.IndexOf("{") < 0;
             var rs = File.ReadAllLines(path).ToArray();
@@ -837,7 +863,7 @@ namespace ChessAnalCon {
                     }
 
                     try {
-                        info.eval = engine.CalcScore(info.fen, depth: 18);
+                        info.eval = engine.CalcScore(info.fen, depth: Config.current.evalDepth);
                     } catch { ctrlC = true; }
 
                     count--;
@@ -874,12 +900,20 @@ namespace ChessAnalCon {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
             var config = JsonConvert.DeserializeObject<Config>(File.ReadAllText("d:/.chess-anal"));
 
-            //processBook($"d:/Projects/smalls/{config.mdName}.md", $"d:/{config.mdName}.html", config.mdColor);
+            var fn = (config.fn.Split(' ').Where(x => x[0] == '*').FirstOrDefault() ?? "*").Substring(1);
+            switch (fn) {
+                case "md":
+                    processMd();
+                    break;
+                case "eval":
+                    evalPgn();
+                    break;
+            }
+
             //findGames();
-            evalPgn("d:/panov-amin.pgn");
             //handlePgn();
 
-            Console.WriteLine("Save? (y/n)");
+            //Console.WriteLine("Save? (y/n)");
             //if (Console.ReadLine() == "y") {
                 // File.WriteAllLines("d:/lichess.json", nodes.Select(x => JsonConvert.SerializeObject(x)));
             //}
