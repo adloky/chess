@@ -297,12 +297,27 @@ namespace ChessAnalCon {
 
         private Regex re;
 
-        private static MoveInfo start = new MoveInfo() { fen = Board.DEFAULT_STARTING_FEN };
+        private MoveInfo start;
+
+        private int startIndex;
 
         private List<MoveInfoList> list { get; } = new List<MoveInfoList>();
 
+        public string Fen { get { return start.fen; } }
+
+        MoveInfoHub() {
+            SetFen(Board.DEFAULT_STARTING_FEN);
+        }
+
+        public void SetFen(string fenStr) {
+            start = new MoveInfo() { fen = fenStr };
+            var fen = FEN.Parse(fenStr);
+            startIndex = fen.historyLenDiff;
+            list.Clear();
+        }
+
         private MoveInfo getPrev(int level, int index) {
-            if (index == 0) return start;
+            if (index == startIndex) return start;
 
             for (; list.Count - 1 < level || list[level][index - 1] == null; level--) ;
 
@@ -388,7 +403,7 @@ namespace ChessAnalCon {
     }
 
     public class Tag {
-        private static Regex tagRe = new Regex("<(?<name>[^/ ]+)[^/]*/>");
+        private static Regex tagRe = new Regex("<(?<name>[^/ ]+)(\"[^\"]*\"|[^/])*/>");
         private static Regex attrRe = new Regex(" +(?<attr>[^=]+)=\"(?<value>[^\"]*)\"");
 
         public string name { get; set; }
@@ -440,7 +455,6 @@ namespace ChessAnalCon {
     public class Config {
         public string mdPath { get; set; }
         public string mdDstDir { get; set; }
-        public int mdColor { get; set; }
         public string evalPath { get; set; }
 
         public string enginePath { get; set; }
@@ -725,6 +739,15 @@ namespace ChessAnalCon {
                     .Select(x => int.Parse(x.attr["value"]))
                     .FirstOrDefault();
 
+                var fen = tags
+                    .Where(x => x.name == "fen")
+                    .Select(x => x.attr.ContainsKey("value") ? x.attr["value"] : Board.DEFAULT_STARTING_FEN)
+                    .FirstOrDefault();
+
+                if (fen != null) {
+                    hub.SetFen(fen);
+                }
+
                 var levels = getLevels(s2, lastLevel);
                 lastLevel = tags.Any(x => x.name == "continue") ? levels.Last().Item2 : 1;
 
@@ -754,6 +777,8 @@ namespace ChessAnalCon {
                     breakHandle = r.IndexOf("=>") >= 0;
                     return r;
                 });
+
+                rs = rs.Replace("(S)", $"<span class=\"move\" fen=\"{fen}\">(S)</span>");
 
                 rss.Add(rs);
 
@@ -807,28 +832,55 @@ namespace ChessAnalCon {
             return body;
         }
 
-        private static void handlePgn() {
-            using (var stream = File.OpenRead("d:/navara.pgn")) {
-                var rs = new List<string>();
-                foreach (var pgn in Pgn.LoadMany(stream)) {
-                    var isWhite = pgn.Params["White"] == "FormerProdigy";
-                    var isWin = pgn.Params["Result"] == "1-0";
-                    var control = int.Parse(pgn.Params["TimeControl"].Split('/')[0].Split('+')[0]);
-                    var id = pgn.Params["Link"].Split('/').Last();
-                    var isOpen = pgn.Moves.IndexOf("e4 c6 d4 d5 exd5 cxd5 c4") == 0; //&& pgn.Moves.IndexOf(" d3") >= 0;
+        private static HashSet<string> pgnParams = new HashSet<string>(new string[] { "Date", "White", "Black", "Result", "Date", "WhiteElo", "BlackElo", "TimeControl", "Link" });
 
-                    if (!(isWhite && isWin && control >= 180 && isOpen)) {
+        private static void handlePgn() {
+            var path = "d:/chess/pgns/naroditsky.pgn";
+            var prefix = "spanish-d3-";
+            var open = "1. e4 e5 2. Nf3 Nc6 3. Bb5";
+            var openSubs = " d3";
+            var color = 1;
+
+            var fileName = Path.GetFileName(path);
+            var dstPath = path.Replace(fileName, prefix + fileName);
+            open = string.Join(" ", open.Split(' ').Where(x => x.IndexOf(".") < 0));
+
+            using (var stream = File.OpenRead(path)) {
+                var rs = new List<string>();
+                var pgns = Pgn.LoadMany(stream).ToArray();
+                var nicks = new Dictionary<string, int>();
+                foreach (var pgn in pgns) {
+                    var ss = new string[] { pgn.Params["White"], pgn.Params["Black"] };
+                    foreach (var s in ss) {
+                        if (!nicks.ContainsKey(s)) {
+                            nicks.Add(s, 0);
+                        }
+                        nicks[s]++;
+                    }
+                }
+                var nick = nicks.OrderByDescending(x => x.Value).First().Key;
+
+                foreach (var pgn in pgns) {
+                    var isWhite = pgn.Params["White"] == nick;
+                    var nickColor = isWhite ? 1 : -1;
+                    var isWin = isWhite ? pgn.Params["Result"] == "1-0" : pgn.Params["Result"] == "0-1";
+                    var control = int.Parse(pgn.Params["TimeControl"].Split('/')[0].Split('+')[0]);
+                    var isOpen = pgn.Moves.IndexOf(open) == 0 && pgn.Moves.IndexOf(openSubs) >= 0;
+
+                    if (!(color == nickColor && isWin && control >= 180 && isOpen)) {
                         continue;
                     }
 
-                    rs.Add($"[White \"Navara\"]");
-                    rs.Add($"[Black \"chess-com-{id}\"]");
+                    var filtredParams = pgn.Params.Where(x => pgnParams.Contains(x.Key)).Select(x => $"[{x.Key} \"{x.Value}\"]").ToList();
+                    filtredParams.ForEach(x => rs.Add(x));
+
                     rs.Add($"");
                     rs.Add(PrettyPgn(pgn.Moves));
                     rs.Add($"");
                 }
-
-                File.WriteAllLines("d:/panov-navara.pgn", rs);
+                if (rs.Count > 0) {
+                    File.WriteAllLines(dstPath, rs);
+                }
             }
         }
 
@@ -900,6 +952,7 @@ namespace ChessAnalCon {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
             var config = JsonConvert.DeserializeObject<Config>(File.ReadAllText("d:/.chess-anal"));
 
+            
             var fn = (config.fn.Split(' ').Where(x => x[0] == '*').FirstOrDefault() ?? "*").Substring(1);
             switch (fn) {
                 case "md":
