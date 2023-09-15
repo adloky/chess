@@ -397,7 +397,7 @@ namespace ChessAnalCon {
             }
         }
 
-        public MoveInfoHub(Regex re) {
+        public MoveInfoHub(Regex re) : this() {
             this.re = re;
         }
     }
@@ -778,7 +778,7 @@ namespace ChessAnalCon {
                     return r;
                 });
 
-                rs = rs.Replace("(S)", $"<span class=\"move\" fen=\"{fen}\">(S)</span>");
+                rs = rs.Replace("(S)", $"<span class=\"move\" fen=\"{hub.Fen}\">(S)</span>");
 
                 rss.Add(rs);
 

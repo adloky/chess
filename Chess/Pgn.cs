@@ -106,6 +106,11 @@ namespace Chess {
 
         public static Pgn Load(string pgn) {
             using (var memStream = new MemoryStream()) {
+                pgn = pgn.Replace("\r\n", "\n");
+                var hasMoves = pgn.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).Any(x => x[0] != '[');
+                if (!hasMoves) {
+                    pgn = pgn + "\n\n*";
+                }
                 var pgnBytes = Encoding.UTF8.GetBytes(pgn + "\n\n");
                 memStream.Write(pgnBytes, 0, pgnBytes.Length);
                 memStream.Position = 0;
