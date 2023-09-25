@@ -187,17 +187,15 @@ namespace ChessAnalCon {
         public string fen { get; set; }
 
         public bool err { get; set; }
+    }
 
-        [JsonIgnore]
+    public class MoveInfoEval : MoveInfo {
         public int eval { get; set; }
 
-        [JsonIgnore]
         public int num { get; set; }
 
-        [JsonIgnore]
         public string numStr { get { return $"{num / 2 + 1}.{(num % 2 == 0 ? "" : "..")}"; } }
 
-        [JsonIgnore]
         public string evalStr { get { return ((float)eval / 100).ToString(CultureInfo.InvariantCulture); } }
     }
 
@@ -465,10 +463,17 @@ namespace ChessAnalCon {
 
         private static Config _current;
 
+        private static Config getConfig() {
+            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".chess-anal");
+            if (!File.Exists(path)) {
+                path = "d:/.chess-anal";
+            }
+            return JsonConvert.DeserializeObject<Config>(File.ReadAllText(path));
+        }
+
         public static Config current {
             get {
-                return _current
-                    ?? (_current = JsonConvert.DeserializeObject<Config>(File.ReadAllText("d:/.chess-anal")));
+                return _current ?? (_current = getConfig());
             }
         }
     }
@@ -537,6 +542,11 @@ namespace ChessAnalCon {
             var hash = sha.ComputeHash(bytes, 0, len);
             var guid = new Guid(hash.Take(16).ToArray());
             return guid;
+        }
+
+        public static Guid StringToGuid(string s) {
+            var bytes = Encoding.ASCII.GetBytes(s);
+            return BytesToGuid(bytes, bytes.Length);
         }
 
         public static IEnumerable<PieceMove> PromoteProcessed(PieceMove move) {
@@ -705,9 +715,12 @@ namespace ChessAnalCon {
 
             var configStr = ss.Take(10).Where(x => x.IndexOf("<config") >= 0).FirstOrDefault() ?? "<config/>";
             var configTag = Tag.Parse(configStr).Where(x => x.name == "config").First();
-            var color = "";
-            if (configTag.attr.TryGetValue("color", out color) && color == "-1") {
+            var configVal = "";
+            if (configTag.attr.TryGetValue("color", out configVal) && configVal == "-1") {
                 book = book.Select(x => x.Replace("flip = false", "flip = true")).ToArray();
+            }
+            if (configTag.attr.TryGetValue("hilight", out configVal) && configVal == "1") {
+                book = book.Select(x => x.Replace(".move-hilight", ".move")).ToArray();
             }
 
             var lastLevel = 1;
@@ -832,14 +845,14 @@ namespace ChessAnalCon {
             return body;
         }
 
-        private static HashSet<string> pgnParams = new HashSet<string>(new string[] { "Date", "White", "Black", "Result", "Date", "WhiteElo", "BlackElo", "TimeControl", "Link" });
+        private static HashSet<string> pgnParams = new HashSet<string>(new string[] { "Date", "White", "Black", "Result", "Date", "WhiteElo", "BlackElo", "TimeControl", "Link", "Color" });
 
         private static void handlePgn() {
-            var path = "d:/chess/pgns/naroditsky.pgn";
-            var prefix = "spanish-d3-";
-            var open = "1. e4 e5 2. Nf3 Nc6 3. Bb5";
-            var openSubs = " d3";
-            var color = 1;
+            var path = "d:/chess/pgns/_top.pgn";
+            var prefix = "panov-";
+            var open = "1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4";
+            var openSubs = " ";
+            var findColor = 1;
 
             var fileName = Path.GetFileName(path);
             var dstPath = path.Replace(fileName, prefix + fileName);
@@ -848,26 +861,15 @@ namespace ChessAnalCon {
             using (var stream = File.OpenRead(path)) {
                 var rs = new List<string>();
                 var pgns = Pgn.LoadMany(stream).ToArray();
-                var nicks = new Dictionary<string, int>();
-                foreach (var pgn in pgns) {
-                    var ss = new string[] { pgn.Params["White"], pgn.Params["Black"] };
-                    foreach (var s in ss) {
-                        if (!nicks.ContainsKey(s)) {
-                            nicks.Add(s, 0);
-                        }
-                        nicks[s]++;
-                    }
-                }
-                var nick = nicks.OrderByDescending(x => x.Value).First().Key;
 
                 foreach (var pgn in pgns) {
-                    var isWhite = pgn.Params["White"] == nick;
-                    var nickColor = isWhite ? 1 : -1;
-                    var isWin = isWhite ? pgn.Params["Result"] == "1-0" : pgn.Params["Result"] == "0-1";
+                    var color = int.Parse(pgn.Params["Color"]);
+                    var isWin = color == 1 ? pgn.Params["Result"] == "1-0" : pgn.Params["Result"] == "0-1";
+                    var isLoss = color == 1 ? pgn.Params["Result"] == "0-1" : pgn.Params["Result"] == "1-0";
                     var control = int.Parse(pgn.Params["TimeControl"].Split('/')[0].Split('+')[0]);
                     var isOpen = pgn.Moves.IndexOf(open) == 0 && pgn.Moves.IndexOf(openSubs) >= 0;
 
-                    if (!(color == nickColor && isWin && control >= 180 && isOpen)) {
+                    if (!((findColor == color || findColor == 0) && !isLoss && control >= 180 && isOpen)) {
                         continue;
                     }
 
@@ -901,11 +903,11 @@ namespace ChessAnalCon {
 
                 var moves = Pgn.Load(s).Moves.Split(' ');
                 var fen = Board.DEFAULT_STARTING_FEN;
-                var infos = new List<MoveInfo>();
+                var infos = new List<MoveInfoEval>();
                 var num = 0;
                 foreach (var move in moves) {
                     fen = FEN.Move(fen, move);
-                    infos.Add(new MoveInfo() { fen = fen, moveSan = move, num = num });
+                    infos.Add(new MoveInfoEval() { fen = fen, moveSan = move, num = num });
                     num++;
                 }
 
@@ -950,10 +952,29 @@ namespace ChessAnalCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
-            var config = JsonConvert.DeserializeObject<Config>(File.ReadAllText("d:/.chess-anal"));
 
+            var dir = "d:/chess/chessable/_all";
+            var paths = Directory.GetFiles(dir, "*.pgn", SearchOption.AllDirectories);
+
+            var writer = new StreamWriter(File.OpenWrite("d:/chessable.pgn"));
+            foreach (var path in paths) {
+                var fileName = path.Substring(dir.Length + 1);
+                fileName = string.Concat(fileName.Skip(Math.Max(0, fileName.Length - 120))).Replace("\\", "/").Replace(".pgn", "");
+                Console.WriteLine(fileName);
+                using (var stream = File.OpenRead(path)) {
+                    foreach (var pgn in Pgn.LoadMany(stream)) {
+                        pgn.Params.Add("File", fileName);
+                        writer.Write(pgn.ToString());
+                    }
+                }
+            }
             
-            var fn = (config.fn.Split(' ').Where(x => x[0] == '*').FirstOrDefault() ?? "*").Substring(1);
+            Console.ReadLine();
+
+            // handlePgn();
+
+            /*
+            var fn = (Config.current.fn.Split(' ').Where(x => x[0] == '*').FirstOrDefault() ?? "*").Substring(1);
             switch (fn) {
                 case "md":
                     processMd();
@@ -962,13 +983,14 @@ namespace ChessAnalCon {
                     evalPgn();
                     break;
             }
-
+            */
+            
             //findGames();
             //handlePgn();
 
             //Console.WriteLine("Save? (y/n)");
             //if (Console.ReadLine() == "y") {
-                // File.WriteAllLines("d:/lichess.json", nodes.Select(x => JsonConvert.SerializeObject(x)));
+            // File.WriteAllLines("d:/lichess.json", nodes.Select(x => JsonConvert.SerializeObject(x)));
             //}
         }
     }

@@ -5,10 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace Chess {
     public class Pgn {
-        private readonly static Regex ParamRegex = new Regex(@"^\[([^ ]+) ""([^""]*)""\]$", RegexOptions.Compiled);
+        private readonly static Regex ParamRegex = new Regex(@"^\[(?<name>[^ ]+) ""(?<value>(\\""|[^""])*)""\]$", RegexOptions.Compiled);
         private readonly static Regex CommentRegex = new Regex(@" \{[^}]*\}", RegexOptions.Compiled);
         private readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);
         private readonly static Regex ScoreRegex = new Regex(@"[!?]", RegexOptions.Compiled);
@@ -17,6 +18,8 @@ namespace Chess {
 
         public string Fen { get; private set; } = Board.DEFAULT_STARTING_FEN;
         public string Moves { get; private set; } = "";
+
+        public List<string> MovesSource { get; } = new List<string>();
         public string Site { get; private set; }
         public Dictionary<string, string> Params { get; private set; } = new Dictionary<string, string>();
 
@@ -59,17 +62,21 @@ namespace Chess {
                 prevState = state;
                 var s = reader.ReadLine();
 
+                var paramMatch = ParamRegex.Match(s);
                 state = (s == "") ? ParseState.Empty
-                                    : (s[0] == '[') ? ParseState.Param
+                                    : paramMatch.Success ? ParseState.Param
                                     : ParseState.Moves;
 
                 if (state == ParseState.Param) {
-                    var match = ParamRegex.Match(s);
-                    if (!match.Success) throw new Exception($"Invalid param: {s}");
-                    pgn.Params.Add(match.Groups[1].Value, match.Groups[2].Value);
+                    if (!paramMatch.Success) throw new Exception($"Invalid param: {s}");
+                    var name = paramMatch.Groups["name"].Value;
+                    if (!pgn.Params.ContainsKey(name)) {
+                        pgn.Params.Add(paramMatch.Groups["name"].Value, paramMatch.Groups["value"].Value);
+                    }
                 }
 
                 if (state == ParseState.Moves) {
+                    pgn.MovesSource.Add(s);
                     pgn.Moves = $"{pgn.Moves} {s}";
                 }
 
@@ -120,5 +127,19 @@ namespace Chess {
         }
 
         #endregion GetMoves
+
+        public override string ToString() {
+            var sb = new StringBuilder();
+            foreach (var param in Params) {
+                sb.Append($"[{param.Key} \"{param.Value}\"]{Environment.NewLine}");
+            }
+            sb.Append(Environment.NewLine);
+            foreach (var s in MovesSource) {
+                sb.Append($"{s}{Environment.NewLine}");
+            }
+            sb.Append(Environment.NewLine);
+
+            return sb.ToString();
+        }
     }
 }

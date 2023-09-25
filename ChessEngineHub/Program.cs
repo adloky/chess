@@ -36,7 +36,7 @@ namespace ChessEngineHub {
         private static BaseEngine[] engines = {
             new LichessEngine(),
             Engine.Open(@"d:\Distribs\lc0\lc0.exe"),
-            Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe"),
+            Engine.Open(@"d:\Distribs\stockfish_16\stockfish-windows-x86-64-modern.exe"),
             Engine.Open(@"d:\Distribs\komodo-dragon-3\dragon-3-64bit.exe")
         };
         private static int[] nodeCounts = { 0, 20000, 50000000, 50000000 };
