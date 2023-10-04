@@ -9,7 +9,7 @@ using System.Web;
 
 namespace Chess {
     public class Pgn {
-        private readonly static Regex ParamRegex = new Regex(@"^\[(?<name>[^ ]+) ""(?<value>(\\""|[^""])*)""\]$", RegexOptions.Compiled);
+        private readonly static Regex ParamRegex = new Regex(@"^\[(?<name>[^ ]+) ""(?<value>(\\""|""[^\]]|[^""])*)""\] *$", RegexOptions.Compiled);
         private readonly static Regex CommentRegex = new Regex(@" \{[^}]*\}", RegexOptions.Compiled);
         private readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);
         private readonly static Regex ScoreRegex = new Regex(@"[!?]", RegexOptions.Compiled);
@@ -62,16 +62,16 @@ namespace Chess {
                 prevState = state;
                 var s = reader.ReadLine();
 
-                var paramMatch = ParamRegex.Match(s);
                 state = (s == "") ? ParseState.Empty
-                                    : paramMatch.Success ? ParseState.Param
+                                    : s[0] == '[' && prevState != ParseState.Moves ? ParseState.Param
                                     : ParseState.Moves;
 
                 if (state == ParseState.Param) {
-                    if (!paramMatch.Success) throw new Exception($"Invalid param: {s}");
-                    var name = paramMatch.Groups["name"].Value;
+                    var match = ParamRegex.Match(s);
+                    if (!match.Success) throw new Exception($"Invalid param: {s}");
+                    var name = match.Groups["name"].Value;
                     if (!pgn.Params.ContainsKey(name)) {
-                        pgn.Params.Add(paramMatch.Groups["name"].Value, paramMatch.Groups["value"].Value);
+                        pgn.Params.Add(match.Groups["name"].Value, match.Groups["value"].Value);
                     }
                 }
 

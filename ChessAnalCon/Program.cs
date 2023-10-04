@@ -16,6 +16,7 @@ using System.Globalization;
 using ChessEngine;
 using System.Net;
 using Lichess;
+using System.Threading;
 
 namespace ChessAnalCon {
 
@@ -377,7 +378,7 @@ namespace ChessAnalCon {
                 }
 
                 if (!skipInc) id++;
-                return $"<span id='move{id}' class='move' fen='{mi.fen}' uci='{mi.moveUci}'>{x}{(mi.err ? "ERR" : "")}</span>";
+                return $"<span id='move{id}' class='move' fen='{mi.fen}' uci='{mi.moveUci}'>{(mi.err ? "=>" : "")}{x}</span>";
             });
         }
 
@@ -702,8 +703,8 @@ namespace ChessAnalCon {
             }
         }
 
-        private static void processMd() {
-            var srcPath = Config.current.mdPath;
+        private static void processMd(string path = null) {
+            var srcPath = path ?? Config.current.mdPath;
             var name = Path.GetFileNameWithoutExtension(srcPath);
             var dstPath = Path.Combine(Config.current.mdDstDir, $"{name}.html");
 
@@ -782,7 +783,7 @@ namespace ChessAnalCon {
                     var addTuple = adds.Where(y => x.IndexOf(y.Item1) == 0).FirstOrDefault();
                     var add = addTuple?.Item2;
                     if (add != null) {
-                        hub.Push(level, add, false);
+                        hub.Push(level, add, true);
                         adds.Remove(addTuple);
                     }
 
@@ -935,6 +936,58 @@ namespace ChessAnalCon {
             engine.Dispose();
         }
 
+        private static void handleChessable() {
+            var src = "d:/chess/pgns/everyman.pgn";
+            var dst = "d:/everyman-panov.pgn";
+            var open = "1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4";
+            var except = "Panov";
+
+            open = string.Join(" ", open.Split(' ').Where(x => x.IndexOf(".") < 0));
+            var rs = new List<string>();
+            using (var stream = File.OpenRead(src)) {
+                foreach (var pgn in Pgn.LoadMany(stream)) {
+                    if (pgn.Moves.IndexOf(open) == 0 && pgn.Params["File"].IndexOf(except) == -1) {
+                        rs.Add(pgn.ToString());
+                    }
+                }
+            }
+            File.WriteAllLines(dst, rs);
+        }
+
+        private static Queue<CancellationTokenSource> delayCtsQue = new Queue<CancellationTokenSource>();
+        private static Task lastChangeTask = Task.Run(() => { });
+
+        private static void mdMonitor() {
+            using (var watcher = new FileSystemWatcher(@"d:/Projects/smalls")) {
+                watcher.Filter = "*.md";
+                watcher.EnableRaisingEvents = true;
+                watcher.Changed += (object sender, FileSystemEventArgs e) => {
+                    if (e.ChangeType != WatcherChangeTypes.Changed || e.Name[0] == '~') {
+                        return;
+                    }
+
+                    while (delayCtsQue.Count > 0) {
+                        var cts = delayCtsQue.Dequeue();
+                        cts.Cancel();
+                        cts.Dispose();
+                    }
+
+                    var delayCts = new CancellationTokenSource();
+                    delayCtsQue.Enqueue(delayCts);
+
+                    lastChangeTask = lastChangeTask.ContinueWith(async t => {
+                        await Task.Delay(1000, delayCts.Token);
+                        if (delayCts.IsCancellationRequested) return;
+                       
+                        processMd(e.FullPath);
+                        Console.WriteLine(e.FullPath);
+                    });
+                };
+                Console.WriteLine("Press enter to exit.");
+                Console.ReadLine();
+            }
+        }
+
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
         private static string bookPath = "d:/Projects/smalls/book.html";
         private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|XX";
@@ -953,26 +1006,8 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
-            var dir = "d:/chess/chessable/_all";
-            var paths = Directory.GetFiles(dir, "*.pgn", SearchOption.AllDirectories);
-
-            var writer = new StreamWriter(File.OpenWrite("d:/chessable.pgn"));
-            foreach (var path in paths) {
-                var fileName = path.Substring(dir.Length + 1);
-                fileName = string.Concat(fileName.Skip(Math.Max(0, fileName.Length - 120))).Replace("\\", "/").Replace(".pgn", "");
-                Console.WriteLine(fileName);
-                using (var stream = File.OpenRead(path)) {
-                    foreach (var pgn in Pgn.LoadMany(stream)) {
-                        pgn.Params.Add("File", fileName);
-                        writer.Write(pgn.ToString());
-                    }
-                }
-            }
-            
-            Console.ReadLine();
-
             // handlePgn();
-
+            mdMonitor();
             /*
             var fn = (Config.current.fn.Split(' ').Where(x => x[0] == '*').FirstOrDefault() ?? "*").Substring(1);
             switch (fn) {
@@ -984,7 +1019,6 @@ namespace ChessAnalCon {
                     break;
             }
             */
-            
             //findGames();
             //handlePgn();
 
@@ -995,6 +1029,26 @@ namespace ChessAnalCon {
         }
     }
 }
+
+/*
+var dir = "d:/chess/chessable/_all";
+var paths = Directory.GetFiles(dir, "*.pgn", SearchOption.AllDirectories);
+
+var writer = new StreamWriter(File.OpenWrite("d:/chessable.pgn"));
+foreach (var path in paths) {
+    var fileName = path.Substring(dir.Length + 1).Replace("\\", "/").Replace(".pgn", "");
+    fileName = string.Concat(fileName.Skip(Math.Max(0, fileName.Length - 120)));
+    Console.WriteLine(fileName);
+    using (var stream = File.OpenRead(path)) {
+        foreach (var pgn in Pgn.LoadMany(stream)) {
+            pgn.Params.Add("File", fileName);
+            writer.Write(pgn.ToString());
+         }
+    }
+}
+
+Console.ReadLine();
+*/
 
 /*
             var nullCount = dic.Values.Count(x => x.score == null);
