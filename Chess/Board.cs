@@ -243,7 +243,7 @@ namespace Chess
         }
 
         public int? GetMateState() {
-            var validMoves = this[this.Turn].SelectMany(p => p.GetValidMoves()).Where(m => IsValid(m)).ToArray();
+            var validMoves = this[this.Turn].SelectMany(p => p.GetValidMoves()).Where(IsValid).ToArray();
 
             // fix bug
             var king = King(Turn);
@@ -621,11 +621,13 @@ namespace Chess
 
             MoveCore(move, false);
             Turn = Turn.Opponent();
-
+            
             if (IsInCheck()) {
+                History.Add(move);
                 san += ((GetMateState() ?? 0) == 0) ? "+" : "#";
+                History.RemoveAt(History.Count - 1);
             }
-
+            
             MoveCoreUndo(move);
             Turn = Turn.Opponent();
 

@@ -1073,7 +1073,11 @@ namespace ChessAnalCon {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
             //mdMonitor();
-            simplifyChessable();
+            //simplifyChessable();
+
+            var board = Board.Load("r1bqk1nr/1ppp1ppp/p1n5/1Nb5/1PPp4/P7/4PPPP/R1BQKBNR b KQkq b3 0 6");
+
+            Console.ReadLine();
             /*
             FEN.Move("3rr1k1/1bq2pb1/2p1nnpp/1p2p3/P1p1P3/5NNP/2QB1PP1/R3RBK1 w - - 0 25", "axb5");
 
