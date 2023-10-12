@@ -80,7 +80,7 @@ namespace ChessAnalCon {
         [JsonIgnore]
         public int turn {
             get {
-                return fen.IndexOf(" w ") > -1 ? 1 : -1;
+                return fen.Contains(" w ") ? 1 : -1;
             }
         }
 
@@ -338,7 +338,7 @@ namespace ChessAnalCon {
         public MoveInfo Push(int level, int index, string move) {
             var prev = getPrev(level, index);
             var err = false;
-            if (move.IndexOf("+") >= 0) {
+            if (move.Contains("+")) {
                 var uci = FEN.San2Uci(prev.fen, move);
                 var san = FEN.Uci2San(prev.fen, uci);
                 err = move != san;
@@ -360,7 +360,7 @@ namespace ChessAnalCon {
                 var move = m.Groups["move"].Value + m.Groups["ccm"].Value;
                 var num = m.Groups["num"].Value;
                 if (num != "") {
-                    index = (int.Parse(num.Replace(".", "")) - 1) * 2 + (num.IndexOf("...") > -1 ? 1 : 0);
+                    index = (int.Parse(num.Replace(".", "")) - 1) * 2 + (num.Contains("...") ? 1 : 0);
                 }
                 else {
                     index++;
@@ -601,7 +601,7 @@ namespace ChessAnalCon {
 
         private static void renameFiles() {
             var prefix = "Aspose.Words.87de280c-dfc0-448b-960a-33bcf0583fb7.";
-            var files = Directory.EnumerateFiles("d:/nimzo-lysyy").Where(x => x.IndexOf(prefix) >= 0);
+            var files = Directory.EnumerateFiles("d:/nimzo-lysyy").Where(x => x.Contains(prefix));
 
             foreach (var file in files) {
                 File.Move(file, file.Replace(prefix, ""));
@@ -680,13 +680,13 @@ namespace ChessAnalCon {
                     var isBlitz = split[1] == "blitz";
                     var elos = split[2].Split(' ').Select(x => int.Parse(x)).ToArray();
                     var isWin = split[3] == "1-0";
-                    var isOpen = moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 d3") == 0
-                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 Nf6 d3") == 0
-                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 d6 c3 Nf6 d3") == 0
-                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 d6 c3 a6 Ba4 Nf6 d3") == 0
-                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 d3") == 0
-                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 Bc5 c3 Nf6 d3") == 0
-                              || moves.IndexOf("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 c3 Nf6 d3") == 0;
+                    var isOpen = moves.StartsWith("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 d3")
+                              || moves.StartsWith("e4 e5 Nf3 Nc6 Bb5 Nf6 d3")
+                              || moves.StartsWith("e4 e5 Nf3 Nc6 Bb5 d6 c3 Nf6 d3")
+                              || moves.StartsWith("e4 e5 Nf3 Nc6 Bb5 d6 c3 a6 Ba4 Nf6 d3")
+                              || moves.StartsWith("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 d3")
+                              || moves.StartsWith("e4 e5 Nf3 Nc6 Bb5 Bc5 c3 Nf6 d3")
+                              || moves.StartsWith("e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Bc5 c3 Nf6 d3");
 
                     count++;
                     
@@ -713,7 +713,7 @@ namespace ChessAnalCon {
             var sn = prevSkipMoveRe.Match(s).Value;
             var n = int.Parse(sn.Replace(".", ""));
 
-            return (sn.IndexOf("...") >= 0) ? $"{n}.XX" : $"{n - 1}...XX";
+            return (sn.Contains("...")) ? $"{n}.XX" : $"{n - 1}...XX";
         }
 
         private static void processMd(string path = null) {
@@ -727,7 +727,7 @@ namespace ChessAnalCon {
             var rss = new List<string>();
             var ss = File.ReadAllLines(srcPath);
 
-            var configStr = ss.Take(10).Where(x => x.IndexOf("<config") >= 0).FirstOrDefault() ?? "<config/>";
+            var configStr = ss.Take(10).Where(x => x.Contains("<config")).FirstOrDefault() ?? "<config/>";
             var configTag = Tag.Parse(configStr).Where(x => x.name == "config").First();
             var configVal = "";
             if (configTag.attr.TryGetValue("color", out configVal) && configVal == "-1") {
@@ -739,7 +739,7 @@ namespace ChessAnalCon {
 
             var lastLevel = 1;
             foreach (var s in ss) {
-                if (s == "" || s.IndexOf("![](") == 0 || s.IndexOf("#") == 0) {
+                if (s == "" || s.StartsWith("![](") || s.StartsWith("#")) {
                     rss.Add(s);
                     continue;
                 }
@@ -787,20 +787,20 @@ namespace ChessAnalCon {
 
                 var breakHandle = false;
                 var rs = handleString(s2, moveSeqRe, (x, m) => {
-                    if (skipAll || skipStarts.Any(y => x.IndexOf(y) == 0) || breakHandle) {
+                    if (skipAll || skipStarts.Any(y => x.StartsWith(y)) || breakHandle) {
                         return x;
                     }
 
                     var level = levels.TakeWhile(y => y.Item1 < m.Index).Last().Item2;
                     level += levelAll;
-                    var levelTagTuple = levelTags.Where(y => x.IndexOf(y.Item1) == 0).FirstOrDefault();
+                    var levelTagTuple = levelTags.Where(y => x.StartsWith(y.Item1)).FirstOrDefault();
                     var levelTag = levelTagTuple?.Item2;
                     if (levelTag != null) {
                         level += levelTag.Value;
                         levelTags.Remove(levelTagTuple);
                     }
 
-                    var addTuple = adds.Where(y => x.IndexOf(y.Item1) == 0).FirstOrDefault();
+                    var addTuple = adds.Where(y => x.StartsWith(y.Item1)).FirstOrDefault();
                     var add = addTuple?.Item2;
                     if (add != null) {
                         hub.Push(level, add, true);
@@ -808,7 +808,7 @@ namespace ChessAnalCon {
                     }
 
                     var r = hub.Push(level, x);
-                    breakHandle = r.IndexOf("=>") >= 0;
+                    breakHandle = r.Contains("=>");
                     return r;
                 });
 
@@ -816,7 +816,7 @@ namespace ChessAnalCon {
 
                 rss.Add(rs);
 
-                if (rs.IndexOf("=>") >= 0) {
+                if (rs.Contains("=>")) {
                     break;
                 }
             }
@@ -877,7 +877,7 @@ namespace ChessAnalCon {
 
             var fileName = Path.GetFileName(path);
             var dstPath = path.Replace(fileName, prefix + fileName);
-            open = string.Join(" ", open.Split(' ').Where(x => x.IndexOf(".") < 0));
+            open = string.Join(" ", open.Split(' ').Where(x => !x.Contains(".")));
 
             using (var stream = File.OpenRead(path)) {
                 var rs = new List<string>();
@@ -888,7 +888,7 @@ namespace ChessAnalCon {
                     var isWin = color == 1 ? pgn.Params["Result"] == "1-0" : pgn.Params["Result"] == "0-1";
                     var isLoss = color == 1 ? pgn.Params["Result"] == "0-1" : pgn.Params["Result"] == "1-0";
                     var control = int.Parse(pgn.Params["TimeControl"].Split('/')[0].Split('+')[0]);
-                    var isOpen = pgn.Moves.IndexOf(open) == 0 && pgn.Moves.IndexOf(openSubs) >= 0;
+                    var isOpen = pgn.Moves.StartsWith(open) && pgn.Moves.Contains(openSubs);
 
                     if (!((findColor == color || findColor == 0) && !isLoss && control >= 180 && isOpen)) {
                         continue;
@@ -911,9 +911,9 @@ namespace ChessAnalCon {
             var path = Config.current.evalPath;
             var engine = Engine.Open(Config.current.enginePath);
 
-            Func<string, bool> forHandle = x => x != "" && x[0] != '[' && x.IndexOf("{") < 0;
+            Func<string, bool> forHandle = x => x != "" && !x.StartsWith("[") && !x.Contains("{");
             var rs = File.ReadAllLines(path).ToArray();
-            var count = rs.Where(x => forHandle(x)).Sum(x => x.Split(' ').Where(y => y.IndexOf(".") < 0).Count());
+            var count = rs.Where(x => forHandle(x)).Sum(x => x.Split(' ').Where(y => !y.Contains(".")).Count());
 
             for (var i = 0; i < rs.Length; i++) {
                 var s = rs[i];
@@ -962,11 +962,11 @@ namespace ChessAnalCon {
             var open = "1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4";
             var except = "Panov";
 
-            open = string.Join(" ", open.Split(' ').Where(x => x.IndexOf(".") < 0));
+            open = string.Join(" ", open.Split(' ').Where(x => !x.Contains(".")));
             var rs = new List<string>();
             using (var stream = File.OpenRead(src)) {
                 foreach (var pgn in Pgn.LoadMany(stream)) {
-                    if (pgn.Moves.IndexOf(open) == 0 && pgn.Params["File"].IndexOf(except) == -1) {
+                    if (pgn.Moves.StartsWith(open) && !pgn.Params["File"].Contains(except)) {
                         rs.Add(pgn.ToString());
                     }
                 }
@@ -1048,6 +1048,8 @@ namespace ChessAnalCon {
 
                 return x;
             });
+
+            s = "<style> div { display: inline; } </style>\r\n" + s;
 
             File.WriteAllText(dst, s);
         }
