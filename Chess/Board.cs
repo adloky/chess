@@ -285,10 +285,21 @@ namespace Chess
                     this.OnSquareChanged(castleRookTarget);
                 }
             }
+
+            var promoteRank = move.Piece.Player == PlayerColor.White ? 8 : 1;
+            if (move.Piece is Pawn && move.Target.GetRank() == promoteRank) {
+                var newPiece = move.Piece.Promote(move.PawnPromotedTo);
+                this[move.Piece.Square] = newPiece;
+            }
         }
 
         private void MoveCoreUndo(PieceMove move)
         {
+            var promoteRank = move.Piece.Player == PlayerColor.White ? 8 : 1;
+            if (move.Piece is Pawn && move.Target.GetRank() == promoteRank) {
+                this[move.Piece.Square] = move.Piece;
+            }
+
             this[move.Source] = this[move.Target];
 
             if (move.CapturedPiece != null) {

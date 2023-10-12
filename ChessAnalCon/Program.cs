@@ -17,6 +17,7 @@ using ChessEngine;
 using System.Net;
 using Lichess;
 using System.Threading;
+using System.CodeDom;
 
 namespace ChessAnalCon {
 
@@ -1075,7 +1076,18 @@ namespace ChessAnalCon {
             //mdMonitor();
             //simplifyChessable();
 
-            var board = Board.Load("r1bqk1nr/1ppp1ppp/p1n5/1Nb5/1PPp4/P7/4PPPP/R1BQKBNR b KQkq b3 0 6");
+            // hxg1=Q+
+            var board = Board.Load("rnb1k1nr/pppp1pBp/8/8/1b5q/8/P1PPP1Bp/RN1Q1KNR b kq - 1 7");
+
+            Enumerable.Repeat(board[Square.H2], 1)
+                .SelectMany(x => x.GetValidMoves())
+                .SelectMany(x => PromoteProcessed(x))
+                .Select(x => x.ToUciString())
+                .Select(x => board.Uci2San(x))
+                .ToList()
+                .ForEach(Console.WriteLine);
+
+
 
             Console.ReadLine();
             /*
