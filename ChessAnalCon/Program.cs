@@ -1013,8 +1013,8 @@ namespace ChessAnalCon {
             { "knight", "N" }, { "bishop", "B" }, { "queen", "Q" }, { "rook", "R" }, { "king", "K" } };
 
         private static void simplifyChessable() {
-            var src = "d:/catalan-b-ss.html";
-            var dst = "d:/catalan-b-ss-2.html";
+            var src = "d:/tarrasch-b-ss.html";
+            var dst = "d:/tarrasch-b-ss-2.html";
             var s = File.ReadAllText(src);
 
             s = svgTagRe.Replace(s, "");
@@ -1072,7 +1072,8 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
-            mdMonitor();
+            //mdMonitor();
+            simplifyChessable();
             /*
             FEN.Move("3rr1k1/1bq2pb1/2p1nnpp/1p2p3/P1p1P3/5NNP/2QB1PP1/R3RBK1 w - - 0 25", "axb5");
 
