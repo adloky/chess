@@ -402,10 +402,12 @@ namespace ChessAnalCon {
     }
 
     public class Tag {
-        private static Regex tagRe = new Regex("<(?<name>[^/ ]+)(\"[^\"]*\"|[^/])*/>");
-        private static Regex attrRe = new Regex(" +(?<attr>[^=]+)=\"(?<value>[^\"]*)\"");
+        public static Regex tagRe { get; } = new Regex(@"<(?<close>/)?(?<name>[^/> ]+)(""[^""]*""|[^/>])*/?>");
+        private static Regex attrRe = new Regex(@" +(?<attr>[^=]+)=""(?<value>[^""]*)""");
 
         public string name { get; set; }
+
+        public bool isOpen { get; private set; }
 
         public Dictionary<string, string> attr { get; } = new Dictionary<string, string>();
 
@@ -415,6 +417,7 @@ namespace ChessAnalCon {
             while (m.Success) {
                 var tag = new Tag();
                 tag.name = m.Groups["name"].Value;
+                tag.isOpen = m.Groups["close"].Value != "/";
                 var m2 = attrRe.Match(m.Value);
                 while (m2.Success) {
                     tag.attr.Add(m2.Groups["attr"].Value, m2.Groups["value"].Value);
@@ -703,6 +706,16 @@ namespace ChessAnalCon {
             }
         }
 
+
+        private static Regex prevSkipMoveRe = new Regex("\\d+\\.+", RegexOptions.Compiled);
+
+        private static string prevSkipMove(string s) {
+            var sn = prevSkipMoveRe.Match(s).Value;
+            var n = int.Parse(sn.Replace(".", ""));
+
+            return (sn.IndexOf("...") >= 0) ? $"{n}.XX" : $"{n - 1}...XX";
+        }
+
         private static void processMd(string path = null) {
             var srcPath = path ?? Config.current.mdPath;
             var name = Path.GetFileNameWithoutExtension(srcPath);
@@ -733,6 +746,13 @@ namespace ChessAnalCon {
 
                 var tags = Tag.Parse(s);
                 var s2 = Tag.Clear(s);
+
+                foreach (var tag in tags.Where(x => x.name == "addx" && x.attr.ContainsKey("start"))) {
+                    tag.name = "add";
+                    tag.attr.Add("value", prevSkipMove(tag.attr["start"]));
+                }
+
+                var skipAll = tags.Any(x => x.name == "skip" && !x.attr.ContainsKey("start"));
                 var skipStarts = tags
                     .Where(x => x.name == "skip" && x.attr.ContainsKey("start"))
                     .Select(x => x.attr["start"])
@@ -767,7 +787,7 @@ namespace ChessAnalCon {
 
                 var breakHandle = false;
                 var rs = handleString(s2, moveSeqRe, (x, m) => {
-                    if (skipStarts.Any(y => x.IndexOf(y) == 0) || breakHandle) {
+                    if (skipAll || skipStarts.Any(y => x.IndexOf(y) == 0) || breakHandle) {
                         return x;
                     }
 
@@ -988,6 +1008,50 @@ namespace ChessAnalCon {
             }
         }
 
+        private static Regex svgTagRe = new Regex("<svg.*?</svg>", RegexOptions.Multiline);
+        private static Dictionary<string, string> pieceAbbr = new Dictionary<string, string>() {
+            { "knight", "N" }, { "bishop", "B" }, { "queen", "Q" }, { "rook", "R" }, { "king", "K" } };
+
+        private static void simplifyChessable() {
+            var src = "d:/catalan-b-ss.html";
+            var dst = "d:/catalan-b-ss-2.html";
+            var s = File.ReadAllText(src);
+
+            s = svgTagRe.Replace(s, "");
+
+            s = handleString(s, Tag.tagRe, (x, m) => {
+                var tag = Tag.Parse(x)[0];
+                var piece = (string)null;
+                if (!tag.attr.TryGetValue("data-piece", out piece)) {
+                    return x;
+                }
+
+                return x + pieceAbbr[piece];
+            });
+
+            s = handleString(s, Tag.tagRe, (x, m) => {
+                var tag = Tag.Parse(x)[0];
+                var @class = (string)null;
+                var classes = new HashSet<string>();
+
+                if (tag.attr.TryGetValue("class", out @class)) {
+                    @class.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList().ForEach(y => classes.Add(y));
+                }
+
+                if ((new string[] { "blackMove", "openingNum", "commentMoveSmall" }).Any(y => classes.Contains(y))) {
+                    x = " " + x;
+                }
+
+                if (classes.Contains("commentInMove")) {
+                    x = "<p>" + x;
+                }
+
+                return x;
+            });
+
+            File.WriteAllText(dst, s);
+        }
+
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
         private static string bookPath = "d:/Projects/smalls/book.html";
         private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|XX";
@@ -1006,8 +1070,24 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
-            // handlePgn();
             mdMonitor();
+            /*
+            FEN.Move("3rr1k1/1bq2pb1/2p1nnpp/1p2p3/P1p1P3/5NNP/2QB1PP1/R3RBK1 w - - 0 25", "axb5");
+
+            Console.WriteLine("END");
+            Console.ReadLine();
+            */
+            // 
+            // handlePgn();
+
+            /*
+            var path = @"d:\Projects\smalls\ruy-lopez-mbm.md";
+            var rs = File.ReadAllLines(path);
+            var re = new Regex($"\\.\\.\\. ({moveReS})");
+            rs = rs.Select(x => handleString(x, re, (s,m) => s.Replace(" ", ""))).ToArray();
+            File.WriteAllLines(path, rs);
+            */
+
             /*
             var fn = (Config.current.fn.Split(' ').Where(x => x[0] == '*').FirstOrDefault() ?? "*").Substring(1);
             switch (fn) {
