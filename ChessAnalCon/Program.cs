@@ -1073,23 +1073,14 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
-            //mdMonitor();
+            // processMd("d:\\Projects\\smalls\\nimzo-lysyy.md");
+            mdMonitor();
+
             //simplifyChessable();
 
-            // hxg1=Q+
-            var board = Board.Load("rnb1k1nr/pppp1pBp/8/8/1b5q/8/P1PPP1Bp/RN1Q1KNR b kq - 1 7");
+            //FEN.Move("4r1k1/3P1pp1/5n1p/2P5/1Q2p3/4NbPq/PP3P1P/R4RK1 b - - 0 25", "Rf8");
+            //Console.ReadLine();
 
-            Enumerable.Repeat(board[Square.H2], 1)
-                .SelectMany(x => x.GetValidMoves())
-                .SelectMany(x => PromoteProcessed(x))
-                .Select(x => x.ToUciString())
-                .Select(x => board.Uci2San(x))
-                .ToList()
-                .ForEach(Console.WriteLine);
-
-
-
-            Console.ReadLine();
             /*
             FEN.Move("3rr1k1/1bq2pb1/2p1nnpp/1p2p3/P1p1P3/5NNP/2QB1PP1/R3RBK1 w - - 0 25", "axb5");
 

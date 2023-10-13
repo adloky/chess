@@ -287,7 +287,7 @@ namespace Chess
             }
 
             var promoteRank = move.Piece.Player == PlayerColor.White ? 8 : 1;
-            if (move.Piece is Pawn && move.Target.GetRank() == promoteRank) {
+            if (move.Piece is Pawn && move.Target.GetRank() == promoteRank && move.PawnPromotedTo != null) {
                 var newPiece = move.Piece.Promote(move.PawnPromotedTo);
                 this[move.Piece.Square] = newPiece;
             }

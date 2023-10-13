@@ -194,7 +194,9 @@ namespace Chess
         public static string Move(string fen, string move) {
             var board = Board.Load(fen);
             var opt = new MoveOptions() { SkipTestMate = true };
-            if (!board.Move(move, opt)) throw new Exception($"Invalid move (FEN: {fen}; Move: {move})");
+            if (!board.Move(move, opt)) {
+                throw new Exception($"Invalid move (FEN: {fen}; Move: {move})");
+            };
 
             return board.GetFEN();
         }
