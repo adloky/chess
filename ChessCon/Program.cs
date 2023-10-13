@@ -46,7 +46,7 @@ namespace ChessCon {
         [JsonIgnore]
         public int turn {
             get {
-                return fen.IndexOf(" w ") > -1 ? 1 : -1;
+                return fen.Contains(" w ") ? 1 : -1;
             }
         }
 
@@ -115,6 +115,17 @@ namespace ChessCon {
             return wns.Concat(EnumerateNodesRecurse(parentNode, moves, takeWhile));
         }
 
+        private static OpeningNode getNodeByMoves(string moves = null) {
+            moves = Regex.Replace(moves ?? "", @"\d+\.\s+", "");
+            var fen = Board.DEFAULT_STARTING_FEN;
+            var ms = moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var last = ms.LastOrDefault();
+            foreach (var move in ms) {
+                fen = FEN.Move(fen, move);
+            }
+            return nodeDic[OpeningNode.GetKey(fen, last)];
+        }
+
         public static string PrettyPgn(string pgn) {
             var result = "";
             var split = pgn.Split(' ');
@@ -177,7 +188,7 @@ namespace ChessCon {
             }
 
             var s = $" {tags} ";
-            return s.IndexOf($" {tag} ") > -1 ? tags : $"{tags} {tag}";
+            return s.Contains($" {tag} ") ? tags : $"{tags} {tag}";
         }
 
         private static string nodesPath = "d:/lichess.json";
@@ -188,7 +199,9 @@ namespace ChessCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
-            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.IndexOf("#spanish") > -1).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#other")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+            Console.WriteLine("nodeDic loaded.");
+
 
             // foreach (var node in nodeDic.Values) { node.status = 0; }
 
@@ -242,7 +255,7 @@ namespace ChessCon {
             }
             */
 
-            
+            /*
             var wns = EnumerateNodes("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3", n => n.count >= 5)
                 .Where(x => (x.node.score - x.parentNode.score) * x.node.turn >= 50 && x.parentNode.score * x.node.turn >= -20 && x.node.turn == 1)
                 .OrderByDescending(wn => wn.node.count);
@@ -250,7 +263,7 @@ namespace ChessCon {
             foreach (var wn in wns) {
                 Console.WriteLine($"{PrettyPgn(wn.moves)}; score: {wn.node.score - wn.parentNode.score}; count: {wn.node.count};");
             }
-            
+            */
 
             /*
             var wns = EnumerateNodes("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 b5 6. Bb3 Bc5", n => n.topCount >= 5 && n.score < 50 && n.score > -20).ToList();
@@ -264,7 +277,7 @@ namespace ChessCon {
 
             Console.Write("Press ENTER");
             Console.ReadLine();
-            
+
             /*
             Console.WriteLine("Save? (y/n)");
             if (Console.ReadLine() == "y") {
@@ -274,6 +287,15 @@ namespace ChessCon {
         }
     }
 }
+
+// XX: #english #zukertort
+// d4: #queens #indian #london
+// e4: #french #caro-kann #sicilian #modern #pirc #scandinavian
+// e4 e5: #bishops #kings
+// e4 e5 Nf3: #russian #philidor
+// e4 e5 Nf3 Nc6: #spanish #italian #scotch
+
+
 
 /*
             using (var engine = Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe")) {
