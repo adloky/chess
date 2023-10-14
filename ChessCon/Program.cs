@@ -20,6 +20,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using Newtonsoft.Json.Linq;
+using System.Globalization;
 
 namespace ChessCon {
 
@@ -262,23 +263,28 @@ namespace ChessCon {
             OpeningNode.color = 1;
             OpeningNode.relCountFunc = x => x.midCount;
 
-            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#caro-kann")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#sicil")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
             Console.WriteLine("nodeDic loaded.");
 
+            var start = "1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O";
+            var startNode = getNodeByMoves(start);
+            var startScore = startNode.relScore;
+            Func<WalkNode, string> scoreDiff = wn => ((float)(wn.node.relScore - startScore) / 100).ToString(CultureInfo.InvariantCulture);
+
             Func<WalkNode, WalkState> getState = wn => {
-                if (wn.freq < 0.01) return WalkState.None;
+                if (wn.freq < 0.05) return WalkState.None;
 
                 return wn.node.lastColor == OpeningNode.color
-                    ? (wn.node.relScore >= -10 ? WalkState.Continue : WalkState.None)
-                    : (wn.node.relScore <= 40 ? WalkState.Continue : WalkState.Break);
+                    ? (wn.node.relScore >= startScore - 20 ? WalkState.Continue : WalkState.None)
+                    : (wn.node.relScore <= startScore + 30 ? WalkState.Continue : WalkState.Break);
             };
 
-            var wns = EnumerateNodes("1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4 Nf6 5. Nc3 Nc6 6. Bg5", getState).ToList();
+            var wns = EnumerateNodes(start, getState).ToList();
 
             ShrinkSubMoves(wns);
 
             foreach (var wn in wns) {
-                Console.WriteLine($"{PrettyPgn(wn.moves)} ({wn.freqPc}%) [{(float)wn.node.score / 100}]");
+                Console.WriteLine($"{PrettyPgn(wn.moves)} ({wn.freqPc}%) [{scoreDiff(wn)}]");
             }
 
             /*
