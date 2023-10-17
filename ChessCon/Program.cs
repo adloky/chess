@@ -110,6 +110,8 @@ namespace ChessCon {
 
         public int? scoreDiff { get { return node.relScore - parent.relScore; } }
 
+        public string info { get; set; }
+
         public WalkNode(OpeningNode node, OpeningNode[] parents, float freq = 1) {
             nodes = new OpeningNode[parents.Length + 1];
             Array.Copy(parents, 0, nodes, 1, parents.Length);
@@ -134,7 +136,7 @@ namespace ChessCon {
 
             keys.ForEach(k => hashs.Add(k));
 
-            var wns = keys.Select(k => nodeDic[k])
+            var wns = keys.Select(k => nodeDic[k]).Where(n => !enumExcepts.Contains(n))
                 .Select(n => new WalkNode(n, parents, getFreq(freq, n, parents)))
                 .ToArray();
 
@@ -187,44 +189,32 @@ namespace ChessCon {
             return nodeDic[OpeningNode.GetKey(fen, last)];
         }
 
-        public static string PrettyPgn(string pgn) {
-            var result = "";
-            var split = pgn.Split(' ');
-            for (var i = 0; i < split.Length; i++) {
-                if (i % 2 == 0) {
-                    result += $"{i/2+1}. ";
-                }
-                result += $"{split[i]} ";
-            }
-            if (result != "") { result = result.Substring(0, result.Length - 1); }
-
-            return result;
-        }
-
-        public static void ShrinkSubMoves(IList<WalkNode> wns) {
+        public static void ShrinkSubMoves(IList<WalkNode> wns, string start) {
+            start = Regex.Replace(start ?? "", @"\d+\.\s+", "");
             if (wns.Count < 2) return;
             var i = 1;
             do {
-                if (wns[i].moves.Contains(wns[i-1].moves)) { wns.RemoveAt(i-1); } else { i++; }
+                if (wns[i].moves.Contains(wns[i-1].moves) && wns[i-1].moves != start) { wns.RemoveAt(i-1); } else { i++; }
             } while (i < wns.Count); 
         }
 
-        public static void Calc(string moves = "") {
-           using (var engine = Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe")) {
-                var nodes = EnumerateNodes(moves).ToArray();
-                var nullCount = nodes.Where(x => x.node.score == null).Count();
-                foreach (var wn in nodes) {
-                    if (ctrlC) break;
-                    foreach (var node in new OpeningNode[] { wn.parent, wn.node }) {
-                        if (node.score == null) {
-                            try {
-                                node.score = engine.CalcScore(node.fen, 2000000);
-                            } catch {}
-                            nullCount--;
-                            Console.WriteLine($"{node.fen}, Score: {node.score}, {nullCount}");
-                        }
-                    }
-                }
+        public static void Prettify(IList<WalkNode> wns) {
+            if (wns.Count > 0) {
+                wns[0].info = Pgn.PrettyMoves(wns[0].moves);
+            }
+
+            var prev = wns.FirstOrDefault()?.moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var wn in wns.Skip(1)) {
+                var cur  = wn.moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                var l = Math.Min(prev.Length, cur.Length);
+                var skip = 0;
+                for (skip = 0; skip < l && prev[skip] == cur[skip]; skip++);
+                wn.info = Pgn.PrettyMoves(wn.moves, skip);
+                prev = cur;
+            }
+
+            foreach (var wn in wns) {
+                wn.info = wn.info.Replace(". ", ".");
             }
         }
 
@@ -244,12 +234,12 @@ namespace ChessCon {
         }
 
         private static string pushTag(string tags, string tag) {
-            if (tags == null) {
-                return tag;
-            }
+            return tags == null ? null : $" {tags} ".Contains($" {tag} ") ? tags : $"{tags} {tag}";
+        }
 
-            var s = $" {tags} ";
-            return s.Contains($" {tag} ") ? tags : $"{tags} {tag}";
+        private static string align(object o, int s) {
+            var r = o.ToString();
+            return (new string(' ', Math.Max(0, s - r.Length))) + r;
         }
 
         private static string nodesPath = "d:/lichess.json";
@@ -257,6 +247,8 @@ namespace ChessCon {
         private static Dictionary<string,OpeningNode> nodeDic;
 
         private static volatile bool ctrlC = false;
+
+        private static HashSet<OpeningNode> enumExcepts = new HashSet<OpeningNode>();
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
@@ -266,13 +258,15 @@ namespace ChessCon {
             nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#sicil")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
             Console.WriteLine("nodeDic loaded.");
 
-            var start = "1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O";
+            var start = "1. e4 c5 2. d4 cxd4 3. c3";
+            enumExcepts.Add(getNodeByMoves("1. e4 c5 2. d4 cxd4 3. c3 dxc3"));
+            enumExcepts.Add(getNodeByMoves("1. e4 c5 2. d4 cxd4 3. c3 d3"));
             var startNode = getNodeByMoves(start);
             var startScore = startNode.relScore;
-            Func<WalkNode, string> scoreDiff = wn => ((float)(wn.node.relScore - startScore) / 100).ToString(CultureInfo.InvariantCulture);
+            Func<WalkNode, string> scoreDiff = wn => align(((float)(wn.node.relScore - startScore) / 100).ToString("0.00", CultureInfo.InvariantCulture), 6);
 
             Func<WalkNode, WalkState> getState = wn => {
-                if (wn.freq < 0.05) return WalkState.None;
+                if (wn.freq < 0.02) return WalkState.None;
 
                 return wn.node.lastColor == OpeningNode.color
                     ? (wn.node.relScore >= startScore - 20 ? WalkState.Continue : WalkState.None)
@@ -281,10 +275,12 @@ namespace ChessCon {
 
             var wns = EnumerateNodes(start, getState).ToList();
 
-            ShrinkSubMoves(wns);
+            ShrinkSubMoves(wns, start);
+
+            Prettify(wns);
 
             foreach (var wn in wns) {
-                Console.WriteLine($"{PrettyPgn(wn.moves)} ({wn.freqPc}%) [{scoreDiff(wn)}]");
+                Console.WriteLine($"{scoreDiff(wn)} {align(wn.freqPc, 3)}% {wn.info}");
             }
 
             /*

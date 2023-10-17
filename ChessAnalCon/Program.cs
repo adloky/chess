@@ -379,7 +379,7 @@ namespace ChessAnalCon {
                 }
 
                 if (!skipInc) id++;
-                return $"<span id='move{id}' class='move' fen='{mi.fen}' uci='{mi.moveUci}'>{(mi.err ? "=>" : "")}{x}</span>";
+                return $"<span id='move{id}' class='move' fen='{FEN.StrictEnPassed(mi.fen)}' uci='{mi.moveUci}'>{(mi.err ? "=>" : "")}{x}</span>";
             });
         }
 
@@ -813,7 +813,7 @@ namespace ChessAnalCon {
                     return r;
                 });
 
-                rs = rs.Replace("(S)", $"<span class=\"move\" fen=\"{hub.Fen}\">(S)</span>");
+                rs = rs.Replace("(S)", $"<span class=\"move\" fen=\"{FEN.StrictEnPassed(hub.Fen)}\">(S)</span>");
 
                 rss.Add(rs);
 

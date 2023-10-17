@@ -126,6 +126,27 @@ namespace Chess {
             }
         }
 
+        public static int ParseNum(string s) {
+            return int.Parse(s.Replace(".", "")) * 2 - 2 + (s.Contains("...") ? 1 : 0);
+        }
+
+        public static string NumToString(int n) {
+            return $"{n / 2 + 1}{(n % 2 == 0 ? "." : "...")}";
+        }
+
+        public static string PrettyMoves(string s, int skip = 0) {
+            var sb = new StringBuilder();
+            var moves = s.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            for (var i = skip; i < moves.Length; i++) {
+                if (i % 2 == 0 || i == skip) {
+                    sb.Append(NumToString(i) + " "); 
+                }
+                sb.Append(moves[i] + " ");
+            }
+
+            return sb.ToString().Trim();
+        }
+
         #endregion GetMoves
 
         public override string ToString() {
