@@ -430,8 +430,8 @@ namespace ChessAnalCon {
             return r.ToArray();
         }
 
-        public static string Clear(string s) {
-            return tagRe.Replace(s, "");
+        public static string Clear(string s, HashSet<string> names = null) {
+            return Program.handleString(s, tagRe, (x, m) => (names == null || names.Contains(m.Groups["name"].Value)) ? "" : x);
         }
     }
 
@@ -717,6 +717,9 @@ namespace ChessAnalCon {
             return (sn.Contains("...")) ? $"{n}.XX" : $"{n - 1}...XX";
         }
 
+        private static HashSet<string> clearTags = new HashSet<string>() { "add", "addx", "level", "skip", "config", "fen", "confinue" };
+        private static Regex headerRe = new Regex("^#+ ", RegexOptions.Compiled);
+
         private static void processMd(string path = null) {
             var srcPath = path ?? Config.current.mdPath;
             var name = Path.GetFileNameWithoutExtension(srcPath);
@@ -738,15 +741,25 @@ namespace ChessAnalCon {
                 book = book.Select(x => x.Replace(".move-hilight", ".move")).ToArray();
             }
 
+            var content = new List<string>();
             var lastLevel = 1;
             foreach (var s in ss) {
-                if (s == "" || s.StartsWith("![](") || s.StartsWith("#")) {
+                var headerMatch = headerRe.Match(s);
+                if (headerMatch.Success) {
+                    var n = headerMatch.Value.Length - 1;
+                    var header = s.Substring(n + 1);
+                    content.Add($"<p class=\"indent{n}\"><a  href=\"#ref{content.Count}\"><b>{header}</b></a></p>\r\n");
+                    rss.Add($"{headerMatch.Value}<a name=\"ref{content.Count-1}\"></a>{header}");
+                    continue;
+                }
+
+                if (s == "" || s.StartsWith("![](")) {
                     rss.Add(s);
                     continue;
                 }
 
                 var tags = Tag.Parse(s);
-                var s2 = Tag.Clear(s);
+                var s2 = Tag.Clear(s, clearTags);
 
                 foreach (var tag in tags.Where(x => x.name == "addx" && x.attr.ContainsKey("start"))) {
                     tag.name = "add";
@@ -823,6 +836,12 @@ namespace ChessAnalCon {
             }
 
             var html = rss.Where(x => x != "").Select(x => Markdown.ToHtml(x)).ToArray();
+
+            for (var i = 0; i < Math.Min(100, html.Length); i++) {
+                if (html[i].StartsWith("<content/>")) {
+                    html[i] = string.Join("", content);
+                }
+            }
             
             File.WriteAllLines(dstPath, book.Concat(html));
         }
