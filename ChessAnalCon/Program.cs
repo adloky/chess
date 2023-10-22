@@ -740,6 +740,15 @@ namespace ChessAnalCon {
             if (configTag.attr.TryGetValue("hilight", out configVal) && configVal == "1") {
                 book = book.Select(x => x.Replace(".move-hilight", ".move")).ToArray();
             }
+            if (configTag.attr.TryGetValue("offline", out configVal) && configVal == "1") {
+                var jqeury = "<script>\r\n" + File.ReadAllText("d:/Projects/smalls/jquery-2.2.4.min.js") + "</script>\r\n";
+                for (var i = 0; i < book.Length; i++) {
+                    if (book[i].StartsWith("<script src=\"https://code.jquery.com")) {
+                        book[i] = jqeury;
+                        break;
+                    }
+                }
+            }
 
             var content = new List<string>();
             var lastLevel = 1;
@@ -748,7 +757,7 @@ namespace ChessAnalCon {
                 if (headerMatch.Success) {
                     var n = headerMatch.Value.Length - 1;
                     var header = s.Substring(n + 1);
-                    content.Add($"<p class=\"indent{n}\"><a  href=\"#ref{content.Count}\"><b>{header}</b></a></p>\r\n");
+                    content.Add($"<p class=\"indent{n}\"><a href=\"#ref{content.Count}\"><b>{header}</b></a></p>\r\n");
                     rss.Add($"{headerMatch.Value}<a name=\"ref{content.Count-1}\"></a>{header}");
                     continue;
                 }
@@ -977,10 +986,10 @@ namespace ChessAnalCon {
         }
 
         private static void handleChessable() {
-            var src = "d:/chess/pgns/everyman.pgn";
-            var dst = "d:/everyman-panov.pgn";
-            var open = "1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4";
-            var except = "Panov";
+            var src = "d:/chess/pgns/_everyman.pgn";
+            var dst = "d:/tarrasch-everyman.pgn";
+            var open = "1. d4 d5 2. c4 e6 3. Nc3 c5";
+            var except = "Tarrasch";
 
             open = string.Join(" ", open.Split(' ').Where(x => !x.Contains(".")));
             var rs = new List<string>();
@@ -1094,6 +1103,7 @@ namespace ChessAnalCon {
 
             // processMd("d:\\Projects\\smalls\\nimzo-lysyy.md");
             mdMonitor();
+            //handleChessable();
 
             //simplifyChessable();
 
