@@ -630,6 +630,22 @@ namespace ChessAnalCon {
             return sb.ToString();
         }
 
+        public static IEnumerable<string> enumReString(string s, Regex re) {
+            var m = re.Match(s);
+            var i = 0;
+
+            while (m.Success) {
+                var ls = s.Substring(i, m.Index - i);
+                yield return ls;
+                ls = s.Substring(m.Index, m.Length);
+                yield return ls;
+                i = m.Index + m.Length;
+                m = m.NextMatch();
+            }
+            var ls2 = s.Substring(i, s.Length - i);
+            yield return ls2;
+        }
+
         private static string norm(string s) {
             s = s.Replace("х", "x");
             s = s.Replace("а", "a");
@@ -769,6 +785,10 @@ namespace ChessAnalCon {
 
                 var tags = Tag.Parse(s);
                 var s2 = Tag.Clear(s, clearTags);
+                
+                foreach (var tag in tags.Where(x => x.name == "level" && !x.attr.ContainsKey("value"))) {
+                    tag.attr.Add("value", "+1");
+                }
 
                 foreach (var tag in tags.Where(x => x.name == "addx" && x.attr.ContainsKey("start"))) {
                     tag.name = "add";
@@ -987,9 +1007,9 @@ namespace ChessAnalCon {
 
         private static void handleChessable() {
             var src = "d:/chess/pgns/_everyman.pgn";
-            var dst = "d:/tarrasch-everyman.pgn";
-            var open = "1. d4 d5 2. c4 e6 3. Nc3 c5";
-            var except = "Tarrasch";
+            var dst = "d:/morra-everyman.pgn";
+            var open = "1. e4 c5 2. d4";
+            var except = "Morra";
 
             open = string.Join(" ", open.Split(' ').Where(x => !x.Contains(".")));
             var rs = new List<string>();
@@ -1042,8 +1062,8 @@ namespace ChessAnalCon {
             { "knight", "N" }, { "bishop", "B" }, { "queen", "Q" }, { "rook", "R" }, { "king", "K" } };
 
         private static void simplifyChessable() {
-            var src = "d:/tarrasch-b-ss.html";
-            var dst = "d:/tarrasch-b-ss-2.html";
+            var src = "d:/dutch-b-ss.html";
+            var dst = "d:/dutch-b-ss-2.html";
             var s = File.ReadAllText(src);
 
             s = svgTagRe.Replace(s, "");
@@ -1102,11 +1122,12 @@ namespace ChessAnalCon {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
             // processMd("d:\\Projects\\smalls\\nimzo-lysyy.md");
-            mdMonitor();
+            //mdMonitor();
             //handleChessable();
 
-            //simplifyChessable();
-
+            simplifyChessable();
+            //handleChessable();
+            //Console.ReadLine();
             //FEN.Move("4r1k1/3P1pp1/5n1p/2P5/1Q2p3/4NbPq/PP3P1P/R4RK1 b - - 0 25", "Rf8");
             //Console.ReadLine();
 

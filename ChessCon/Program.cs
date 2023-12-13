@@ -136,7 +136,11 @@ namespace ChessCon {
 
             keys.ForEach(k => hashs.Add(k));
 
-            var wns = keys.Select(k => nodeDic[k]).Where(n => !enumExcepts.Contains(n))
+            var nodes = keys.Select(k => nodeDic[k]).OrderByDescending(x => x.relCount).ToArray();
+            if (nodes.Any(n => hintSet.Contains(n))) {
+                nodes = nodes.Where(n => hintSet.Contains(n)).ToArray();
+            }
+            var wns = nodes.Where(n => !exceptSet.Contains(n))
                 .Select(n => new WalkNode(n, parents, getFreq(freq, n, parents)))
                 .ToArray();
 
@@ -155,22 +159,32 @@ namespace ChessCon {
             return r;
         }
 
-        public static IEnumerable<WalkNode> EnumerateNodes(string moves = null, Func<WalkNode, WalkState> getState = null) {
-            if (getState == null) getState = x => WalkState.Continue;
-            moves = Regex.Replace(moves ?? "", @"\d+\.\s+", "");
+        private static IEnumerable<OpeningNode> enumNodesByMoves(string moves = null) {
+            yield return nodeDic[OpeningNode.GetKey(Board.DEFAULT_STARTING_FEN, null)];
 
+            moves = Regex.Replace(moves ?? "", @"\d+\.\s+", "");
             var fen = Board.DEFAULT_STARTING_FEN;
             var ms = moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            
+            foreach (var move in ms)             {
+                fen = FEN.Move(fen, move);
+                OpeningNode node;
+                if (!nodeDic.TryGetValue(OpeningNode.GetKey(fen, move), out node)) {
+                    yield break;
+                }
+                yield return node;
+            }
+        }
+
+        public static IEnumerable<WalkNode> EnumerateNodes(string moves = null, Func<WalkNode, WalkState> getState = null) {
+            if (getState == null) getState = x => WalkState.Continue;
+
             var parents = new List<OpeningNode>();
             Func<OpeningNode[]> parentsReverse = () => ((IEnumerable<OpeningNode>)parents).Reverse().ToArray();
             var wns = new List<WalkNode>();
-            parents.Add(nodeDic[fen]);
+            var nodes = enumNodesByMoves(moves).ToArray();
+            parents.Add(nodes[0]);
 
-            foreach (var move in ms) {
-                fen = FEN.Move(fen, move);
-                var key = OpeningNode.GetKey(fen, move);
-                var node = nodeDic[key];
+            foreach (var node in nodes.Skip(1)) {
                 wns.Add(new WalkNode(node, parentsReverse()));
                 parents.Add(node);
             }
@@ -179,14 +193,18 @@ namespace ChessCon {
         }
 
         private static OpeningNode getNodeByMoves(string moves = null) {
-            moves = Regex.Replace(moves ?? "", @"\d+\.\s+", "");
-            var fen = Board.DEFAULT_STARTING_FEN;
-            var ms = moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            var last = ms.LastOrDefault();
-            foreach (var move in ms) {
-                fen = FEN.Move(fen, move);
+            return enumNodesByMoves(moves).Last();
+        }
+
+        private static void addHints(string moves = null) {
+            var nodes = enumNodesByMoves(moves).Skip(1).ToArray();
+            for (var i = 0; i < nodes.Length; i++) {
+                var color = 1 - (i % 2) * 2;
+                var node = nodes[i];
+                if (color == OpeningNode.color && !hintSet.Contains(node)) {
+                    hintSet.Add(node);
+                }
             }
-            return nodeDic[OpeningNode.GetKey(fen, last)];
         }
 
         public static void ShrinkSubMoves(IList<WalkNode> wns, string start) {
@@ -248,29 +266,36 @@ namespace ChessCon {
 
         private static volatile bool ctrlC = false;
 
-        private static HashSet<OpeningNode> enumExcepts = new HashSet<OpeningNode>();
+        private static HashSet<OpeningNode> exceptSet = new HashSet<OpeningNode>();
+        private static HashSet<OpeningNode> hintSet = new HashSet<OpeningNode>();
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
             OpeningNode.color = 1;
             OpeningNode.relCountFunc = x => x.midCount;
 
-            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#sicil")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#caro")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
             Console.WriteLine("nodeDic loaded.");
 
-            var start = "1. e4 c5 2. d4 cxd4 3. c3";
-            enumExcepts.Add(getNodeByMoves("1. e4 c5 2. d4 cxd4 3. c3 dxc3"));
-            enumExcepts.Add(getNodeByMoves("1. e4 c5 2. d4 cxd4 3. c3 d3"));
+            var start = "1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4 dxc4 5. Bxc4";
+            //exceptSet.Add(getNodeByMoves("1. e4 c5 2. d4 cxd4 3. c3 dxc3"));
+            //exceptSet.Add(getNodeByMoves("1. e4 c5 2. d4 cxd4 3. c3 d3"));
+                   // 1. e4 e6 2. d4 d5 3. Nc3 Nf6 4. Bg5 Be7 5. e5 Nfd7 6. Bxe7 Qxe7 7. f4 O-O 8.Nf3 f5 9.a3
+                   // 1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4 dxc4 5. Bxc4 Nf6 6. Nf3 e6 7. O-O Bd6 8. Nc3
+            addHints("1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4 dxc4 5. Bxc4 Nf6 6. Nf3 e6 7. O-O Be7 8. Nc3 O-O 9. Re1");
+            addHints("1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4 dxc4 5. Bxc4 e6 6. Nf3 Nf6 7. O-O Be7 8. Nc3 O-O 9. Re1");
+            addHints("1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4 dxc4 5. Bxc4 Nf6 6. Nf3 e6 7. O-O Bd6 8. Nc3 O-O 9. Bg5");
+
             var startNode = getNodeByMoves(start);
             var startScore = startNode.relScore;
             Func<WalkNode, string> scoreDiff = wn => align(((float)(wn.node.relScore - startScore) / 100).ToString("0.00", CultureInfo.InvariantCulture), 6);
 
             Func<WalkNode, WalkState> getState = wn => {
-                if (wn.freq < 0.02) return WalkState.None;
+                if (wn.freq < 0.05) return WalkState.None;
 
                 return wn.node.lastColor == OpeningNode.color
                     ? (wn.node.relScore >= startScore - 20 ? WalkState.Continue : WalkState.None)
-                    : (wn.node.relScore <= startScore + 30 ? WalkState.Continue : WalkState.Break);
+                    : (wn.node.relScore <= startScore + 40 ? WalkState.Continue : WalkState.Break);
             };
 
             var wns = EnumerateNodes(start, getState).ToList();
@@ -282,7 +307,7 @@ namespace ChessCon {
             foreach (var wn in wns) {
                 Console.WriteLine($"{scoreDiff(wn)} {align(wn.freqPc, 3)}% {wn.info}");
             }
-
+            
             /*
             var wns = EnumerateNodes("1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4 Nf6 5. Nc3 Nc6 6. Bg5", n => n.relCount >= 3)
                 .Where(x => x.scoreDiff >= 30 && x.parent.score >= -10)
