@@ -182,6 +182,8 @@ namespace ChessAnalCon {
     public class MoveInfo {
         public string id { get; set; }
 
+        public string prev { get; set; }
+
         public string moveSan { get; set; }
 
         public string moveUci { get; set; }
@@ -336,7 +338,7 @@ namespace ChessAnalCon {
             return FEN.Move(fen, move);
         }
 
-        public MoveInfo Push(int level, int index, string move) {
+        public MoveInfo Push(int level, int index, string move, bool skipId = false) {
             var prev = getPrev(level, index);
             var err = false;
             if (move.Contains("+")) {
@@ -344,13 +346,14 @@ namespace ChessAnalCon {
                 var san = FEN.Uci2San(prev.fen, uci);
                 err = move != san;
             }
-            var mi = new MoveInfo() { fen = fenMove(prev.fen, move), moveSan = move, moveUci = move == "XX" ? null : FEN.San2Uci(prev.fen, move), err = err };
+            if (!skipId) id++;
+            var mi = new MoveInfo() { id = skipId ? null : $"move{id}", prev = prev.id, fen = fenMove(prev.fen, move), moveSan = move, moveUci = move == "XX" ? null : FEN.San2Uci(prev.fen, move), err = err };
             this[level, index] = mi;
 
             return mi;
         }
 
-        public string Push(int level, string moves, bool skipInc = false) {
+        public string Push(int level, string moves, bool skipId = false) {
             var index = 0;
             var isEx = false;
             return Program.handleString(moves, re, (x, m) => {
@@ -369,7 +372,7 @@ namespace ChessAnalCon {
 
                 var mi = (MoveInfo)null;
                 try {
-                    mi = Push(level, index, move);
+                    mi = Push(level, index, move, skipId);
                 }
                 catch { }
 
@@ -378,8 +381,7 @@ namespace ChessAnalCon {
                     return $"=>{x}";
                 }
 
-                if (!skipInc) id++;
-                return $"<span id='move{id}' class='move' fen='{FEN.StrictEnPassed(mi.fen)}' uci='{mi.moveUci}'>{(mi.err ? "=>" : "")}{x}</span>";
+                return $"<span id='{mi.id}' prev='{mi.prev}' class='move' fen='{FEN.StrictEnPassed(mi.fen)}' uci='{mi.moveUci}' san='{mi.moveSan}'>{(mi.err ? "=>" : "")}{x}</span>";
             });
         }
 
@@ -1005,11 +1007,28 @@ namespace ChessAnalCon {
             engine.Dispose();
         }
 
+        private static void handleCbHtml(string path) {
+            var s = File.ReadAllText(path);
+            s = s.Replace("0-0-0", "O-O-O").Replace("0-0", "O-O");
+            s = handleString(s, new Regex(@"<b>\w\d*\) </b>"), (x,m) => x.Replace("<b>", "").Replace("</b>", ""));
+            s = s.Replace("<i>", "").Replace("</i>", "");
+            s = s.Replace("<b></b>", "");
+            s = s.Replace("<b>", "<p><b>").Replace("</b>", "</b><p>");
+            s = (new Regex("..StartBracket..")).Replace(s, "(");
+            s = (new Regex("..EndBracket..")).Replace(s, ")");
+
+            //s = s.Replace(" --- ", "<p>");
+
+            var ext = Path.GetExtension(path);
+            var newPath = path.Replace(ext, "-2" + ext);
+            File.WriteAllText(newPath, s);
+        }
+
         private static void handleChessable() {
-            var src = "d:/chess/pgns/_everyman.pgn";
-            var dst = "d:/morra-everyman.pgn";
-            var open = "1. e4 c5 2. d4";
-            var except = "Morra";
+            var src = "d:/chess/pgns/_chessable.pgn";
+            var dst = "d:/wing-french-chessable.pgn";
+            var open = "1. e4 e6 2. Nf3 d5 3. e5";
+            var except = "asdfasdfasdf";
 
             open = string.Join(" ", open.Split(' ').Where(x => !x.Contains(".")));
             var rs = new List<string>();
@@ -1062,8 +1081,8 @@ namespace ChessAnalCon {
             { "knight", "N" }, { "bishop", "B" }, { "queen", "Q" }, { "rook", "R" }, { "king", "K" } };
 
         private static void simplifyChessable() {
-            var src = "d:/dutch-b-ss.html";
-            var dst = "d:/dutch-b-ss-2.html";
+            var src = "d:/e4-gambits.html";
+            var dst = "d:/e4-gambits-2.html";
             var s = File.ReadAllText(src);
 
             s = svgTagRe.Replace(s, "");
@@ -1121,12 +1140,13 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
-            // processMd("d:\\Projects\\smalls\\nimzo-lysyy.md");
-            //mdMonitor();
+            // processMd("d:/Projects/smalls/ideas-my.md");
+            mdMonitor();
             //handleChessable();
 
-            simplifyChessable();
-            //handleChessable();
+            //simplifyChessable();
+            // handleChessable();
+            //handleCbHtml("d:/williams.html");
             //Console.ReadLine();
             //FEN.Move("4r1k1/3P1pp1/5n1p/2P5/1Q2p3/4NbPq/PP3P1P/R4RK1 b - - 0 25", "Rf8");
             //Console.ReadLine();
