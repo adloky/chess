@@ -134,7 +134,7 @@ namespace ChessCon {
                 .Where(k => nodeDic.ContainsKey(k) && !hashs.Contains(k))
                 .ToList();
 
-            keys.ForEach(k => hashs.Add(k));
+            //keys.ForEach(k => hashs.Add(k));
 
             var nodes = keys.Select(k => nodeDic[k]).OrderByDescending(x => x.relCount).ToArray();
             if (nodes.Any(n => hintSet.Contains(n))) {
@@ -210,17 +210,38 @@ namespace ChessCon {
             }
         }
 
+        private static void addExcept(string moves = null) {
+            exceptSet.Add(enumNodesByMoves(moves).Last());
+        }
+
         private static void addNodes(string moves) {
             var nodes = enumNodesByMoves(moves).ToArray();
             var ms = getMoves(moves).Skip(nodes.Length - 1).ToArray();
             var node = nodes.Last();
             var fen = node.fen;
+            var nodeColor = node.fen.Contains(" b ") ? 1 : -1;
+            if (nodeColor == OpeningNode.color || ms.Length == 0) {
+                return;
+            }
+
+            var move = ms.First();
+            fen = FEN.Move(fen, move);
+            node.moves = (node.moves == null) ? move : $"{node.moves} {move}";
+            node = new OpeningNode { fen = fen, last = move, score = node.score, count = node.count, midCount = node.midCount };
+            if (!nodeDic.ContainsKey(node.key)) {
+                nodeDic.Add(node.key, node);
+            }
+
+            /*
             foreach (var move in ms) {
                 fen = FEN.Move(fen, move);
                 node.moves = (node.moves == null) ? move : $"{node.moves} {move}";
                 node = new OpeningNode { fen = fen, last = move, score = node.score, count = node.count, midCount = node.midCount };
-                nodeDic.Add(node.key, node);
+                if (!nodeDic.ContainsKey(node.key)) {
+                    nodeDic.Add(node.key, node);
+                }
             }
+            */
         }
 
         public static void ShrinkSubMoves(IList<WalkNode> wns, string start) {
@@ -291,38 +312,48 @@ namespace ChessCon {
             OpeningNode.color = 1;
             OpeningNode.relCountFunc = x => x.midCount;
 
-            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#french")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#spanish")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
             Console.WriteLine("nodeDic loaded.");
 
-            var start = "1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4";
-            //exceptSet.Add(getNodeByMoves("1. e4 Nf6 2. e5 Nd5 3. Nc3 Nxc3 4. dxc3 d5"));
+            var start = "1. e4 e5 2. Nf3 Nc6 3. Bb5";
+            //Console.WriteLine(EnumerateNodes(start).Count());
             //exceptSet.Add(getNodeByMoves("1. e4 c5 2. d4 cxd4 3. c3 d3"));
-                   // 1. e4 e6 2. d4 d5 3. Nc3 Nf6 4. Bg5 Be7 5. e5 Nfd7 6. Bxe7 Qxe7 7. f4 O-O 8.Nf3 f5 9.a3
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 Nc6 6. a3 bxa3 7. c3 Nge7 8. Bd3 Ng6 9. h4");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 Nc6 6. a3 bxa3 7. c3 Nge7 8. Bd3 Nf5 9. Nxa3 Be7 10. g4");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 Nc6 6. a3 bxa3 7. c3 Bd7 8. Bd3 a6 9. Ng5");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 Nc6 6. a3 bxa3 7. c3 Bd7 8. Bd3 Nge7 9. Nxa3");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 Nc6 6. a3 bxa3 7. c3 Bd7 8. Bd3 Rc8 9. Ng5");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 Nc6 6. a3 bxa3 7. c3 a6 8. Bd3 Bd7 9. Ng5");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 Nc6 6. a3 bxa3 7. c3 Nh6 8. Bxh6 gxh6");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 Nc6 6. a3 Nge7 7. axb4 Nxb4 8. c3 Nbc6 9. Bd3");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 Nc6 6. a3");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 Ne7 6. a3");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 a5 6. a3 bxa3 7. c3");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 cxb4 5. d4 f6 6. Bd3");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 b6 5. c3 cxb4 6. cxb4 Bxb4");
-            addHints("1. e4 e6 2. Nf3 d5 3. e5 c5 4. b4 d4 5. bxc5 Bxc5 6. Ba3");
+            // addHints("1. e4 Nf6 2. e5 Nd5 3. Nc3 Nxc3 4. dxc3 d6 5. Nf3 g6 6. Bc4 Bg7 7. Ng5");
+
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 b5 6. Bb3 Be7 7. a4");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 b5 6. Bb3 Bc5 7. Bg5");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 b5 6. Bb3 d6 7. a4");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 Bc5 6. c3");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 d6 6. c3");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 b5 5. Bb3 Nf6 6. d3");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 d6 5. O-O");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 exd4 5. Nxd4 Bd7 6. O-O Nxd4 7. Bxd7+ Qxd7 8. Qxd4 Nf6 9. Nc3");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 exd4 5. Nxd4 Bd7 6. O-O Nf6 7. Nc3 Be7 8. Nxc6 bxc6 9. Bd3");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 exd4 5. Nxd4 Bd7 6. O-O Nf6 7. Nc3 Nxd4 8. Bxd7+ Qxd7 9. Qxd4");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 exd4 5. Nxd4 Bd7 6. O-O Be7 7. Nxc6");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 Bd7 5. Bxc6");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 a6 5. Bxc6+ bxc6 6. dxe5");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. c3 d6 6. d4 exd4 7. cxd4 Bb4+ 8. Bd2");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. c3 O-O 6. O-O d6 7. Re1");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 d6 5. O-O");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5 4. c3 d6 5. d4");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5 4. c3 Nf6 5. d4 exd4 6. e5");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5 4. c3 a6 5. Ba4 b5 6. Bb3");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5 4. c3 Nge7 5. O-O");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Nge7 4. Nc3");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Nd4 4. Nxd4 exd4 5. O-O");
+            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 f5 4. d3");
 
             var startNode = getNodeByMoves(start);
             var startScore = startNode.relScore;
             Func<WalkNode, string> scoreDiff = wn => align(((float)(wn.node.relScore - startScore) / 100).ToString("0.00", CultureInfo.InvariantCulture), 6);
 
             Func<WalkNode, WalkState> getState = wn => {
-                if (wn.freq < 0.01) return WalkState.None;
+                if (wn.freq < 0.02) return WalkState.None;
 
                 return wn.node.lastColor == OpeningNode.color
                     ? (wn.node.relScore >= startScore - 30 ? WalkState.Continue : WalkState.None)
-                    : (wn.node.relScore <= startScore + 40 ? WalkState.Continue : WalkState.Break);
+                    : (wn.node.relScore <= startScore + 60 ? WalkState.Continue : WalkState.Break);
             };
 
             var wns = EnumerateNodes(start, getState).ToList();
@@ -374,8 +405,8 @@ namespace ChessCon {
             /*
             var tag = "#sicilian";
             foreach (var wn in EnumerateNodes("1. e4 c5")) {
-                if (wn.parentNode.last == null) {
-                    wn.parentNode.tags = pushTag(wn.parentNode.tags, tag);
+                if (wn.parent.last == null) {
+                    wn.parent.tags = pushTag(wn.parent.tags, tag);
                 }
 
                 wn.node.tags = pushTag(wn.node.tags, tag);

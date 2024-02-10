@@ -192,6 +192,20 @@ namespace Chess
             return piece.Player == PlayerColor.White ? char.ToUpper(notation) : char.ToLower(notation);
         }
         public static string Move(string fen, string move) {
+            if (move == "--") {
+                var fs = fen.Split(' ');
+                if (fs[1] == "w") {
+                    fs[1] = "b";
+                }
+                else {
+                    fs[5] = (int.Parse(fs[5]) + 1).ToString();
+                    fs[1] = "w";
+                }
+                fs[3] = "-";
+
+                return string.Join(" ", fs);
+            }
+
             var board = Board.Load(fen);
             var opt = new MoveOptions() { SkipTestMate = true };
             if (!board.Move(move, opt)) {

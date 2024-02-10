@@ -10,8 +10,9 @@ using System.Web;
 namespace Chess {
     public class Pgn {
         private readonly static Regex ParamRegex = new Regex(@"^\[(?<name>[^ ]+) ""(?<value>(\\""|""[^\]]|[^""])*)""\] *$", RegexOptions.Compiled);
-        private readonly static Regex CommentRegex = new Regex(@" \{[^}]*\}", RegexOptions.Compiled);
-        private readonly static Regex NumberRegex = new Regex(@"\d+\.+ ", RegexOptions.Compiled);
+        private readonly static Regex CommentRegex = new Regex(@"\{[^}]*\}", RegexOptions.Compiled);
+        private readonly static Regex NumberRegex = new Regex(@"\d+\.+ ?", RegexOptions.Compiled);
+        private readonly static Regex NagRegex = new Regex(@" \$\d+", RegexOptions.Compiled);
         private readonly static Regex ScoreRegex = new Regex(@"[!?]", RegexOptions.Compiled);
         private readonly static Regex SpaceRegex = new Regex(@"\s+", RegexOptions.Compiled);
         private readonly static Regex ResultRegex = new Regex(@" ?(1-0|0-1|1/2-1/2|\*)$", RegexOptions.Compiled);
@@ -83,6 +84,7 @@ namespace Chess {
                 if (state == ParseState.Empty && prevState == ParseState.Moves) {
                     pgn.Moves = CommentRegex.Replace(pgn.Moves, "");
                     pgn.Moves = NumberRegex.Replace(pgn.Moves, "");
+                    pgn.Moves = NagRegex.Replace(pgn.Moves, "");
                     pgn.Moves = ScoreRegex.Replace(pgn.Moves, "");
                     pgn.Moves = removeVariants(pgn.Moves);
                     pgn.Moves = SpaceRegex.Replace(pgn.Moves, " ");
