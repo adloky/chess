@@ -723,7 +723,7 @@ namespace ChessAnalCon {
             return (sn.Contains("...")) ? $"{n}.--" : $"{n - 1}...--";
         }
 
-        private static HashSet<string> clearTags = new HashSet<string>() { "add", "addx", "level", "skip", "config", "fen", "confinue" };
+        private static HashSet<string> clearTags = new HashSet<string>() { "add", "addz", "level", "skip", "config", "fen", "fend", "confinue" };
         private static Regex headerRe = new Regex("^#+ ", RegexOptions.Compiled);
 
         private static void processMd(string path = null) {
@@ -735,7 +735,7 @@ namespace ChessAnalCon {
             var hub = new MoveInfoHub(moveRe);
 
             var rss = new List<string>();
-            var ss = File.ReadAllLines(srcPath);
+            var ss = File.ReadAllLines(srcPath).Where(x => x != "").ToArray();
 
             var configStr = ss.Take(10).Where(x => x.Contains("<config")).FirstOrDefault() ?? "<config/>";
             var configTag = Tag.Parse(configStr).Where(x => x.name == "config").First();
@@ -768,11 +768,6 @@ namespace ChessAnalCon {
                     continue;
                 }
 
-                if (s == "" || s.StartsWith("![](")) {
-                    rss.Add(s);
-                    continue;
-                }
-
                 var tags = Tag.Parse(s);
                 var s2 = Tag.Clear(s, clearTags);
                 
@@ -780,7 +775,7 @@ namespace ChessAnalCon {
                     tag.attr.Add("value", "+1");
                 }
 
-                foreach (var tag in tags.Where(x => x.name == "addx" && x.attr.ContainsKey("start"))) {
+                foreach (var tag in tags.Where(x => x.name == "addz" && x.attr.ContainsKey("start"))) {
                     tag.name = "add";
                     tag.attr.Add("value", prevSkipMove(tag.attr["start"]));
                 }
@@ -845,16 +840,14 @@ namespace ChessAnalCon {
                     return r;
                 });
 
-                var fenend = tags
-                    .Where(x => x.name == "fenend")
+                var fend = tags
+                    .Where(x => x.name == "fend")
                     .Select(x => x.attr.ContainsKey("value") ? x.attr["value"] : Board.DEFAULT_STARTING_FEN)
                     .FirstOrDefault();
 
-                if (fenend != null) {
-                    hub.SetFen(fenend);
+                if (fend != null) {
+                    hub.SetFen(fend);
                 }
-
-                //rs = rs.Replace("(S)", $"<span class=\"move\" fen=\"{FEN.StrictEnPassed(hub.Fen)}\">(S)</span>");
 
                 rss.Add(rs);
 
@@ -863,10 +856,27 @@ namespace ChessAnalCon {
                 }
             }
 
-            var html = rss.Where(x => x != "").Select(x => Markdown.ToHtml(x)).ToArray();
+            string[] ts = null;
+            if (configTag.attr.TryGetValue("translate", out configVal)) {
+                ts = File.ReadAllLines(configVal);
+            }
 
-            for (var i = 0; i < Math.Min(100, html.Length); i++) {
-                if (html[i].StartsWith("<content/>")) {
+            var html = new List<string>();
+            for (var i = 0; i < rss.Count; i++) {
+                var s = rss[i];
+                if (s == "") continue;
+
+                if (ts == null) {
+                    html.Add(Markdown.ToHtml(s));
+                    continue;
+                }
+
+                var t = (i < ts.Length) ? ts[i] : "";
+                html.Add($"<div><div class=\"column\">{Markdown.ToHtml(s)}</div><div class=\"column\">{Markdown.ToHtml(t)}</div></div>");
+            }
+
+            for (var i = 0; i < Math.Min(100, html.Count); i++) {
+                if (html[i].Contains("<content/>")) {
                     html[i] = string.Join("", content);
                 }
             }
@@ -1061,7 +1071,7 @@ namespace ChessAnalCon {
             });
 
             s = handleString(s, new Regex(@"<hr>(.|\n)*?</p>", RegexOptions.Multiline), (x, m) => {
-                return x.Replace("<p>", "<h3>").Replace("</p>", "</h3>").Replace("<hr>", "");
+                return x.Replace("<p>", "<h3>").Replace("</p>", "</h3>").Replace("<hr>", "").Replace("<b>","").Replace("</b>", "");
             });
 
             s = Regex.Replace(s, @"<hr>", "");
@@ -1077,15 +1087,36 @@ namespace ChessAnalCon {
             var reBraces = new Regex(@"^\( .*? \)$", RegexOptions.Compiled);
             var reBold = new Regex(@"^\*\*.*?\*\*$", RegexOptions.Compiled);
             var reBoldMoves = new Regex(@"^\*\*\d+\..*?\*\*$", RegexOptions.Compiled);
+            var reHeader = new Regex(@"^### ", RegexOptions.Compiled);
+            var reHeaderNum = new Regex(@"^### \(\d+\)", RegexOptions.Compiled);
+            var moveRe = new Regex($"\\d+\\.+ +({moveReS.Replace("|--", "")})");
+            var nlRe = new Regex(" --- ");
+            var headerN = 1;
             for (var i = 0; i < ss.Length; i++) {
                 var s = ss[i];
 
+                s = handleString(s, moveRe, (x,m) => x.Replace(" ", ""));
+                
                 if (reBraces.IsMatch(s)) {
                     s = s.Substring(2, s.Length - 4);
                 }
 
                 if (reBold.IsMatch(s) && !reBoldMoves.IsMatch(s)) {
                     s = s.Substring(2, s.Length - 4);
+                }
+
+                if (reHeader.IsMatch(s) && !reHeaderNum.IsMatch(s)) {
+                    s = s.Replace("### ", $"### ({headerN}) ");
+                    headerN++;
+                }
+
+                if (!s.StartsWith("**") && !s.StartsWith("### ")) {
+                    var levels = getLevels(s);
+                    
+                    s = handleString(s, nlRe, (x,m) => {
+                        var level = levels.TakeWhile(y => y.Item1 < m.Index).Last().Item2;
+                        return level == 1 ? "\r\n\r\n" : x;
+                    });
                 }
 
                 ss[i] = s;
@@ -1242,6 +1273,18 @@ namespace ChessAnalCon {
             File.WriteAllLines(path, rs.Select(x => x + "\r\n"));
         }
 
+        private static void makeForTranslate(string path) {
+            var ext = Path.GetExtension(path);
+            var ss = File.ReadAllLines(path).Where(x => x != "").ToArray();
+            path = path.Replace(ext, ".txt");
+            for (var i = 0; i < ss.Length; i++) {
+                var s = ss[i];
+                s = $"nmbr{i.ToString("000000")} {Tag.Clear(s)}";
+                ss[i] = s;
+            }
+            File.WriteAllLines(path, ss);
+        }
+
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
         private static string bookPath = "d:/Projects/smalls/book.html";
         private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|--";
@@ -1262,10 +1305,22 @@ namespace ChessAnalCon {
 
             // processMd("d:/Projects/smalls/ideas-my.md");
             mdMonitor();
+            //makeForTranslate(@"d:\Projects\smalls\french-classic-b-mbm.md");
+
             //handleScidHtml("d:/french-classic-mbm.html");
             //handleScidMd(@"d:\Projects\smalls\french-classic-b-mbm.md");
             //Console.ReadLine();
             //handleChessable();
+
+            /*
+            Directory.GetFiles(@"d:\Projects\smalls\", "*.md").ToList().ForEach(path => {
+                var s = File.ReadAllText(path);
+                s = s.Replace("<addx", "<addz");
+                File.WriteAllText(path, s);
+            });
+            Console.ReadLine();
+            */
+
 
             /*
             var path = @"d:\Projects\smalls\caruana-mbm.md";
