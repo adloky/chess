@@ -659,14 +659,15 @@ namespace ChessAnalCon {
             var bold = false;
             for (var i = 0; i < s.Length; i++) {
                 var c = s[i];
+                var shield = i > 0 && s[i-1] == '\\';
                 if (c == '*' && i > 0 && s[i - 1] == '*') {
                     bold = !bold;
                     level = bold ? 0 : 1;
                     r.Add(new Tuple<int, int>(i, level));
                 }
 
-                if (c == '(') { level++; r.Add(new Tuple<int, int>(i, level)); }
-                else if (c == ')' && level > 1) { level--; r.Add(new Tuple<int, int>(i, level)); }
+                if (c == '(' && !shield) { level++; r.Add(new Tuple<int, int>(i, level)); }
+                else if (c == ')' && level > 1 && !shield) { level--; r.Add(new Tuple<int, int>(i, level)); }
             }
 
             return r;
@@ -856,9 +857,14 @@ namespace ChessAnalCon {
                 }
             }
 
-            string[] ts = null;
+            string[] ts1 = null;
+            string[] ts2 = null;
             if (configTag.attr.TryGetValue("translate", out configVal)) {
-                ts = File.ReadAllLines(configVal);
+                var paths = configVal.Split(';');
+                ts1 = File.ReadAllLines(paths[0]);
+                if (paths.Length > 1) {
+                    ts2 = File.ReadAllLines(paths[1]);
+                }
             }
 
             var html = new List<string>();
@@ -866,13 +872,14 @@ namespace ChessAnalCon {
                 var s = rss[i];
                 if (s == "") continue;
 
-                if (ts == null) {
+                if (ts1 == null) {
                     html.Add(Markdown.ToHtml(s));
                     continue;
                 }
 
-                var t = (i < ts.Length) ? ts[i] : "";
-                html.Add($"<div><div class=\"column\">{Markdown.ToHtml(s)}</div><div class=\"column\">{Markdown.ToHtml(t)}</div></div>");
+                var t1 = (i < ts1.Length) ? ts1[i] : "";
+                var t2 = (ts2 != null && i < ts2.Length) ? ts2[i] : "";
+                html.Add($"<table class=\"colums{(ts2 == null ? "2" : "3" )}\"><tr><td>{Markdown.ToHtml(s)}</td><td>{Markdown.ToHtml(t1)}</td>{(ts2 == null ? "" : $"<td>{Markdown.ToHtml(t2)}</td>")}</tr></table>");
             }
 
             for (var i = 0; i < Math.Min(100, html.Count); i++) {
@@ -1017,19 +1024,115 @@ namespace ChessAnalCon {
         private static void handleCbHtml(string path) {
             var s = File.ReadAllText(path);
             s = s.Replace("0-0-0", "O-O-O").Replace("0-0", "O-O");
-            s = handleString(s, new Regex(@"<b>\w\d*\) </b>"), (x,m) => x.Replace("<b>", "").Replace("</b>", ""));
+            s = handleString(s, new Regex(@"<b>\w\d*\) </b>"), (x,m) => x.Replace("<b>", "var_").Replace("</b>", ""));
             s = s.Replace("<i>", "").Replace("</i>", "");
+            s = s.Replace("<b></b> [", "<p>").Replace("</b> [", "</b>").Replace("] <b>", "<b>");
+            s = Regex.Replace(s, @" *\*</b>", "</b>");
             s = s.Replace("<b></b>", "");
             s = s.Replace("<b>", "<p><b>").Replace("</b>", "</b><p>");
-            s = (new Regex("..StartBracket..")).Replace(s, "(");
-            s = (new Regex("..EndBracket..")).Replace(s, ")");
-            s = (new Regex("..StartFEN...*?..EndFEN..")).Replace(s, "");
+            s = s.Replace("<p>. ", "<p>");
 
-            //s = s.Replace(" --- ", "<p>");
+            s = s.Replace("~~", "∞").Replace("+/=", "⩲").Replace("=/+", "⩱").Replace("+/-", "±").Replace("-/+", "∓")
+                .Replace("+-", "+−").Replace("-+", "−+").Replace("(.)", "⨀").Replace("|^", "↑")
+                .Replace("->", "→").Replace("~/=", "=/∞").Replace("<=>", "⇆");
+
+            s = handleString(s, new Regex(moveNEvalReS), (x, m) => x.Replace("@", "⟳"));
+
+            s = Regex.Replace(s, "..StartBracket..", "(");
+            s = Regex.Replace(s, "..EndBracket..", ")");
+            s = Regex.Replace(s, "..(StartFEN|EndFEN)..", " ");
+
+            //s = s.Replace("(semicolon)", ";");
 
             var ext = Path.GetExtension(path);
             var newPath = path.Replace(ext, "-2" + ext);
             File.WriteAllText(newPath, s);
+        }
+
+        private static int getMoveCount(string s) {
+            var ms = moveSeqRe.Matches(s);
+            var sb = new StringBuilder();
+            foreach (var m in ms) {
+                sb.Append(((Match)m).Value);
+            }
+            var moves = sb.ToString().Replace("...", ".").Replace(" ", ".");
+            return moves.Count(x => x == '.');
+        }
+
+        private static int[] get2dLevels(string s) {
+            var levels = getLevels(s).ToArray();
+            var pl = levels.Last();
+            var ns = new List<int>();
+            foreach (var l in levels.Reverse().Skip(1)) {
+                if (pl.Item2 == 1 || l.Item2 == 1) {
+                    ns.Add(pl.Item1 + l.Item2 - 1);
+                }
+                pl = l;
+            }
+
+            var rs = new List<int>();
+            for (var i = 0; i < ns.Count(); i += 2) {
+                if (getMoveCount(s.Substring(ns[i + 1], ns[i] - ns[i + 1])) > 0) {
+                    rs.Add(ns[i]);
+                    rs.Add(ns[i+1]);
+                }
+            }
+
+            return rs.Reverse<int>().ToArray();
+        }
+
+        private static void handleCbMd(string path) {
+            var nlRe = new Regex(" ?--- | ---|; ?", RegexOptions.Compiled);
+
+            var ss = File.ReadAllLines(path).Where(x => x != "").ToArray();
+
+            for (var i = 1; i <= 3; i++) {
+                ss = ss.SelectMany(s => {
+                    if (s.StartsWith("**") && !s.StartsWith("### ")) return Enumerable.Repeat(s, 1);
+
+                    var ls = get2dLevels(s).Reverse().ToArray();
+                    switch (i) {
+                        case 1:
+                            if (ls.Length == 0) break;
+
+                            var tail = s.Substring(ls[0], s.Length - ls[0]);
+
+                            if (getMoveCount(tail) > 0) break;
+
+                            s = s.Remove(ls[0] - 1, 1);
+                            s = s.Insert(ls[0] - 1, (tail.Length <= 2) ? "\n" : "{warning: close bracket}\n");
+                            s = s.Remove(ls[1], 1);
+                            s = s.Insert(ls[1], (tail.Length <= 2) ? "\n" : "\n{warning: open bracket}");
+
+                            break;
+                        case 2:
+                            var levels = getLevels(s);
+                            s = handleString(s, nlRe, (x, m) => {
+                                var level = levels.TakeWhile(y => y.Item1 < m.Index).Last().Item2;
+                                return level == 1 ? "\n" : x;
+                            });
+
+                            break;
+                        case 3:
+                            for (var j = 0; j < ls.Length; j+=2) {
+                                var bs = s.Substring(ls[j + 1], ls[j] - ls[j + 1]);
+                                var mc = getMoveCount(bs);
+                                if (!(bs.Length > 25 || mc > 2)) continue;
+                                s = s.Insert(ls[j], "\n");
+                                s = s.Insert(ls[j+1], "\n");
+                            }
+
+                            break;
+                    }
+
+                    return s.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim());
+
+                }).ToArray();
+            }
+
+            var ext = Path.GetExtension(path);
+            var newPath = path.Replace(ext, "-2" + ext);
+            File.WriteAllLines(newPath, ss.Select(s => s.Replace("(semicolon)", ";") + "\r\n")); ;
         }
 
         private static Regex scidAltRe = new Regex(@"alt=""([^""]*)""");
@@ -1273,13 +1376,36 @@ namespace ChessAnalCon {
             File.WriteAllLines(path, rs.Select(x => x + "\r\n"));
         }
 
-        private static void makeForTranslate(string path) {
+        private static void splitDeepl(string path) {
+            var qs = new Queue<string>(File.ReadAllLines(path));
+            var ext = Path.GetExtension(path);
+            path = path.Replace(ext, "-d" + ext);
+
+            var rs = new List<string>();
+            while (qs.Count > 0) {
+                var ms = new List<string>();
+                var len = 0;
+                while (qs.Count > 0 && qs.Peek().Length + len < 4900) {
+                    var _s = qs.Dequeue();
+                    len += _s.Length + 2;
+                    ms.Add(_s);
+                }
+
+                rs.AddRange(ms);
+                rs.Add("=============================");
+            }
+
+            File.WriteAllLines(path, rs);
+        }
+
+        private static void prepareTranslate(string path) {
             var ext = Path.GetExtension(path);
             var ss = File.ReadAllLines(path).Where(x => x != "").ToArray();
             path = path.Replace(ext, ".txt");
             for (var i = 0; i < ss.Length; i++) {
                 var s = ss[i];
-                s = $"nmbr{i.ToString("000000")} {Tag.Clear(s)}";
+                //s = $"nmbr{i.ToString("000000")} {Tag.Clear(s)}";
+                s = $"{Tag.Clear(s)}";
                 ss[i] = s;
             }
             File.WriteAllLines(path, ss);
@@ -1289,15 +1415,16 @@ namespace ChessAnalCon {
         private static string bookPath = "d:/Projects/smalls/book.html";
         private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|--";
         //private static Regex moveRe = new Regex(moveReS);
-        private static string moveEvalReS = $"({moveReS})(?<eval>[^ ,\\.\\*;:)]*)";
         //private static Regex moveEvalRe = new Regex(moveEvalReS);
         private static string evalLongReS = $"(?<ccm>\\+)−\\+|(?<ccm>\\+)\\+−|\\+−|−\\+|(?<ccm>\\+)|(?<ccm>#)";
-        private static string evalReS = $"({evalLongReS}|[!?⩱⩲∓±↻=∞⇄↑→N])*";
+        private static string evalLong2ReS = evalLongReS.Replace("?<ccm>", "");
+        private static string evalShortReS = "[!?⩱⩲∓±↻=∞⇄↑→N@⨀/]";
+        private static string evalReS = $"({evalLongReS})?({evalLong2ReS}|{evalShortReS})*";
         private static string moveNEvalReS = $"(?<move>{moveReS})(?<eval>{evalReS})";
         private static string moveSeq1stReS = $"\\d+\\.{moveNEvalReS}( {moveNEvalReS} \\d+\\.{moveNEvalReS})*( {moveNEvalReS})?";
         private static string moveSeq2ndReS = $"\\d+\\.\\.\\.{moveNEvalReS}( \\d+\\.{moveNEvalReS} {moveNEvalReS})*( \\d+\\.{moveNEvalReS})?";
         private static string moveSeqFullReS = $"{moveSeq1stReS}|{moveSeq2ndReS}";
-        private static Regex moveSeqRe = new Regex(moveSeqFullReS);
+        private static Regex moveSeqRe = new Regex(moveSeqFullReS, RegexOptions.Compiled);
         private static Regex moveRe = new Regex($"(?<num>\\d+\\.(\\.\\.)?)?{moveNEvalReS}");
 
         static void Main(string[] args) {
@@ -1305,12 +1432,18 @@ namespace ChessAnalCon {
 
             // processMd("d:/Projects/smalls/ideas-my.md");
             mdMonitor();
-            //makeForTranslate(@"d:\Projects\smalls\french-classic-b-mbm.md");
+            //prepareTranslate(@"d:\Projects\smalls\french-b-fs.md");
+            //splitDeepl("d:/french-b-fs.txt");
 
             //handleScidHtml("d:/french-classic-mbm.html");
             //handleScidMd(@"d:\Projects\smalls\french-classic-b-mbm.md");
             //Console.ReadLine();
             //handleChessable();
+            //simplifyChessable();
+            //handleCbMd(@"d:\Projects\smalls\french-b-fs.md");
+
+            //removeChessableDublicates("d:/Projects/smalls/spanish-d3-other.md");
+
 
             /*
             Directory.GetFiles(@"d:\Projects\smalls\", "*.md").ToList().ForEach(path => {
@@ -1323,22 +1456,23 @@ namespace ChessAnalCon {
 
 
             /*
-            var path = @"d:\Projects\smalls\caruana-mbm.md";
+            var path = @"d:\caruana-mbm.md";
             var ss = File.ReadAllLines(path);
-            //var re = new Regex(@"\*\*( ?[CEIGK])\*\*");
-            var re = new Regex(@"\d+\.\.\. ([NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?)");
+            //var re = new Regex(@"[CEIGK][a-h]?[1-8]?x?[a-h][1-8]");
+            //var re = new Regex(@"([NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?)\.([NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?)");
+            //var re = new Regex(@"\d+ ([NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?)");
+            var re = new Regex(@"[а-я]- [а-я]");
             ss = ss.Select(s => handleString(s, re, (x,m) => {
-                return x.Replace(" ", "");
+                // CEIGK
+                // NBQRK
+                return x.Replace("- ", "");
             })).ToArray();
             File.WriteAllLines(path, ss);
             */
 
-            //simplifyChessable();
-            //handleCbHtml("d:/rubinstein.html");
-            //removeChessableDublicates("d:/Projects/smalls/spanish-d3-other.md");
             //Console.ReadLine();
             //FEN.Move("4r1k1/3P1pp1/5n1p/2P5/1Q2p3/4NbPq/PP3P1P/R4RK1 b - - 0 25", "Rf8");
-            //Console.ReadLine();
+
 
             /*
             FEN.Move("3rr1k1/1bq2pb1/2p1nnpp/1p2p3/P1p1P3/5NNP/2QB1PP1/R3RBK1 w - - 0 25", "axb5");
