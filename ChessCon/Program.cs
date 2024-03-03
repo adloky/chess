@@ -312,48 +312,34 @@ namespace ChessCon {
             OpeningNode.color = 1;
             OpeningNode.relCountFunc = x => x.midCount;
 
-            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#spanish")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#philidor")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
             Console.WriteLine("nodeDic loaded.");
 
-            var start = "1. e4 e5 2. Nf3 Nc6 3. Bb5";
+            var start = "1. e4 e5 2. Nf3 d6 3. d4";
             //Console.WriteLine(EnumerateNodes(start).Count());
             //exceptSet.Add(getNodeByMoves("1. e4 c5 2. d4 cxd4 3. c3 d3"));
             // addHints("1. e4 Nf6 2. e5 Nd5 3. Nc3 Nxc3 4. dxc3 d6 5. Nf3 g6 6. Bc4 Bg7 7. Ng5");
-
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 b5 6. Bb3 Be7 7. a4");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 b5 6. Bb3 Bc5 7. Bg5");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 b5 6. Bb3 d6 7. a4");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 Bc5 6. c3");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3 d6 6. c3");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 b5 5. Bb3 Nf6 6. d3");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 d6 5. O-O");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 exd4 5. Nxd4 Bd7 6. O-O Nxd4 7. Bxd7+ Qxd7 8. Qxd4 Nf6 9. Nc3");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 exd4 5. Nxd4 Bd7 6. O-O Nf6 7. Nc3 Be7 8. Nxc6 bxc6 9. Bd3");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 exd4 5. Nxd4 Bd7 6. O-O Nf6 7. Nc3 Nxd4 8. Bxd7+ Qxd7 9. Qxd4");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 exd4 5. Nxd4 Bd7 6. O-O Be7 7. Nxc6");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 Bd7 5. Bxc6");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 d6 4. d4 a6 5. Bxc6+ bxc6 6. dxe5");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. c3 d6 6. d4 exd4 7. cxd4 Bb4+ 8. Bd2");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. c3 O-O 6. O-O d6 7. Re1");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 d6 5. O-O");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5 4. c3 d6 5. d4");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5 4. c3 Nf6 5. d4 exd4 6. e5");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5 4. c3 a6 5. Ba4 b5 6. Bb3");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5 4. c3 Nge7 5. O-O");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Nge7 4. Nc3");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 Nd4 4. Nxd4 exd4 5. O-O");
-            addHints("1. e4 e5 2. Nf3 Nc6 3. Bb5 f5 4. d3");
+            // File.ReadAllLines(@"d:\sicilian-alapin.txt").ToList().ForEach(x => addHints(x));
+            addHints("1. e4 e5 2. Nf3 d6 3. d4 exd4 4. Nxd4 Nf6 5. Nc3 Be7 6. Bf4 O-O 7. Qd2");
+            addHints("1. e4 e5 2. Nf3 d6 3. d4 exd4 4. Nxd4 Be7 5. Nc3");
+            addHints("1. e4 e5 2. Nf3 d6 3. d4 exd4 4. Nxd4 Nc6 5. Nc3 Nxd4 6. Qxd4 Nf6 7. Bf4");
+            addHints("1. e4 e5 2. Nf3 d6 3. d4 exd4 4. Nxd4 c5 5. Ne2 Nc6 6. Nbc3");
+            addHints("1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5");
+            addHints("1. e4 e5 2. Nf3 d6 3. d4 Nc6 4. Nc3");
+            addHints("1. e4 e5 2. Nf3 d6 3. d4 Nd7 4. Bc4");
+            
+            
 
             var startNode = getNodeByMoves(start);
             var startScore = startNode.relScore;
             Func<WalkNode, string> scoreDiff = wn => align(((float)(wn.node.relScore - startScore) / 100).ToString("0.00", CultureInfo.InvariantCulture), 6);
 
             Func<WalkNode, WalkState> getState = wn => {
-                if (wn.freq < 0.02) return WalkState.None;
+                if (wn.freq < 0.03) return WalkState.None;
 
                 return wn.node.lastColor == OpeningNode.color
                     ? (wn.node.relScore >= startScore - 30 ? WalkState.Continue : WalkState.None)
-                    : (wn.node.relScore <= startScore + 60 ? WalkState.Continue : WalkState.Break);
+                    : (wn.node.relScore <= startScore + 80 ? WalkState.Continue : WalkState.Break);
             };
 
             var wns = EnumerateNodes(start, getState).ToList();
