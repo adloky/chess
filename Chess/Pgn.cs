@@ -20,7 +20,7 @@ namespace Chess {
         public string Fen { get; private set; } = Board.DEFAULT_STARTING_FEN;
         public string Moves { get; private set; } = "";
 
-        public List<string> MovesSource { get; } = new List<string>();
+        public List<string> MovesSource { get; set; } = new List<string>();
         public string Site { get; private set; }
         public Dictionary<string, string> Params { get; private set; } = new Dictionary<string, string>();
 

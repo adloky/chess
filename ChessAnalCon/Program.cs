@@ -753,6 +753,10 @@ namespace ChessAnalCon {
             if (configTag.attr.TryGetValue("hilight", out configVal) && configVal == "1") {
                 book = book.Select(x => x.Replace(".move-hilight", ".move")).ToArray();
             }
+            if (configTag.attr.TryGetValue("eval", out configVal) && configVal == "0") {
+                book = book.Select(x => x.Replace("evalFen = true", "evalFen = false")).ToArray();
+            }
+
             if (configTag.attr.TryGetValue("offline", out configVal) && configVal == "1") {
                 var jqeury = "<script>\r\n" + File.ReadAllText("d:/Projects/smalls/jquery-2.2.4.min.js") + "</script>\r\n";
                 for (var i = 0; i < book.Length; i++) {
@@ -940,10 +944,12 @@ namespace ChessAnalCon {
         private static HashSet<string> pgnParams = new HashSet<string>(new string[] { "Date", "White", "Black", "Result", "Date", "WhiteElo", "BlackElo", "TimeControl", "Link", "Color" });
 
         private static void handlePgn() {
-            var path = "d:/chess/pgns/_top.pgn";
-            var prefix = "panov-";
-            var open = "1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4";
+            var path = "d:/esserman-li.pgn";
+            var login = "MassterofMayhem";
+            var prefix = "morra-";
+            var open = "1. e4 c5 2. d4";
             var openSubs = " ";
+            var fullMoves = true;
             var findColor = 1;
 
             var fileName = Path.GetFileName(path);
@@ -955,7 +961,9 @@ namespace ChessAnalCon {
                 var pgns = Pgn.LoadMany(stream).ToArray();
 
                 foreach (var pgn in pgns) {
-                    var color = int.Parse(pgn.Params["Color"]);
+                    //var color = int.Parse(pgn.Params["Color"]);
+                    var color = pgn.Params["White"] == login ? 1 : -1;
+                    pgn.Params.Add("Color", color.ToString());
                     var isWin = color == 1 ? pgn.Params["Result"] == "1-0" : pgn.Params["Result"] == "0-1";
                     var isLoss = color == 1 ? pgn.Params["Result"] == "0-1" : pgn.Params["Result"] == "1-0";
                     var control = int.Parse(pgn.Params["TimeControl"].Split('/')[0].Split('+')[0]);
@@ -965,11 +973,23 @@ namespace ChessAnalCon {
                         continue;
                     }
 
+                    var site = (string)null;
+                    pgn.Params.TryGetValue("Site", out site);
+                    if (site != null && site.Contains("lichess.org")) {
+                        pgn.Params.Add("Link", site);
+                    }
+
                     var filtredParams = pgn.Params.Where(x => pgnParams.Contains(x.Key)).Select(x => $"[{x.Key} \"{x.Value}\"]").ToList();
                     filtredParams.ForEach(x => rs.Add(x));
 
                     rs.Add($"");
-                    rs.Add(PrettyPgn(pgn.Moves));
+                    if (fullMoves) {
+                        rs.Add(string.Join(" ", pgn.MovesSource).Replace("  ", " "));
+                    }
+                    else {
+                        rs.Add(PrettyPgn(pgn.Moves));
+                    }
+                    
                     rs.Add($"");
                 }
                 if (rs.Count > 0) {
@@ -1433,6 +1453,133 @@ namespace ChessAnalCon {
             File.WriteAllLines(path, ss);
         }
 
+        private static IList<EngineCalcResult> puzzleCalc(Engine engine, string fen, int depth, int mateDepthDeff = -2) {
+            var unmateScores = new ConcurrentDictionary<string, EngineCalcResult>();
+            var mateAfterScores = new ConcurrentDictionary<string, EngineCalcResult>();
+            var scores = (IList<EngineCalcResult>)null;
+            var color = fen.Contains(" w ") ? 1 : -1;
+            foreach (var _scores in engine.CalcScores(fen, depth: depth)) {
+                foreach (var score in _scores.Where(s => Math.Abs(s.score) <= 20000 && s.san1st != null)) {
+                    unmateScores.AddOrUpdate(score.san1st, score, (k,s) => score);
+                }
+                foreach (var score in _scores.Where(s => Math.Abs(s.score) > 20000 && s.san1st != null)) {
+                    var existScore = (EngineCalcResult)null;
+                    if (unmateScores.TryGetValue(score.san1st, out existScore)) {
+                        mateAfterScores.TryAdd(score.san1st, existScore);
+                    }
+                }
+                scores = _scores;
+            }
+
+            scores = scores.Select(s => {
+                var score = (EngineCalcResult)null;
+                if (Math.Abs(s.score) <= 20000 || 30000 - Math.Abs(s.score) <= depth + (mateDepthDeff) * 100)
+                    return s;
+                else if (s.san1st != null && mateAfterScores.TryGetValue(s.san1st, out score))
+                    return score;
+                else return null;
+            }).Where(s => s != null).OrderByDescending(s => s.score * color).ToArray();
+
+            return scores;
+        }
+
+        private static void solvePuzzles(string path, int limit) {
+            limit = limit * 2 - 1 + 2;
+
+            var pgns = (Pgn[]) null;
+            using (var stream = File.OpenRead(path)) {
+                pgns = Pgn.LoadMany(stream).ToArray();
+            }
+
+            var engine = Engine.Open(@"d:\Distribs\stockfish-simple\Stockfish.exe");
+
+            foreach (var pgn in pgns.Where(x => x.Moves == "" && !x.Params.ContainsKey("Error"))) {
+                var fen = pgn.Params["FEN"];
+                var color = fen.Contains(" w ") ? 1 : -1;
+                var ms = new List<string>();
+                Console.WriteLine(fen);
+
+                var kings = string.Join("", Regex.Matches(fen.Split(' ')[0], "[Kk]").Cast<Match>().Select(m => m.Value).OrderBy(x => x));
+                var fenSplit = fen.Split(' ')[0].Split('/');
+                var pawn0 = (fenSplit[0] + fenSplit[7]).ToUpper().Contains("P");
+
+                if (kings != "kK" || pawn0) {
+                    pgn.Params.Add("Error", "fen");
+                    Console.WriteLine("Error: fen");
+                    continue;
+                }
+
+                for (var depth = limit; depth > 0; depth-=2) {
+                    if (FEN.GetMateState(fen) != null) {
+                        if (depth == limit) {
+                            pgn.Params.Add("Error", "none");
+                        }
+                        break;
+                    }
+
+                    var scores = (IList<EngineCalcResult>)null;
+                    try {
+                        scores = puzzleCalc(engine, fen, depth);
+                    } catch {
+                        ctrlC = true;
+                        break;
+                    }
+                    
+                    var _ms = (scores.First().san ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                    if (depth == limit) {
+                        if (_ms.Count == 0) {
+                            pgn.Params.Add("Error", "none");
+                            break;
+                        }
+
+                        if (Math.Abs(scores.First().score) > 20000) {
+                            ms = _ms;
+                            break;
+                        }
+                    }
+
+                    var scoreDiff = (scores.Count > 1) ? Math.Abs(scores[0].score - scores[1].score) : 30000; 
+                    if (scoreDiff < 150) {
+                        if (depth == limit) {
+                            pgn.Params.Add("Error", "dirty");
+                        }
+                        break;
+                    }
+
+                    if (depth == 1) {
+                        pgn.Params.Add("Error", "limit");
+                        ms.Clear();
+                        break;
+                    }
+
+                    ms.Add(_ms[0]);
+                    fen = FEN.Move(fen, _ms[0]);
+                    if (FEN.GetMateState(fen) != null) break;
+
+                    if (_ms.Count < 2) {
+                        var move = engine.CalcScores(fen, depth: depth - 1).Last().First().san1st;
+                        _ms.Add(move);
+                    }
+                    ms.Add(_ms[1]);
+                    fen = FEN.Move(fen, _ms[1]);
+                }
+
+                if (ctrlC) break;
+
+                if (ms.Count == 0) {
+                    Console.WriteLine("Error: " + pgn.Params["Error"]);
+                    continue;
+                }
+
+                ms = ms.Take(ms.Count - ((ms.Count + 1) % 2)).ToList();
+
+                pgn.MovesSource = new List<string>() { color == 1 ? Pgn.PrettyMoves(string.Join(" ", ms)) : Pgn.PrettyMoves("-- " + string.Join(" ", ms), 1) };
+                Console.WriteLine(pgn.MovesSource[0]);
+            }
+
+            //File.WriteAllLines(path, pgns.Select(x => x.ToString()));
+        }
+
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
         private static string bookPath = "d:/Projects/smalls/book.html";
         private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|--";
@@ -1452,8 +1599,13 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
+            solvePuzzles("d:/Konotop4-2.pgn", 5);
+
+            //handlePgn();
+
             // processMd("d:/Projects/smalls/ideas-my.md");
             //mdMonitor();
+
             // fixGoogleTranslate(@"d:/french-classic-b-mbm-g.txt");
             // prepareTranslate(@"d:\Projects\smalls\french-classic-b-mbm.md");
             //splitDeepl("d:/french-b-fs.txt");
@@ -1467,6 +1619,48 @@ namespace ChessAnalCon {
             //handleCbMd(@"d:\Projects\smalls\panov-mbm.md");
 
             //removeChessableDublicates(@"d:\Projects\smalls\sicilian-alapin.md");
+
+            /*
+            var path = "d:/morra-esserman-li.pgn";
+            var ss = new List<string>();
+            ss.Add("var games = [");
+            foreach (var pgn in Pgn.LoadMany(File.OpenText(path))) {
+                var moves = pgn.MovesSource.FirstOrDefault() ?? "";
+                if (!pgn.MovesSource.First().Contains("{")) continue;
+
+                ss.Add($"{{date:'{pgn.Params["Date"]}',link:'{pgn.Params["Link"]}',moves:'{moves}'}},");
+            }
+            ss[ss.Count - 1] = ss[ss.Count - 1].Replace("},", "}");
+            ss.Add("];");
+            path = path.Replace(".pgn", ".js");
+            File.WriteAllLines(path, ss);
+            */
+
+            /*
+            var path = "d:/morra-esserman-li.pgn";
+            var ss = File.ReadAllLines(path);
+            path = path.Replace(".pgn", "-2.pgn");
+
+            for (var i = 0; i < ss.Length; i++) {
+                var s = ss[i];
+                if (s.StartsWith("[") || s == "") continue;
+
+                s = s.Replace("{ [%eval ", "{").Replace("] }", "}");
+                s = Regex.Replace(s, @" (1-0|0-1|\*|1/2-1/2)$", "");
+
+                s = handleString(s, new Regex(@"\{#-?(\d+)\}"), (x,m) => {
+                    var n = int.Parse(m.Groups[1].Value);
+                    n = 300 - n;
+                    x = Regex.Replace(x, @"\d+", n.ToString()).Replace("#", "");
+                    return x;
+                });
+
+                ss[i] = s;
+            }
+
+            File.WriteAllLines(path,ss);
+            */
+
 
             /*
             Directory.GetFiles(@"d:\Projects\smalls\", "*.md").ToList().ForEach(path => {
