@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Chess;
 using Chess.Pieces;
+using Chess.Sunfish;
 using Newtonsoft.Json;
 using Markdig;
 using System.Globalization;
@@ -309,6 +310,12 @@ namespace ChessAnalCon {
 
         MoveInfoHub() {
             SetFen(Board.DEFAULT_STARTING_FEN);
+        }
+
+        public string GetLastFen() {
+            if (list.Count == 0 || list.Last().Count == 0) return Fen;
+
+            return list.Last().Last().fen;
         }
 
         public void SetFen(string fenStr) {
@@ -724,7 +731,31 @@ namespace ChessAnalCon {
             return (sn.Contains("...")) ? $"{n}.--" : $"{n - 1}...--";
         }
 
-        private static HashSet<string> clearTags = new HashSet<string>() { "add", "addz", "level", "skip", "config", "fen", "fend", "confinue" };
+        private static Dictionary<char, char> meridaChars = new Dictionary<char, char> {
+            { 'P', 'p' }, { 'N', 'n' }, { 'B', 'b' }, { 'R', 'r' }, { 'Q', 'q' }, { 'K', 'k' },
+            { 'p', 'o' }, { 'n', 'm' }, { 'b', 'v' }, { 'r', 't' }, { 'q', 'w' }, { 'k', 'l' }, { '.', '*' }, { '/', '/' }
+        };
+
+        private static string fen2diagram(string fen, int color = 0) {
+            if (color == 0) {
+                color = fen.Contains(" w ") ? 1 : -1;
+            }
+            var f = fen.Split(' ')[0];
+            f = color == 1 ? f : new string(f.Reverse().ToArray());
+            for (var i = 1; i <= 8; i++) {
+                f = f.Replace(i.ToString(), new string('.', i));
+            }
+
+            var fc = f.Select(c => meridaChars[c]).ToArray();
+            for (var i = 0; i < fc.Length; i++) {
+                if (i % 2 == 0 || fc[i] == '/') continue;
+                fc[i] = char.IsLetter(fc[i]) ? char.ToUpper(fc[i]) : '+';
+            }
+
+            return new string(fc);
+        }
+
+        private static HashSet<string> clearTags = new HashSet<string>() { "add", "addz", "level", "skip", "config", "fen", "fend", "confinue", "diagram" };
         private static Regex headerRe = new Regex("^#+ ", RegexOptions.Compiled);
 
         private static void processMd(string path = null) {
@@ -779,7 +810,7 @@ namespace ChessAnalCon {
                     continue;
                 }
 
-                var tags = Tag.Parse(s);
+                var tags = Tag.Parse(s).ToList();
                 var s2 = Tag.Clear(s, clearTags);
                 
                 foreach (var tag in tags.Where(x => x.name == "level" && !x.attr.ContainsKey("value"))) {
@@ -790,6 +821,10 @@ namespace ChessAnalCon {
                     tag.name = "add";
                     tag.attr.Add("value", prevSkipMove(tag.attr["start"]));
                 }
+
+                var diagrams = tags.Where(x => x.name == "diagram").ToArray();
+                diagrams.Where(d => d.attr.ContainsKey("apply") && d.attr.ContainsKey("fen")).ToList()
+                    .ForEach(d => tags.Add(Tag.Parse($"<fen value=\"{d.attr["fen"]}\">")[0]));
 
                 var skipAll = tags.Any(x => x.name == "skip" && !x.attr.ContainsKey("start"));
                 var skipStarts = tags
@@ -850,6 +885,14 @@ namespace ChessAnalCon {
                     breakHandle = r.Contains("=>");
                     return r;
                 });
+
+                foreach (var d in diagrams) {
+                    var val = (string)null;
+                    var _fen = d.attr.TryGetValue("fen", out val) ? val : hub.GetLastFen();
+                    var color = d.attr.TryGetValue("color", out val) ? int.Parse(val) : 1;
+
+                    rs += $"<div class=\"diagram\" fen=\"{_fen}\">" + fen2diagram(_fen, color).Replace("/", "<br/>") + "</div>";
+                }
 
                 var fend = tags
                     .Where(x => x.name == "fend")
@@ -1458,6 +1501,7 @@ namespace ChessAnalCon {
             var mateAfterScores = new ConcurrentDictionary<string, EngineCalcResult>();
             var scores = (IList<EngineCalcResult>)null;
             var color = fen.Contains(" w ") ? 1 : -1;
+
             foreach (var _scores in engine.CalcScores(fen, depth: depth)) {
                 foreach (var score in _scores.Where(s => Math.Abs(s.score) <= 20000 && s.san1st != null)) {
                     unmateScores.AddOrUpdate(score.san1st, score, (k,s) => score);
@@ -1471,9 +1515,12 @@ namespace ChessAnalCon {
                 scores = _scores;
             }
 
+            if (scores == null) return new EngineCalcResult[] { };
+
             scores = scores.Select(s => {
                 var score = (EngineCalcResult)null;
-                if (Math.Abs(s.score) <= 20000 || 30000 - Math.Abs(s.score) <= depth + (mateDepthDeff) * 100)
+                var sAbs = Math.Abs(s.score);
+                if (Math.Abs(s.score) <= 20000 || (sAbs <= 30000 && 30000 - sAbs <= (depth + mateDepthDeff) * 100))
                     return s;
                 else if (s.san1st != null && mateAfterScores.TryGetValue(s.san1st, out score))
                     return score;
@@ -1483,7 +1530,11 @@ namespace ChessAnalCon {
             return scores;
         }
 
-        private static void solvePuzzles(string path, int limit) {
+        private static void solvePuzzles(string path, int limit, bool mateOnly = false, string enginePath = null) {
+            if (enginePath == null) {
+                enginePath = Config.current.enginePath;
+            }
+
             limit = limit * 2 - 1 + 2;
 
             var pgns = (Pgn[]) null;
@@ -1491,7 +1542,9 @@ namespace ChessAnalCon {
                 pgns = Pgn.LoadMany(stream).ToArray();
             }
 
-            var engine = Engine.Open(@"d:\Distribs\stockfish-simple\Stockfish.exe");
+            var engine = Engine.Open(enginePath);
+
+            Func<IList<string>, int, string> pretty = (ms,c) => c == 1 ? Pgn.PrettyMoves(string.Join(" ", ms)) : Pgn.PrettyMoves("-- " + string.Join(" ", ms), 1);
 
             foreach (var pgn in pgns.Where(x => x.Moves == "" && !x.Params.ContainsKey("Error"))) {
                 var fen = pgn.Params["FEN"];
@@ -1517,13 +1570,20 @@ namespace ChessAnalCon {
                         break;
                     }
 
-                    var scores = (IList<EngineCalcResult>)null;
+                    var scores = (IList<EngineCalcResult>)(new EngineCalcResult[] { });
                     try {
                         scores = puzzleCalc(engine, fen, depth);
                     } catch {
                         ctrlC = true;
                         break;
                     }
+
+                    if (scores.Count == 0) {
+                        if (depth == limit) {
+                            pgn.Params.Add("Error", "none");
+                        }
+                        break;
+                    } 
                     
                     var _ms = (scores.First().san ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
                     if (depth == limit) {
@@ -1532,8 +1592,12 @@ namespace ChessAnalCon {
                             break;
                         }
 
-                        if (Math.Abs(scores.First().score) > 20000) {
+                        if (Math.Abs(scores.First().score) > 20000 && _ms.Count <= limit - 2) {
                             ms = _ms;
+                            break;
+                        }
+                        else if (mateOnly) {
+                            pgn.Params.Add("Error", "continue");
                             break;
                         }
                     }
@@ -1542,6 +1606,7 @@ namespace ChessAnalCon {
                     if (scoreDiff < 150) {
                         if (depth == limit) {
                             pgn.Params.Add("Error", "dirty");
+                            pgn.MovesSource = new List<string>() { "{ " + pretty(_ms, color) + $"; ({scoreDiff / 100})" + pretty(scores[1].san.Split(' '), color) + "}" };
                         }
                         break;
                     }
@@ -1553,15 +1618,40 @@ namespace ChessAnalCon {
                     }
 
                     ms.Add(_ms[0]);
-                    fen = FEN.Move(fen, _ms[0]);
+                    try {
+                        fen = FEN.Move(fen, _ms[0]);
+                    } catch {
+                        pgn.Params.Add("Error", "parse");
+                        ms.Clear();
+                        break;
+                    }
                     if (FEN.GetMateState(fen) != null) break;
 
                     if (_ms.Count < 2) {
-                        var move = engine.CalcScores(fen, depth: depth - 1).Last().First().san1st;
+                        if (FEN.GetMateState(fen) != null) {
+                            break;
+                        }
+                        try {
+                            scores = puzzleCalc(engine, fen, depth: depth - 1);
+                        }
+                        catch {
+                            ctrlC = true;
+                            break;
+                        }
+
+                        if (scores.Count == 0) { break; }
+
+                        var move = scores.First().san1st;
                         _ms.Add(move);
                     }
                     ms.Add(_ms[1]);
-                    fen = FEN.Move(fen, _ms[1]);
+                    try {
+                        fen = FEN.Move(fen, _ms[1]);
+                    } catch {
+                        pgn.Params.Add("Error", "parse");
+                        ms.Clear();
+                        break;
+                    }
                 }
 
                 if (ctrlC) break;
@@ -1573,11 +1663,11 @@ namespace ChessAnalCon {
 
                 ms = ms.Take(ms.Count - ((ms.Count + 1) % 2)).ToList();
 
-                pgn.MovesSource = new List<string>() { color == 1 ? Pgn.PrettyMoves(string.Join(" ", ms)) : Pgn.PrettyMoves("-- " + string.Join(" ", ms), 1) };
+                pgn.MovesSource = new List<string>() { pretty(ms,color) };
                 Console.WriteLine(pgn.MovesSource[0]);
             }
 
-            //File.WriteAllLines(path, pgns.Select(x => x.ToString()));
+            File.WriteAllLines(path, pgns.Select(x => x.ToString()));
         }
 
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
@@ -1599,7 +1689,7 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
-            solvePuzzles("d:/Konotop4-2.pgn", 5);
+            solvePuzzles("d:/Konotop4-1.pgn", 3, enginePath: @"d:\Distribs\Sunfish\sunfish.exe"); // @"d:\Distribs\Sunfish\sunfish.exe"
 
             //handlePgn();
 

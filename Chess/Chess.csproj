@@ -101,6 +101,7 @@
     <Compile Include="Square.cs" />
     <Compile Include="SquareColor.cs" />
     <Compile Include="StalemateReason.cs" />
+    <Compile Include="Sunfish\Sunfish.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Tests.epd" />

@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessDiagram", "ChessDiagra
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessAnalCon", "ChessAnalCon\ChessAnalCon.csproj", "{08470427-B8FB-4CF1-AFD6-AC7E7295CE40}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SunfishEngine", "SunfishEngine\SunfishEngine.csproj", "{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,6 +127,18 @@ Global
 		{08470427-B8FB-4CF1-AFD6-AC7E7295CE40}.Release|x64.Build.0 = Release|Any CPU
 		{08470427-B8FB-4CF1-AFD6-AC7E7295CE40}.Release|x86.ActiveCfg = Release|Any CPU
 		{08470427-B8FB-4CF1-AFD6-AC7E7295CE40}.Release|x86.Build.0 = Release|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Debug|x64.Build.0 = Debug|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Debug|x86.Build.0 = Debug|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Release|x64.ActiveCfg = Release|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Release|x64.Build.0 = Release|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Release|x86.ActiveCfg = Release|Any CPU
+		{4CBB286B-5641-4C34-8FA6-DEF7A3E20343}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
