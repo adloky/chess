@@ -1686,13 +1686,36 @@ namespace ChessAnalCon {
         private static Regex moveSeqRe = new Regex(moveSeqFullReS, RegexOptions.Compiled);
         private static Regex moveRe = new Regex($"(?<num>\\d+\\.(\\.\\.)?)?{moveNEvalReS}");
 
+        private static IEnumerable<(SfMove m, int i)> test() {
+            for (var i = 1; i < 3; i++) {
+                var m = new SfMove(i+50);
+                yield return (m, i);
+            }
+        }
+
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
+            Sunfish.SimplePst();
+            var pos = SfPosition.FromFen("r1bq1r2/pp3pk1/5Npp/5n2/3Q4/3B2PP/PP4PK/2R2R2 w - - 0 1");
+            
+            foreach (var x in Sunfish.search(pos).Take(20)) {
+                Console.WriteLine($"{x.score} {x.move}");
+            }
+            
 
-            //Sunfish.SimplePst();
-            var pos = SfPosition.FromFen("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w - - 0 2");
-            Console.WriteLine(pos);
+            //foreach (var x in test()) {
+            //}
+
             Console.ReadLine();
+            //Sunfish.SimplePst();
+            /*
+            var a = "".ToCharArray();
+            var l = new SfPartList<char>(a);
+            //l[0] = 'X';
+            //l[2] = 'Y';
+            //Console.WriteLine(l[1]);
+            Console.WriteLine(string.Concat(l));*/
+            
 
             //solvePuzzles("d:/Konotop4-1.pgn", 3, enginePath: @"d:\Distribs\Sunfish\sunfish.exe"); // @"d:\Distribs\Sunfish\sunfish.exe"
             //handlePgn();

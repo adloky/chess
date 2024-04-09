@@ -143,23 +143,8 @@ namespace Chess.Sunfish {
         }
     }
 
-    /*
-    internal class SfEntry {
-        public int depth = -1;
-        public int score = -1;
-        public int gamma = -1;
-        public Tuple<int, int> bmove = new Tuple<int, int>(-1,-1);
-
-        public SfEntry() {}
-
-        public SfEntry(int depth, int score, int gamma, Tuple<int, int> bmove) {
-            this.depth = depth; this.score = score; this.gamma = gamma; this.bmove = bmove;
-        }
-    }
-    */
-
     public struct SfMove {
-        int a;
+        private int a;
 
         private static readonly string PROM = "qrbn";
 
@@ -215,20 +200,20 @@ namespace Chess.Sunfish {
 
         public override string ToString() {
             var cs = new char[5];
-            var k = 0;
+            var n = 0;
             if (i != 0) {
-                cs[k++] = (char)('a' + (i % 10) - 1);
-                cs[k++] = (char)('1' - (i / 10) + 9);
+                cs[n++] = (char)('a' + (i % 10) - 1);
+                cs[n++] = (char)('1' - (i / 10) + 9);
                 if (j != 0) {
-                    cs[k++] = (char)('a' + (j % 10) - 1);
-                    cs[k++] = (char)('1' - (j / 10) + 9);
+                    cs[n++] = (char)('a' + (j % 10) - 1);
+                    cs[n++] = (char)('1' - (j / 10) + 9);
                     if (k != 0 && k <= PROM.Length) {
-                        cs[k++] = PROM[k - 1];
+                        cs[n++] = PROM[k - 1];
                     }
                 }
             }
 
-            return new string(cs, 0, k);
+            return new string(cs, 0, n);
         }
     }
 
@@ -241,43 +226,45 @@ namespace Chess.Sunfish {
             this.a = a;
         }
 
+        private int chIndex(int index) {
+            var ci = ch.Count - 1;
+            for (; ci > 0; ci--) {
+                if (ch[ci].i == index) {
+                    break;
+                }
+            }
+            return ci;
+        }
+
         public T this[int index] {
             get {
-                var ci = ch.Where(x => x.i == index).Select((x,i) => (int?)i).FirstOrDefault();
-                return ci == null ? a[index] : ch[ci.Value].v;
+                var ci = chIndex(index);
+                return ci < 0 ? a[index] : ch[ci].v;
             }
             set {
-                var ci = ch.Where(x => x.i == index).Select(x => (int?)x.i).FirstOrDefault();
-                if (ci == null) {
+                var ci = chIndex(index);
+                if (ci < 0) {
                     ch.Add((index, value));
                     sorted = false;
                 }
                 else {
-                    ch[ci.Value] = (index,value);
+                    ch[ci] = (index, value);
                 }
             }
         }
 
         private IEnumerable<T> enumerate() {
             if (!sorted) { ch.Sort((a, b) => a.i.CompareTo(b.i)); sorted = true; }
-            if (ch.Count == 0) {
-                foreach (var x in a) {
-                    yield return x;
-                }
-                yield break;
-            }
-
             var j = 0;
-            for (var i = 0; i < ch.Count; i++) {
-                for (; j < ch[i].i; j++) {
+            for (var i = 0; i <= ch.Count; i++) {
+                var il = i == ch.Count ? a.Length : ch[i].i;
+                for (; j < il; j++) {
                     yield return a[j];
                 }
-                yield return ch[i].v;
-                j++;
-            }
-            
-            for (; j < a.Length; j++) {
-                yield return a[j];
+                if (i < ch.Count) {
+                    yield return ch[i].v;
+                    j++;
+                }
             }
         }
 
@@ -364,7 +351,7 @@ namespace Chess.Sunfish {
                 cs[k++] = '/';
             }
 
-            var bStr = new string(cs, 0, k-1);
+            var bStr = new string(cs, 0, k - 1);
 
             k = 0;
             if (wc.k) cs[k++] = 'K';
@@ -379,10 +366,10 @@ namespace Chess.Sunfish {
             return $"{bStr} {cStr} {epStr} {kpStr} {score}";
         }
 
-        public IEnumerable<int> gen_moves() {
+        public IEnumerable<SfMove> gen_moves() {
             for (int i = 0; i < board.Length; i++) {
                 var p = board[i];
-                if (char.IsUpper(p))
+                if (!char.IsUpper(p))
                     continue;
 
                 foreach (var d in Sf.directions[p]) {
@@ -414,7 +401,7 @@ namespace Chess.Sunfish {
 
                         yield return new SfMove(i, j, 0);
 
-                        if (p =='P' || p =='N' || p == 'K' || char.IsLower(q))
+                        if (p == 'P' || p == 'N' || p == 'K' || char.IsLower(q))
                             break;
 
                         if (i == Sf.A1 && board[j + Sf.E] == 'K' && wc.q) {
@@ -496,7 +483,7 @@ namespace Chess.Sunfish {
             }
 
             if (p == 'K' && Math.Abs(i - j) == 2) {
-                score += Sf.pst['R'][(i + j)/2];
+                score += Sf.pst['R'][(i + j) / 2];
                 score -= Sf.pst['R'][j < i ? Sf.A1 : Sf.H1];
             }
 
@@ -512,147 +499,161 @@ namespace Chess.Sunfish {
             return score;
         }
 
-        /*
-        static int nodes = 0;
-        static int bound(SfPosition pos, int gamma, int depth, Tuple<int,int> exMove = null) {
-            nodes += 1;
+    }
 
-            if (!Sf.tp.ContainsKey(pos)) {
-                Sf.tp.Add(pos, new SfEntry());
+    public struct SfEntry {
+        public int lower { get; set; }
+        public int upper { get; set; }
+
+        public SfEntry(int lower, int upper) {
+            this.lower = lower;
+            this.upper = upper;
+        }
+    }
+
+    public class SfStrDict<T1,T2> : Dictionary<string,T2> {
+        public bool TryGetValue(T1 key, out T2 val, T2 def = default(T2)) {
+            T2 val2;
+            bool r;
+            if (r = TryGetValue(key.ToString(), out val2)) {
+                val = val2;
             }
-            SfEntry initEntry = Sf.tp[pos];
-            if (initEntry.depth != -1 && initEntry.depth >= depth && (initEntry.score < initEntry.gamma && initEntry.score < gamma || initEntry.score >= initEntry.gamma && initEntry.score >= gamma)) {
-                return initEntry.score;
-            }
-
-            if (Math.Abs(pos.score) >= Sf.MATE_VALUE) {
-                return pos.score;
-            }
-
-            int nullscore = (depth > 0) ? -bound(pos.rotate(), 1 - gamma, depth - 3) : pos.score;
-
-            if (nullscore >= gamma) {
-                return nullscore;
-            }
-
-            int best = -3 * Sf.MATE_VALUE;
-            Tuple<int, int> bmove = new Tuple<int, int>(0,0); // ??
-            // not able to do the sorting by value thing here yet. TODO
-            List<Tuple<int, int>> moves = pos.genMoves();
-            for (int i = 0; i < moves.Count; i++) {
-                var move = moves[i];
-                if (exMove != null && exMove.Item1 == move.Item1 && exMove.Item2 == move.Item2) {
-                    continue;
-                }
-                if (depth <= 0 && pos.value(move) < 150) {
-                    break;
-                }
-
-                int score = -bound(pos.move(move), 1 - gamma, depth - 1);
-                if (score > best) {
-                    best = score;
-                    bmove = move;
-                }
-
-                if (score >= gamma) {
-                    break;
-                }
+            else {
+                val = def;
             }
 
-            if (depth <= 0 && best < nullscore) {
-                return nullscore;
-            }
-
-            // Look at this again. No idea what is happening here with the is None.
-            if (depth > 0 && best <= -Sf.MATE_VALUE && nullscore > -Sf.MATE_VALUE) {
-                best = 0;
-            }
-
-            if (initEntry.depth == -1 || depth >= initEntry.depth && best >= gamma) {
-                Sf.tp[pos] = new SfEntry(depth, best, gamma, bmove);
-                if (Sf.tp.Count > Sf.TABLE_SIZE) {
-                    Sf.tp.Remove(Sf.tp.Last().Key); // TODO change since not sorted
-                }
-            }
-            return best; // returns integer score
+            return r;
         }
 
-        static public Tuple<Tuple<int, int>, int> search(SfPosition pos, int maxn = -1, int maxd = -1, Tuple<int, int> exMove = null) {
-            if (maxn == -1) {
-                maxn = Sf.NODES_SEARCHED;
+        public void AddOrUpdate(T1 key, T2 val) {
+            T2 tmp;
+            if (TryGetValue(key, out tmp)) {
+                this[key.ToString()] = val;
             }
-            if (maxd == -1) {
-                maxd = 99;
+            else {
+                Add(key.ToString(), val);
             }
-
-            nodes = 0;
-            int score = 0;
-            Sf.tp.Clear();
-
-            // Limit depth of search to a constant 99 so stack overflow isn't achieved.
-            for (int depth = 1; depth <= maxd; depth++)
-            {
-                // Inner loop is a binary search on the score of the position
-                // Inv: lower <= score <= upper
-                // This can be broken by values from the transposition table since they don't have the same concept of p(score).
-                // As a result lower < upper - margin is used as the loop condition.
-                int lower = -3 * Sf.MATE_VALUE;
-                int upper = 3 * Sf.MATE_VALUE;
-                while (lower < (upper - 3))
-                {
-                    int gamma = (lower + upper + 1) / 2;
-                    score = bound(pos, gamma, depth, exMove);
-                    if (score >= gamma) {
-                        lower = score;
-                    }
-                    if (score < gamma) {
-                        upper = score;
-                    }
-                }
-
-                // Stop increasing depth of search if global counter indicates too much time spent or if game is won
-                if (nodes >= maxn || Math.Abs(score) >= Sf.MATE_VALUE) {
-                    break;
-                }
-            }
-
-            // If game hasn't finished retrieve move from transposition table
-            SfEntry entry = Sf.tp[pos];
-            if (entry.depth != -1) {
-                return new Tuple<Tuple<int, int>, int>(entry.bmove, score);
-            }
-
-            return new Tuple<Tuple<int, int>, int>(new Tuple<int,int>(0, 0), score);
         }
-        
-        static public Tuple<int, int> parse(string sMove) {
-            // calculate starting position
-            int[] pos = { 0, 0 };
-            for (var i = 0; i + 1 < 4 && i + 1 < sMove.Length; i+=2) {
-                int file = sMove[i + 0] - 'a';
-                int rank = sMove[i + 1] - '1';
-                pos[i/2] = Sf.A1 + file - 10 * rank;
-            }
-
-            return new Tuple<int,int>(pos[0], pos[1]);
-        }
-
-        static public string tuple2move(Tuple<int,int> move, bool rotate = false) {
-            int[] p = new int[] { !rotate ? move.Item1 : 119 - move.Item1, !rotate ? move.Item2 : 119 - move.Item2 };
-            char[] r = { ' ', ' ', ' ', ' ' };
-            for (var i = 0; i < 4; i += 2) {
-                r[i]     = (char)('a' + (p[i / 2] % 10) - 1);
-                r[i + 1] = (char)('1' - (p[i / 2] / 10) + 9);
-            }
-            return string.Join("", r);
-        }
-        */
     }
 
     public static class Sunfish {
-        public static void SimplePst()
-        {
+        private static int nodes = 0;
+        private static List<string> history = new List<string>();
+        private static Dictionary<string, SfPosition> historyDic = new Dictionary<string, SfPosition>();
+
+        public static SfStrDict<(SfPosition pos, int depth, bool can_null), SfEntry> tp_score = new SfStrDict<(SfPosition, int, bool), SfEntry>();
+        public static SfStrDict<SfPosition, SfMove> tp_move = new SfStrDict<SfPosition, SfMove>();
+
+        public static void SimplePst() {
             Sf.SimplePst();
+        }
+
+        public static IEnumerable<(SfMove move, int score)> boundMoves(SfPosition pos, int gamma, int depth, bool can_null) {
+            if (depth > 2 && can_null && Math.Abs(pos.score) < 500)
+                yield return (new SfMove(0), -bound(pos.rotate(nullmove: true), 1 - gamma, depth - 3));
+
+            if (depth == 0)
+                yield return (new SfMove(0), pos.score);
+
+            SfMove killer;
+            tp_move.TryGetValue(pos, out killer);
+            if (killer == 0 && depth > 2) {
+                bound(pos, gamma, depth - 3, can_null: false);
+                tp_move.TryGetValue(pos, out killer);
+            }
+
+            var val_lower = Sf.QS - depth * Sf.QS_A;
+
+            if (killer != 0 && pos.value(killer) >= val_lower) {
+                yield return (killer, -bound(pos.move(killer), 1 - gamma, depth - 1));
+            }
+
+            foreach (var vm in pos.gen_moves().Select(m => (val: pos.value(m), move: m)).OrderByDescending(x => x.val)) {
+                var val = vm.val;
+                var move = vm.move;
+
+                if (val < val_lower)
+                    break;
+
+                if (depth <= 1 && pos.score + val < gamma) {
+                    yield return (move, (val < Sf.MATE_LOWER) ? pos.score + val : Sf.MATE_UPPER);
+                    break;
+                }
+
+                yield return (move, -bound(pos.move(move), 1 - gamma, depth - 1));
+            }
+        }
+
+        public static int bound(SfPosition pos, int gamma, int depth, bool can_null = true) {
+            nodes++;
+            depth = Math.Max(depth, 0);
+            if (pos.score <= -Sf.MATE_LOWER) {
+                return -Sf.MATE_UPPER;
+            }
+
+            SfEntry entry;
+            tp_score.TryGetValue((pos,depth,can_null), out entry, new SfEntry(-Sf.MATE_UPPER, Sf.MATE_UPPER));
+            if (entry.lower >= gamma)
+                return entry.lower;
+            if (entry.upper < gamma)
+                return entry.upper;
+
+            var posStr = pos.ToString();
+            if (can_null && depth > 0 && history.Any(x => x == posStr))
+                return 0;
+
+            var best = -Sf.MATE_UPPER;
+            foreach (var ms in boundMoves(pos, gamma, depth, can_null, entry)) {
+                var move = ms.move;
+                var score = ms.score;
+
+                best = Math.Max(best, score);
+                if (best > gamma) {
+                    if (move != 0) {
+                        tp_move.AddOrUpdate(pos,move);
+                    }
+                    break;
+                }
+            }
+
+            if (depth > 2 && best == -Sf.MATE_UPPER) {
+                var flipped = pos.rotate(nullmove: true);
+                var in_check = bound(flipped, Sf.MATE_UPPER, 0) == Sf.MATE_UPPER;
+                best = in_check ? -Sf.MATE_LOWER : 0;
+            }
+
+            if (best >= gamma) {
+                tp_score.AddOrUpdate((pos, depth, can_null), new SfEntry(best, entry.upper));
+            }
+
+            if (best < gamma) {
+                tp_score.AddOrUpdate((pos, depth, can_null), new SfEntry(entry.lower, best));
+            }
+
+            return best;
+        }
+
+        public static IEnumerable<(int depth, int gamma, int score, SfMove move)> search(SfPosition pos) {
+            nodes = 0;
+            tp_score.Clear();
+            var gamma = 0;
+            for (var depth = 1; depth < 1000; depth++) {
+                var lower = -Sf.MATE_LOWER;
+                var upper = Sf.MATE_LOWER;
+                while (lower < upper - Sf.EVAL_ROUGHNESS) {
+                    var score = bound(pos, gamma, depth, can_null: false);
+                    if (score >= gamma) {
+                        lower = score;
+                    }
+                    else {
+                        upper = score;
+                    }
+                    SfMove move;
+                    tp_move.TryGetValue(pos, out move);
+                    yield return (depth, gamma, score, move);
+                    gamma = (lower + upper + 1) / 2;
+                }
+            }
         }
     }
 }
