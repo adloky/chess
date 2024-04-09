@@ -1552,11 +1552,11 @@ namespace ChessAnalCon {
                 var ms = new List<string>();
                 Console.WriteLine(fen);
 
-                var kings = string.Join("", Regex.Matches(fen.Split(' ')[0], "[Kk]").Cast<Match>().Select(m => m.Value).OrderBy(x => x));
+                var kings = string.Concat(fen.Split(' ')[0].Where(x => char.ToUpper(x) == 'K').OrderBy(x => x));
                 var fenSplit = fen.Split(' ')[0].Split('/');
                 var pawn0 = (fenSplit[0] + fenSplit[7]).ToUpper().Contains("P");
 
-                if (kings != "kK" || pawn0) {
+                if (kings != "Kk" || pawn0) {
                     pgn.Params.Add("Error", "fen");
                     Console.WriteLine("Error: fen");
                     continue;
@@ -1689,8 +1689,12 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
-            solvePuzzles("d:/Konotop4-1.pgn", 3, enginePath: @"d:\Distribs\Sunfish\sunfish.exe"); // @"d:\Distribs\Sunfish\sunfish.exe"
+            //Sunfish.SimplePst();
+            var pos = SfPosition.FromFen("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w - - 0 2");
+            Console.WriteLine(pos);
+            Console.ReadLine();
 
+            //solvePuzzles("d:/Konotop4-1.pgn", 3, enginePath: @"d:\Distribs\Sunfish\sunfish.exe"); // @"d:\Distribs\Sunfish\sunfish.exe"
             //handlePgn();
 
             // processMd("d:/Projects/smalls/ideas-my.md");
@@ -1710,6 +1714,23 @@ namespace ChessAnalCon {
 
             //removeChessableDublicates(@"d:\Projects\smalls\sicilian-alapin.md");
 
+            /*
+            var pgns = Pgn.LoadMany(File.OpenText("d:/Konotop4-1.pgn")).ToArray();
+            var i = 0;
+            var ss = new List<string>();
+            foreach (var pgn in pgns) {
+                i++;
+                ss.Add(i.ToString());
+                var fen = pgn.Params["FEN"];
+                ss.Add($"<diagram fen=\"{fen}\" color=\"0\" apply=\"1\"/>");
+                if (pgn.Params.ContainsKey("Error")) {
+                    ss.Add($"Error: {pgn.Params["Error"]}");
+                }
+                ss.Add(pgn.MovesSource[0].Replace(". ", "."));
+            }
+
+            File.WriteAllLines("d:/konotop4.md", ss.Select(s => s + "\r\n"));
+            */
             /*
             var path = "d:/morra-esserman-li.pgn";
             var ss = new List<string>();

@@ -1,22 +1,27 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Chess.Sunfish
-{
+namespace Chess.Sunfish {
     internal class Sf {
-        static public readonly int TABLE_SIZE = 10000000;
-        static public readonly int NODES_SEARCHED = 10000;
-        static public readonly int MATE_VALUE = 30000;
+        //static public readonly int TABLE_SIZE = 10000000;
+        //static public readonly int NODES_SEARCHED = 10000;
+        //static public readonly int MATE_VALUE = 30000;
+        static public readonly int MATE_LOWER;
+        static public readonly int MATE_UPPER;
+        static public readonly int QS = 40;
+        static public readonly int QS_A = 140;
+        static public readonly int EVAL_ROUGHNESS = 15;
 
         static public readonly int A1 = 91;
         static public readonly int H1 = 98;
         static public readonly int A8 = 21;
         static public readonly int H8 = 28;
 
-        static public readonly char[] initilal = "                     rnbqkbnr  pppppppp  ........  ........  ........  ........  PPPPPPPP  RNBQKBNR                    ".ToCharArray();
+        static public readonly char[] initilal = SfPosition.FromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").board;
 
         static public readonly int N = -10;
         static public readonly int E = 1;
@@ -24,43 +29,121 @@ namespace Chess.Sunfish
         static public readonly int W = -1;
 
         static public readonly Dictionary<char, int[]> directions = new Dictionary<char, int[]>() {
-            { 'P', new[] { N, 2 * N, N + W, N + E } },
-            { 'B', new[] { N + E, S + E, S + W, N + W } },
-            { 'N', new[] { 2 * N + E, N + 2 * E, S + 2 * E, 2 * S + E, 2 * S + W, S + 2 * W, N + 2 * W, 2 * N + W } },
+            { 'P', new[] { N, N+N, N+W, N+E } },
+            { 'B', new[] { N+E, S+E, S+W, N+W } },
+            { 'N', new[] { N+N+E, E+N+E, E+S+E, S+S+E, S+S+W, W+S+W, W+N+W, N+N+W } },
             { 'R', new[] { N, E, S, W } },
-            { 'Q', new[] { N, E, S, W, N + E, S + E, S + W, N + W } },
-            { 'K', new[] { N, E, S, W, N + E, S + E, S + W, N + W } }
+            { 'Q', new[] { N, E, S, W, N+E, S+E, S+W, N+W } },
+            { 'K', new[] { N, E, S, W, N+E, S+E, S+W, N+W } }
         };
 
-        static public readonly Dictionary<char, int[]> pst = new Dictionary<char, int[]>() {
-            { 'P', new[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 198, 198, 198, 198, 198, 198, 198, 198, 0, 0, 178, 198, 198, 198, 198, 198, 198, 178, 0, 0, 178, 198, 198, 198, 198, 198, 198, 178, 0, 0, 178, 198, 208, 218, 218, 208, 198, 178, 0, 0, 178, 198, 218, 238, 238, 218, 198, 178, 0, 0, 178, 198, 208, 218, 218, 208, 198, 178, 0, 0, 178, 198, 198, 198, 198, 198, 198, 178, 0, 0, 198, 198, 198, 198, 198, 198, 198, 198, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { 'B', new[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 797, 824, 817, 808, 808, 817, 824, 797, 0, 0, 814, 841, 834, 825, 825, 834, 841, 814, 0, 0, 818, 845, 838, 829, 829, 838, 845, 818, 0, 0, 824, 851, 844, 835, 835, 844, 851, 824, 0, 0, 827, 854, 847, 838, 838, 847, 854, 827, 0, 0, 826, 853, 846, 837, 837, 846, 853, 826, 0, 0, 817, 844, 837, 828, 828, 837, 844, 817, 0, 0, 792, 819, 812, 803, 803, 812, 819, 792, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { 'N', new[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 627, 762, 786, 798, 798, 786, 762, 627, 0, 0, 763, 798, 822, 834, 834, 822, 798, 763, 0, 0, 817, 852, 876, 888, 888, 876, 852, 817, 0, 0, 797, 832, 856, 868, 868, 856, 832, 797, 0, 0, 799, 834, 858, 870, 870, 858, 834, 799, 0, 0, 758, 793, 817, 829, 829, 817, 793, 758, 0, 0, 739, 774, 798, 810, 810, 798, 774, 739, 0, 0, 683, 718, 742, 754, 754, 742, 718, 683, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { 'R', new[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1258, 1263, 1268, 1272, 1272, 1268, 1263, 1258, 0, 0, 1258, 1263, 1268, 1272, 1272, 1268, 1263, 1258, 0, 0, 1258, 1263, 1268, 1272, 1272, 1268, 1263, 1258, 0, 0, 1258, 1263, 1268, 1272, 1272, 1268, 1263, 1258, 0, 0, 1258, 1263, 1268, 1272, 1272, 1268, 1263, 1258, 0, 0, 1258, 1263, 1268, 1272, 1272, 1268, 1263, 1258, 0, 0, 1258, 1263, 1268, 1272, 1272, 1268, 1263, 1258, 0, 0, 1258, 1263, 1268, 1272, 1272, 1268, 1263, 1258, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { 'Q', new[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0, 0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0, 0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0, 0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0, 0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0, 0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0, 0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0, 0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { 'K', new[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 60098, 60132, 60073, 60025, 60025, 60073, 60132, 60098, 0, 0, 60119, 60153, 60094, 60046, 60046, 60094, 60153, 60119, 0, 0, 60146, 60180, 60121, 60073, 60073, 60121, 60180, 60146, 0, 0, 60173, 60207, 60148, 60100, 60100, 60148, 60207, 60173, 0, 0, 60196, 60230, 60171, 60123, 60123, 60171, 60230, 60196, 0, 0, 60224, 60258, 60199, 60151, 60151, 60199, 60258, 60224, 0, 0, 60287, 60321, 60262, 60214, 60214, 60262, 60321, 60287, 0, 0, 60298, 60332, 60273, 60225, 60225, 60273, 60332, 60298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } }
+        static public readonly Dictionary<char, List<int>> pst = new Dictionary<char, List<int>>() {
+            { 'P', new List<int>() {
+                0,   0,   0,   0,   0,   0,   0,   0,
+               78,  83,  86,  73, 102,  82,  85,  90,
+                7,  29,  21,  44,  40,  31,  44,   7,
+              -17,  16,  -2,  15,  14,   0,  15, -13,
+              -26,   3,  10,   9,   6,   1,   0, -23,
+              -22,   9,   5, -11, -10,  -2,   3, -19,
+              -31,   8,  -7, -37, -36, -14,   3, -31,
+                0,   0,   0,   0,   0,   0,   0,   0
+            } },
+            { 'N', new List<int>() {
+              -66, -53, -75, -75, -10, -55, -58, -70,
+               -3,  -6, 100, -36,   4,  62,  -4, -14,
+               10,  67,   1,  74,  73,  27,  62,  -2,
+               24,  24,  45,  37,  33,  41,  25,  17,
+               -1,   5,  31,  21,  22,  35,   2,   0,
+              -18,  10,  13,  22,  18,  15,  11, -14,
+              -23, -15,   2,   0,   2,   0, -23, -20,
+              -74, -23, -26, -24, -19, -35, -22, -69
+            } },
+            { 'B', new List<int>() {
+              -59, -78, -82, -76, -23,-107, -37, -50,
+              -11,  20,  35, -42, -39,  31,   2, -22,
+               -9,  39, -32,  41,  52, -10,  28, -14,
+               25,  17,  20,  34,  26,  25,  15,  10,
+               13,  10,  17,  23,  17,  16,   0,   7,
+               14,  25,  24,  15,   8,  25,  20,  15,
+               19,  20,  11,   6,   7,   6,  20,  16,
+               -7,   2, -15, -12, -14, -15, -10, -10
+            } },
+            { 'R', new List<int>() {
+               35,  29,  33,   4,  37,  33,  56,  50,
+               55,  29,  56,  67,  55,  62,  34,  60,
+               19,  35,  28,  33,  45,  27,  25,  15,
+                0,   5,  16,  13,  18,  -4,  -9,  -6,
+              -28, -35, -16, -21, -13, -29, -46, -30,
+              -42, -28, -42, -25, -25, -35, -26, -46,
+              -53, -38, -31, -26, -29, -43, -44, -53,
+              -30, -24, -18,   5,  -2, -18, -31, -32
+            } },
+            { 'Q', new List<int>() {
+                6,   1,  -8,-104,  69,  24,  88,  26,
+               14,  32,  60, -10,  20,  76,  57,  24,
+               -2,  43,  32,  60,  72,  63,  43,   2,
+                1, -16,  22,  17,  25,  20, -13,  -6,
+              -14, -15,  -2,  -5,  -1, -10, -20, -22,
+              -30,  -6, -13, -11, -16, -11, -16, -27,
+              -36, -18,   0, -19, -15, -15, -21, -38,
+              -39, -30, -31, -13, -31, -36, -34, -42
+            } },
+            { 'K', new List<int>() {
+                4,  54,  47, -99, -99,  60,  83, -62,
+              -32,  10,  55,  56,  56,  55,  10,   3,
+              -62,  12, -57,  44, -67,  28,  37, -31,
+              -55,  50,  11,  -4, -19,  13,   0, -49,
+              -55, -43, -52, -28, -51, -47,  -8, -50,
+              -47, -42, -43, -79, -64, -32, -29, -32,
+               -4,   3, -14, -50, -57, -18,  13,   4,
+               17,  30,  -3, -14,   6,  -1,  40,  18
+            } }
         };
 
-        public static readonly Dictionary<SfPosition, SfEntry> tp = new Dictionary<SfPosition, SfEntry>();
+        //public static readonly Dictionary<SfPosition, SfEntry> tp = new Dictionary<SfPosition, SfEntry>();
 
-        private static void simplePst(char piece, int val) {
+        static Sf() {
+            var pss = new Dictionary<char, int>() { { 'P', 100 }, { 'N', 280 }, { 'B', 320 }, { 'R', 479 }, { 'Q', 929 }, { 'K', 60000 } };
+            foreach (var ps in pss) {
+                var p = ps.Key;
+                var s = ps.Value;
+                var xs = pst[p];
+                for (var i = 0; i < xs.Count; i++) {
+                    xs[i] += s;
+                }
+
+                for (var i = xs.Count; i > 0; i -= 8) {
+                    xs.Insert(i, 0);
+                    xs.Insert(i - 8, 0);
+                }
+
+                xs.InsertRange(0, Enumerable.Repeat(0, 20));
+                xs.AddRange(Enumerable.Repeat(0, 20));
+            }
+
+            MATE_LOWER = pss['K'] - 10 * pss['Q'];
+            MATE_UPPER = pss['K'] + 10 * pss['Q'];
+        }
+
+        private static void simplePst4Piece(char piece, int val) {
             var a = pst[piece];
-            for (var i = 0; i < a.Length; i++) {
+            for (var i = 0; i < a.Count; i++) {
                 if (a[i] == 0) continue;
                 a[i] = val;
             }
         }
 
         public static void SimplePst() {
-            simplePst('P', 100);
-            simplePst('B', 300);
-            simplePst('N', 300);
-            simplePst('R', 500);
-            simplePst('Q', 900);
-            simplePst('K', 30000);
+            simplePst4Piece('P', 100);
+            simplePst4Piece('B', 300);
+            simplePst4Piece('N', 300);
+            simplePst4Piece('R', 500);
+            simplePst4Piece('Q', 900);
+            simplePst4Piece('K', 60000);
         }
     }
 
+    /*
     internal class SfEntry {
         public int depth = -1;
         public int score = -1;
@@ -69,233 +152,368 @@ namespace Chess.Sunfish
 
         public SfEntry() {}
 
-        public SfEntry(int sDepth, int sScore, int sGamma, Tuple<int, int> sBmove) {
-            depth = sDepth; score = sScore; gamma = sGamma; bmove = sBmove;
+        public SfEntry(int depth, int score, int gamma, Tuple<int, int> bmove) {
+            this.depth = depth; this.score = score; this.gamma = gamma; this.bmove = bmove;
+        }
+    }
+    */
+
+    public struct SfMove {
+        int a;
+
+        private static readonly string PROM = "qrbn";
+
+        public int i {
+            get => (a >> 0) & 0xFF;
+            set => a = (a & 0xFFFF00) | ((value & 0xFF) << 0);
+        }
+
+        public int j {
+            get => (a >> 8) & 0xFF;
+            set => a = (a & 0xFF00FF) | ((value & 0xFF) << 8);
+        }
+
+        public int k {
+            get => (a >> 16) & 0xFF;
+            set => a = (a & 0x00FFFF) | ((value & 0xFF) << 16);
+        }
+
+        public char? prom { get => (k == 0) ? (char?)null : PROM[k - 1]; }
+
+        public static implicit operator int(SfMove m) => m.a;
+
+        public SfMove(int a) {
+            this.a = a;
+        }
+
+        public SfMove(int i, int j, int k) {
+            a = 0;
+            this.i = i;
+            this.j = j;
+            this.k = k;
+        }
+
+        public SfMove(int i, int j) : this(i, j, 0) { }
+
+        public static SfMove Parse(string s) {
+            int r = 0;
+            for (var i = 0; i + 1 < 4 && i + 1 < s.Length; i += 2) {
+                int file = s[i + 0] - 'a';
+                int rank = s[i + 1] - '1';
+                if (file < 0 || file > 7 || rank < 0 || rank > 7)
+                    throw new FormatException();
+
+                r += (Sf.A1 + file - 10 * rank) << (i << 2);
+            }
+
+            if (s.Length > 4) {
+                r += (PROM.IndexOf(s[4]) + 1) << 16;
+            }
+
+            return new SfMove(r);
+        }
+
+        public override string ToString() {
+            var cs = new char[5];
+            var k = 0;
+            if (i != 0) {
+                cs[k++] = (char)('a' + (i % 10) - 1);
+                cs[k++] = (char)('1' - (i / 10) + 9);
+                if (j != 0) {
+                    cs[k++] = (char)('a' + (j % 10) - 1);
+                    cs[k++] = (char)('1' - (j / 10) + 9);
+                    if (k != 0 && k <= PROM.Length) {
+                        cs[k++] = PROM[k - 1];
+                    }
+                }
+            }
+
+            return new string(cs, 0, k);
         }
     }
 
+    public class SfPartList<T> : IEnumerable<T> {
+        bool sorted = true;
+        T[] a;
+        List<(int i, T v)> ch = new List<(int, T)>(4);
+
+        public SfPartList(T[] a) {
+            this.a = a;
+        }
+
+        public T this[int index] {
+            get {
+                var ci = ch.Where(x => x.i == index).Select((x,i) => (int?)i).FirstOrDefault();
+                return ci == null ? a[index] : ch[ci.Value].v;
+            }
+            set {
+                var ci = ch.Where(x => x.i == index).Select(x => (int?)x.i).FirstOrDefault();
+                if (ci == null) {
+                    ch.Add((index, value));
+                    sorted = false;
+                }
+                else {
+                    ch[ci.Value] = (index,value);
+                }
+            }
+        }
+
+        private IEnumerable<T> enumerate() {
+            if (!sorted) { ch.Sort((a, b) => a.i.CompareTo(b.i)); sorted = true; }
+            if (ch.Count == 0) {
+                foreach (var x in a) {
+                    yield return x;
+                }
+                yield break;
+            }
+
+            var j = 0;
+            for (var i = 0; i < ch.Count; i++) {
+                for (; j < ch[i].i; j++) {
+                    yield return a[j];
+                }
+                yield return ch[i].v;
+                j++;
+            }
+            
+            for (; j < a.Length; j++) {
+                yield return a[j];
+            }
+        }
+
+        public IEnumerator<T> GetEnumerator() {
+            return enumerate().GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() { return GetEnumerator(); }
+    }
+
     public class SfPosition {
-        public char[] mBoard;
-        public int mScore;
-        public bool[] mWc;
-        public bool[] mBc;
-        int mEp;
-        int mKp;
+        public char[] board;
+        public int score;
+        public (bool q, bool k) wc;
+        public (bool q, bool k) bc;
+        int ep;
+        int kp;
 
-        public static void SimplePst() {
-            Sf.SimplePst();
+        public SfPosition(IEnumerable<char> board, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp, bool rotate = false, bool nullmove = false) {
+            var bs = new char[120];
+            var i = !rotate ? 0 : 119;
+            if (!rotate) {
+                foreach (var b in board) { bs[i] = b; i++; }
+                this.score = score;
+                this.wc = wc;
+                this.bc = bc;
+                this.ep = ep;
+                this.kp = kp;
+            }
+            else {
+                foreach (var b in board) { bs[i] = b < 'A' ? b : b <= 'Z' ? char.ToLower(b) : char.ToUpper(b); i--; }
+                this.score = -score;
+                this.wc = bc;
+                this.bc = wc;
+                this.ep = (ep != 0 && !nullmove) ? 119 - ep : 0;
+                this.kp = (kp != 0 && !nullmove) ? 119 - kp : 0;
+            }
+
+            this.board = bs;
         }
 
-        public SfPosition(char[] board, int score, bool[] wc, bool[] bc, int ep, int kp ) {
-            mBoard = (char[])board.Clone();
-            mScore = score;
-            mWc = (bool[])wc.Clone();
-            mBc = (bool[])bc.Clone();
-            mEp = ep;
-            mKp = kp;
-        }
-
-        static public SfPosition Load(string fen) {
-            var split = fen.Split(' ');
-            var f0 = split[0];
+        private static readonly string space20 = new string(' ', 20);
+        public static SfPosition FromFen(string fen, bool rotate = false) {
+            var fs = fen.Split(' ');
+            var f0 = fs[0];
             for (var i = 8; i > 0; i--) {
                 f0 = f0.Replace(i.ToString(), new string('.', i));
             }
+            var board = $"{space20}{string.Concat(f0.Split('/').Select(x => $" {x} "))}{space20}";
 
-            var board = "                    "
-                + string.Join("", f0.Split('/').Select(x => " " + x + " "))
-                + "                    ";
+            var wc = (fs[2].Contains("Q"), fs[2].Contains("K"));
+            var bc = (fs[2].Contains("q"), fs[2].Contains("k"));
 
-            var fc = split[2];
-            var wc = new bool[] { fc.Contains("Q"), fc.Contains("K") };
-            var bc = new bool[] { fc.Contains("q"), fc.Contains("k") };
+            var ep = SfMove.Parse(fs[3]);
 
-            var ep = parse(split[3]).Item1;
-
-            return new SfPosition(board.ToCharArray(), 0, wc, bc, ep, 0);
+            return new SfPosition(board.ToCharArray(), 0, wc, bc, ep, 0, rotate);
         }
 
-        public List<Tuple<int, int>> genMoves() {
-            List<Tuple<int, int>> moves = new List<Tuple<int, int>>();
-            for (int i = 0; i < 120; i++) {
-                if (char.IsUpper(mBoard[i])) {
-                    int[] dirs = Sf.directions[mBoard[i]];
-                    for (int d = 0; d < dirs.Length; d++) {
-                        int di = dirs[d];
-                        for (int j = di + i; ; j += di) {
-                            char q = mBoard[j];
 
-                            // stay inside playable board
-                            if (q == ' ') {
+        private static readonly string dig = "0123456789";
+
+        public override string ToString() {
+            var cs = new char[100];
+            var k = 0;
+            var sn = 0;
+            for (var i = Sf.A8; i < Sf.H1; i += 10) {
+                var il = i + 8;
+                for (var j = i; j < il; j++) {
+                    if (board[j] == '.') {
+                        sn++;
+                    }
+                    else {
+                        if (sn > 0) {
+                            cs[k++] = dig[sn];
+                            sn = 0;
+                        }
+                        cs[k++] = board[j];
+                    }
+                }
+                if (sn > 0) {
+                    cs[k++] = dig[sn];
+                    sn = 0;
+                }
+                cs[k++] = '/';
+            }
+
+            var bStr = new string(cs, 0, k-1);
+
+            k = 0;
+            if (wc.k) cs[k++] = 'K';
+            if (wc.q) cs[k++] = 'Q';
+            if (bc.k) cs[k++] = 'k';
+            if (bc.q) cs[k++] = 'q';
+
+            var cStr = k == 0 ? "-" : new string(cs, 0, k);
+            var epStr = ep == 0 ? "-" : (new SfMove(ep)).ToString();
+            var kpStr = kp == 0 ? "-" : (new SfMove(kp)).ToString();
+
+            return $"{bStr} {cStr} {epStr} {kpStr} {score}";
+        }
+
+        public IEnumerable<int> gen_moves() {
+            for (int i = 0; i < board.Length; i++) {
+                var p = board[i];
+                if (char.IsUpper(p))
+                    continue;
+
+                foreach (var d in Sf.directions[p]) {
+                    for (var j = i + d; ; j += d) {
+                        var q = board[j];
+
+                        if (char.IsWhiteSpace(q) || char.IsUpper(q))
+                            break;
+
+                        if (p == 'P') {
+                            if ((d == Sf.N || d == Sf.N + Sf.N) && q != '.')
+                                break;
+
+                            if (d == Sf.N + Sf.N && (i < Sf.A1 + Sf.N || board[i + Sf.N] != '.'))
+                                break;
+
+                            if ((d == Sf.N + Sf.W || d == Sf.N + Sf.E)
+                              && q == '.'
+                              && j != ep && Math.Abs(kp - j) > 1)
+                                break;
+
+                            if (Sf.A8 <= j && j <= Sf.H8) {
+                                for (var k = 1; k <= 4; k++) {
+                                    yield return new SfMove(i, j, k);
+                                }
                                 break;
                             }
+                        }
 
-                            // Check castling
-                            if (i == Sf.A1 && q == 'K' && mWc[0]) {
-                                moves.Add(new Tuple<int,int>(j, j - 2));
-                            }
-                            if (i == Sf.H1 && q == 'K' && mWc[1]) {
-                                moves.Add(new Tuple<int, int>(j, j + 2));
-                            }
+                        yield return new SfMove(i, j, 0);
 
-                            // No friendly captures
-                            if (char.IsUpper(q)) {
-                                break;
-                            }
+                        if (p =='P' || p =='N' || p == 'K' || char.IsLower(q))
+                            break;
 
-                            // Special pawn movement
-                            if ( mBoard[i] == 'P' && ( di == Sf.N + Sf.W || di == Sf.N + Sf.E ) && q == '.' && ( j != mEp && j != mKp ) ) {
-						        break;
-					        }
-					        if( mBoard[i] == 'P' && ( di == Sf.N || di == 2 * Sf.N ) && q != '.' ) {
-						        break;
-					        }
-					        if( mBoard[i] == 'P' && di == 2 * Sf.N && ( i < Sf.A1 + Sf.N || mBoard[i + Sf.N] != '.' ) ) {
-						        break;
-					        }
+                        if (i == Sf.A1 && board[j + Sf.E] == 'K' && wc.q) {
+                            yield return new SfMove(j + Sf.E, j + Sf.W);
+                        }
 
-                            // Move the piece
-                            moves.Add(new Tuple<int, int>(i, j));
-
-                            // Stop crawlers from sliding
-                            if (mBoard[i] == 'P' || mBoard[i] == 'N' || mBoard[i] == 'K') {
-                                break;
-                            }
-
-                            // No sliding after captures
-                            if (char.IsLower(q)) {
-                                break;
-                            }
+                        if (i == Sf.H1 && board[j + Sf.W] == 'K' && wc.k) {
+                            yield return new SfMove(j + Sf.W, j + Sf.E);
                         }
                     }
                 }
             }
-
-            return moves;
         }
 
-        public SfPosition rotate() {
-            // Reverse order of board array then swap the case of each character
-            // then return Position( swappedboard, -mScore, mBc, mWc, 119 - mEp, 119 - mKp );
-            //												^-----^---These two need to be swapped like they are here
-            char[] swapBoard = (char[])mBoard.Clone();
-            // Reverse alg taken from http://stackoverflow.com/questions/1128985/c-reverse-array
-            int len = swapBoard.Length;
-            for (int i = 0; i < len / 2; i++) {
-                swapBoard[i] ^= swapBoard[len - i - 1];
-                swapBoard[len - i - 1] ^= swapBoard[i];
-                swapBoard[i] ^= swapBoard[len - i - 1];
-            }
-            // Now need swap case of character.
-            for (int i = 0; i < len; i++) {
-                if (char.IsLetter(swapBoard[i])) {
-                    if (char.IsLower(swapBoard[i])) {
-                        swapBoard[i] = char.ToUpper(swapBoard[i]);
-                    }
-                    else if (char.IsUpper(swapBoard[i])) {
-                        swapBoard[i] = char.ToLower(swapBoard[i]);
-                    }
-                }
-            }
-            return new SfPosition(swapBoard, -mScore, mBc, mWc, 119 - mEp, 119 - mKp);
+        public SfPosition rotate(bool nullmove = false) {
+            return new SfPosition(board, score, wc, bc, ep, kp, rotate: true, nullmove);
         }
 
-        public SfPosition move(Tuple<int, int> sMove)
-        {
-            int i = sMove.Item1;
-            int j = sMove.Item2;
-            char p = mBoard[i];
-            char q = mBoard[j];
-            // put = lambda board, i, p: board[:i] + p + board[i+1:]
-            // creates put functions that places a letter p at a certain point in the board i.
-            // This doesn't need to be done in c++, as we are using a char array, instead of pythons immutable string.
+        public SfPosition move(SfMove m) {
+            var i = m.i;
+            var j = m.j;
+            var prom = char.ToUpper(m.k == 0 ? 'q' : m.prom.Value);
+            char p = this.board[i];
+            char q = this.board[j];
+            var board = new SfPartList<char>(this.board);
+            var wc = this.wc;
+            var bc = this.bc;
+            var ep = 0;
+            var kp = 0;
+            var score = this.score + value(m);
 
-            // Copy variables and reset ep and kp
-            char[] board = (char[])mBoard.Clone();
-            int ep = 0, kp = 0;
-            bool[] wc = (bool[])mWc.Clone();
-            bool[] bc = (bool[])mBc.Clone();
-            int score = mScore + value(sMove);
-            // Actual move
+            if (i == Sf.A1) wc = (false, wc.k);
+            if (i == Sf.H1) wc = (wc.q, false);
+            if (i == Sf.A8) wc = (bc.q, false);
+            if (i == Sf.H8) wc = (false, bc.k);
+
             board[j] = board[i];
             board[i] = '.';
 
-            // Castling rights
-            if (i == Sf.A1) {
-                wc[0] = false;
-            }
-            if (i == Sf.H1) {
-                wc[1] = false;
-            }
-            if (j == Sf.A8) {
-                bc[1] = false;
-            }
-            if (j == Sf.H8) {
-                bc[0] = false;
-            }
             if (p == 'K') {
-                wc[0] = false; wc[1] = false;
-                if (Math.Abs(j - i) == 2)
-                {
-                    kp = (i + j) / 2; // floor
-                    board[(j < i) ? Sf.A1 : Sf.H1] = '.';
+                wc = (false, false);
+                if (Math.Abs(j - i) == 2) {
+                    kp = (i + j) >> 1;
+                    board[j < i ? Sf.A1 : Sf.H1] = '.';
                     board[kp] = 'R';
                 }
             }
+
             if (p == 'P') {
                 if (Sf.A8 <= j && j <= Sf.H8) {
-                    board[j] = 'Q';
+                    board[j] = prom;
                 }
-                if (j - i == 2 * Sf.N) {
+                if (j - i == Sf.N + Sf.N && (board[j + Sf.W] == 'p' || board[j + Sf.E] == 'p')) {
                     ep = i + Sf.N;
                 }
-                if ((j - i == Sf.N + Sf.W || j - i == Sf.N + Sf.E) && q == '.') {
+                if (j == this.ep) {
                     board[j + Sf.S] = '.';
                 }
             }
 
-            return new SfPosition(board, score, wc, bc, ep, kp).rotate();
+            return new SfPosition(board, score, wc, bc, ep, kp, rotate: true);
         }
 
-        public int value(Tuple<int, int> sMove) {
-            int i = sMove.Item1;
-            int j = sMove.Item2;
-            char p = mBoard[i];
-            char q = mBoard[j];
+        public int value(SfMove m) {
+            int i = m.i;
+            int j = m.j;
+            char p = board[i];
+            char q = board[j];
+            var prom = m.k == 0 ? 'Q' : char.ToUpper(m.prom.Value);
 
-            // Actual move
-            int score = Sf.pst[char.ToUpper(p)][j] - Sf.pst[char.ToUpper(p)][i];
+            var score = Sf.pst[p][j] - Sf.pst[char.ToUpper(p)][i];
 
-            // Capture
             if (char.IsLower(q)) {
-                score += Sf.pst[char.ToUpper(q)][j];
-            }
-            if (Math.Abs(j - mKp) < 2) {
-                score += Sf.pst['K'][j];
+                score += Sf.pst[char.ToUpper(q)][119 - j];
             }
 
-            //Castling
-            if (p == 'K' && Math.Abs(i - j) == 2)
-            {
-                score += Sf.pst['R'][(i + j) / 2];
-                score -= Sf.pst['R'][(j < i) ? Sf.A1 : Sf.H1];
+            if (Math.Abs(j - kp) <= 1) {
+                score += Sf.pst['K'][119 - j];
             }
 
-            // More special pawn movement
+            if (p == 'K' && Math.Abs(i - j) == 2) {
+                score += Sf.pst['R'][(i + j)/2];
+                score -= Sf.pst['R'][j < i ? Sf.A1 : Sf.H1];
+            }
+
             if (p == 'P') {
                 if (Sf.A8 <= j && j <= Sf.H8) {
-                    score += Sf.pst['Q'][j] - Sf.pst['P'][j];
+                    score += Sf.pst[prom][j] - Sf.pst['P'][j];
                 }
-                if (j == mEp) {
-                    score += Sf.pst['P'][j + Sf.S];
+                if (j == ep) {
+                    score += Sf.pst['P'][119 - (j + Sf.S)];
                 }
             }
 
             return score;
         }
 
+        /*
         static int nodes = 0;
-
         static int bound(SfPosition pos, int gamma, int depth, Tuple<int,int> exMove = null) {
             nodes += 1;
 
@@ -307,11 +525,11 @@ namespace Chess.Sunfish
                 return initEntry.score;
             }
 
-            if (Math.Abs(pos.mScore) >= Sf.MATE_VALUE) {
-                return pos.mScore;
+            if (Math.Abs(pos.score) >= Sf.MATE_VALUE) {
+                return pos.score;
             }
 
-            int nullscore = (depth > 0) ? -bound(pos.rotate(), 1 - gamma, depth - 3) : pos.mScore;
+            int nullscore = (depth > 0) ? -bound(pos.rotate(), 1 - gamma, depth - 3) : pos.score;
 
             if (nullscore >= gamma) {
                 return nullscore;
@@ -406,7 +624,7 @@ namespace Chess.Sunfish
 
             return new Tuple<Tuple<int, int>, int>(new Tuple<int,int>(0, 0), score);
         }
-
+        
         static public Tuple<int, int> parse(string sMove) {
             // calculate starting position
             int[] pos = { 0, 0 };
@@ -427,6 +645,14 @@ namespace Chess.Sunfish
                 r[i + 1] = (char)('1' - (p[i / 2] / 10) + 9);
             }
             return string.Join("", r);
+        }
+        */
+    }
+
+    public static class Sunfish {
+        public static void SimplePst()
+        {
+            Sf.SimplePst();
         }
     }
 }
