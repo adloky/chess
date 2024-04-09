@@ -7,9 +7,6 @@ using System.Threading.Tasks;
 
 namespace Chess.Sunfish {
     internal class Sf {
-        //static public readonly int TABLE_SIZE = 10000000;
-        //static public readonly int NODES_SEARCHED = 10000;
-        //static public readonly int MATE_VALUE = 30000;
         static public readonly int MATE_LOWER;
         static public readonly int MATE_UPPER;
         static public readonly int QS = 40;
@@ -99,8 +96,6 @@ namespace Chess.Sunfish {
                17,  30,  -3, -14,   6,  -1,  40,  18
             } }
         };
-
-        //public static readonly Dictionary<SfPosition, SfEntry> tp = new Dictionary<SfPosition, SfEntry>();
 
         static Sf() {
             var pss = new Dictionary<char, int>() { { 'P', 100 }, { 'N', 280 }, { 'B', 320 }, { 'R', 479 }, { 'Q', 929 }, { 'K', 60000 } };
@@ -228,7 +223,7 @@ namespace Chess.Sunfish {
 
         private int chIndex(int index) {
             var ci = ch.Count - 1;
-            for (; ci > 0; ci--) {
+            for (; ci >= 0; ci--) {
                 if (ch[ci].i == index) {
                     break;
                 }
@@ -512,22 +507,18 @@ namespace Chess.Sunfish {
     }
 
     public class SfStrDict<T1,T2> : Dictionary<string,T2> {
-        public bool TryGetValue(T1 key, out T2 val, T2 def = default(T2)) {
+        public bool TryGetValue(T1 key, ref T2 val) {
             T2 val2;
             bool r;
             if (r = TryGetValue(key.ToString(), out val2)) {
                 val = val2;
             }
-            else {
-                val = def;
-            }
-
             return r;
         }
 
         public void AddOrUpdate(T1 key, T2 val) {
-            T2 tmp;
-            if (TryGetValue(key, out tmp)) {
+            T2 tmp = default(T2);
+            if (TryGetValue(key, ref tmp)) {
                 this[key.ToString()] = val;
             }
             else {
@@ -555,11 +546,11 @@ namespace Chess.Sunfish {
             if (depth == 0)
                 yield return (new SfMove(0), pos.score);
 
-            SfMove killer;
-            tp_move.TryGetValue(pos, out killer);
+            SfMove killer = new SfMove(0);
+            tp_move.TryGetValue(pos, ref killer);
             if (killer == 0 && depth > 2) {
                 bound(pos, gamma, depth - 3, can_null: false);
-                tp_move.TryGetValue(pos, out killer);
+                tp_move.TryGetValue(pos, ref killer);
             }
 
             var val_lower = Sf.QS - depth * Sf.QS_A;
@@ -591,8 +582,8 @@ namespace Chess.Sunfish {
                 return -Sf.MATE_UPPER;
             }
 
-            SfEntry entry;
-            tp_score.TryGetValue((pos,depth,can_null), out entry, new SfEntry(-Sf.MATE_UPPER, Sf.MATE_UPPER));
+            SfEntry entry = new SfEntry(-Sf.MATE_UPPER, Sf.MATE_UPPER);
+            tp_score.TryGetValue((pos,depth,can_null), ref entry);
             if (entry.lower >= gamma)
                 return entry.lower;
             if (entry.upper < gamma)
@@ -603,7 +594,7 @@ namespace Chess.Sunfish {
                 return 0;
 
             var best = -Sf.MATE_UPPER;
-            foreach (var ms in boundMoves(pos, gamma, depth, can_null, entry)) {
+            foreach (var ms in boundMoves(pos, gamma, depth, can_null)) {
                 var move = ms.move;
                 var score = ms.score;
 
@@ -648,8 +639,8 @@ namespace Chess.Sunfish {
                     else {
                         upper = score;
                     }
-                    SfMove move;
-                    tp_move.TryGetValue(pos, out move);
+                    SfMove move = new SfMove(0);
+                    tp_move.TryGetValue(pos, ref move);
                     yield return (depth, gamma, score, move);
                     gamma = (lower + upper + 1) / 2;
                 }
