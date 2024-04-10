@@ -212,64 +212,53 @@ namespace Chess.Sunfish {
         }
     }
 
-    public class SfPartList<T> : IEnumerable<T> {
-        bool sorted = true;
-        T[] a;
-        List<(int i, T v)> ch = new List<(int, T)>(4);
+    public class SfTxArray<T> : IList<T> {
+        private T[] a;
 
-        public SfPartList(T[] a) {
-            this.a = a;
-        }
+        private List<(int i, T v)> ch = new List<(int, T)>();
 
-        private int chIndex(int index) {
-            var ci = ch.Count - 1;
-            for (; ci >= 0; ci--) {
-                if (ch[ci].i == index) {
-                    break;
-                }
-            }
-            return ci;
-        }
+        public T[] Original => a;
 
-        public T this[int index] {
-            get {
-                var ci = chIndex(index);
-                return ci < 0 ? a[index] : ch[ci].v;
-            }
+        public int Count => a.Length;
+
+        public T this[int index] { get => a[index];
             set {
-                var ci = chIndex(index);
-                if (ci < 0) {
-                    ch.Add((index, value));
-                    sorted = false;
+                if (!ch.Any(x => x.i == index)) {
+                    if (value.Equals(a[index])) {
+                        return;
+                    }
+                    ch.Add((index, a[index]));
                 }
-                else {
-                    ch[ci] = (index, value);
-                }
+                a[index] = value;
             }
         }
 
-        private IEnumerable<T> enumerate() {
-            if (!sorted) { ch.Sort((a, b) => a.i.CompareTo(b.i)); sorted = true; }
-            var j = 0;
-            for (var i = 0; i <= ch.Count; i++) {
-                var il = i == ch.Count ? a.Length : ch[i].i;
-                for (; j < il; j++) {
-                    yield return a[j];
-                }
-                if (i < ch.Count) {
-                    yield return ch[i].v;
-                    j++;
-                }
+        public SfTxArray(T[] a) { this.a = a; }
+
+        public void Rollback() {
+            foreach (var x in ch) {
+                a[x.i] = x.v;
             }
+            ch.Clear();
         }
 
-        public IEnumerator<T> GetEnumerator() {
-            return enumerate().GetEnumerator();
-        }
 
-        IEnumerator IEnumerable.GetEnumerator() { return GetEnumerator(); }
+        #region Not Implemented
+
+        public bool IsReadOnly => throw new NotImplementedException();
+        public void Add(T item) { throw new NotImplementedException(); }
+        public void Clear() { throw new NotImplementedException(); }
+        public bool Contains(T item) { throw new NotImplementedException(); }
+        public void CopyTo(T[] array, int arrayIndex) { throw new NotImplementedException(); }
+        public IEnumerator<T> GetEnumerator() { throw new NotImplementedException(); }
+        public int IndexOf(T item) { throw new NotImplementedException(); }
+        public void Insert(int index, T item) { throw new NotImplementedException(); }
+        public bool Remove(T item) { throw new NotImplementedException(); }
+        public void RemoveAt(int index) { throw new NotImplementedException(); }
+        IEnumerator IEnumerable.GetEnumerator() { throw new NotImplementedException(); }
+
+        #endregion
     }
-
     public class SfPosition {
         public char[] board;
         public int score;
@@ -278,11 +267,9 @@ namespace Chess.Sunfish {
         int ep;
         int kp;
 
-        public SfPosition(IEnumerable<char> board, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp, bool rotate = false, bool nullmove = false) {
-            var bs = new char[120];
-            var i = !rotate ? 0 : 119;
+        public SfPosition(char[] board, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp, bool rotate = false, bool nullmove = false) {
             if (!rotate) {
-                foreach (var b in board) { bs[i] = b; i++; }
+                this.board = (char[])board.Clone();
                 this.score = score;
                 this.wc = wc;
                 this.bc = bc;
@@ -290,15 +277,19 @@ namespace Chess.Sunfish {
                 this.kp = kp;
             }
             else {
-                foreach (var b in board) { bs[i] = b < 'A' ? b : b <= 'Z' ? char.ToLower(b) : char.ToUpper(b); i--; }
+                var bs = new char[board.Length];
+                var i = 0; var j = bs.Length - 1;
+                for (; i < bs.Length; i++, j--) {
+                    var bj = board[j];
+                    bs[i] = !char.IsLetter(bj) ? bj : char.IsUpper(bj) ? char.ToLower(bj) : char.ToUpper(bj);
+                }
                 this.score = -score;
                 this.wc = bc;
                 this.bc = wc;
-                this.ep = (ep != 0 && !nullmove) ? 119 - ep : 0;
-                this.kp = (kp != 0 && !nullmove) ? 119 - kp : 0;
+                this.ep = (ep == 0 || nullmove) ? 0 : 119 - ep;
+                this.kp = (kp == 0 || nullmove) ? 0 : 119 - kp;
+                this.board = bs;
             }
-
-            this.board = bs;
         }
 
         private static readonly string space20 = new string(' ', 20);
@@ -421,7 +412,7 @@ namespace Chess.Sunfish {
             var prom = char.ToUpper(m.k == 0 ? 'q' : m.prom.Value);
             char p = this.board[i];
             char q = this.board[j];
-            var board = new SfPartList<char>(this.board);
+            var board = new SfTxArray<char>(this.board);
             var wc = this.wc;
             var bc = this.bc;
             var ep = 0;
@@ -457,7 +448,10 @@ namespace Chess.Sunfish {
                 }
             }
 
-            return new SfPosition(board, score, wc, bc, ep, kp, rotate: true);
+            var r = new SfPosition(board.Original, score, wc, bc, ep, kp, rotate: true);
+            board.Rollback();
+
+            return r;
         }
 
         public int value(SfMove m) {
@@ -507,30 +501,20 @@ namespace Chess.Sunfish {
     }
 
     public class SfStrDict<T1,T2> : Dictionary<string,T2> {
-        public bool TryGetValue(T1 key, ref T2 val) {
-            T2 val2;
-            bool r;
-            if (r = TryGetValue(key.ToString(), out val2)) {
-                val = val2;
-            }
+        public bool TryGetValue(T1 key, out T2 val) {
+            var r = TryGetValue(key.ToString(), out val);
             return r;
         }
 
-        public void AddOrUpdate(T1 key, T2 val) {
-            T2 tmp = default(T2);
-            if (TryGetValue(key, ref tmp)) {
-                this[key.ToString()] = val;
-            }
-            else {
-                Add(key.ToString(), val);
+        public T2 this[T1 index] {
+            set {
+                this[index.ToString()] = value;
             }
         }
     }
 
     public static class Sunfish {
         private static int nodes = 0;
-        private static List<string> history = new List<string>();
-        private static Dictionary<string, SfPosition> historyDic = new Dictionary<string, SfPosition>();
 
         public static SfStrDict<(SfPosition pos, int depth, bool can_null), SfEntry> tp_score = new SfStrDict<(SfPosition, int, bool), SfEntry>();
         public static SfStrDict<SfPosition, SfMove> tp_move = new SfStrDict<SfPosition, SfMove>();
@@ -540,17 +524,16 @@ namespace Chess.Sunfish {
         }
 
         public static IEnumerable<(SfMove move, int score)> boundMoves(SfPosition pos, int gamma, int depth, bool can_null) {
-            if (depth > 2 && can_null && Math.Abs(pos.score) < 500)
-                yield return (new SfMove(0), -bound(pos.rotate(nullmove: true), 1 - gamma, depth - 3));
-
             if (depth == 0)
                 yield return (new SfMove(0), pos.score);
+            else if (depth > 2 && can_null && Math.Abs(pos.score) < 500)
+                yield return (new SfMove(0), -bound(pos.rotate(nullmove: true), 1 - gamma, depth - 3));
 
             SfMove killer = new SfMove(0);
-            tp_move.TryGetValue(pos, ref killer);
+            tp_move.TryGetValue(pos, out killer);
             if (killer == 0 && depth > 2) {
                 bound(pos, gamma, depth - 3, can_null: false);
-                tp_move.TryGetValue(pos, ref killer);
+                tp_move.TryGetValue(pos, out killer);
             }
 
             var val_lower = Sf.QS - depth * Sf.QS_A;
@@ -577,21 +560,20 @@ namespace Chess.Sunfish {
 
         public static int bound(SfPosition pos, int gamma, int depth, bool can_null = true) {
             nodes++;
+
             depth = Math.Max(depth, 0);
             if (pos.score <= -Sf.MATE_LOWER) {
                 return -Sf.MATE_UPPER;
             }
 
-            SfEntry entry = new SfEntry(-Sf.MATE_UPPER, Sf.MATE_UPPER);
-            tp_score.TryGetValue((pos,depth,can_null), ref entry);
+            SfEntry entry;
+            if (!tp_score.TryGetValue((pos, depth, can_null), out entry)) {
+                entry = new SfEntry(-Sf.MATE_UPPER, Sf.MATE_UPPER);
+            }
             if (entry.lower >= gamma)
                 return entry.lower;
             if (entry.upper < gamma)
                 return entry.upper;
-
-            var posStr = pos.ToString();
-            if (can_null && depth > 0 && history.Any(x => x == posStr))
-                return 0;
 
             var best = -Sf.MATE_UPPER;
             foreach (var ms in boundMoves(pos, gamma, depth, can_null)) {
@@ -599,9 +581,9 @@ namespace Chess.Sunfish {
                 var score = ms.score;
 
                 best = Math.Max(best, score);
-                if (best > gamma) {
+                if (best >= gamma) {
                     if (move != 0) {
-                        tp_move.AddOrUpdate(pos,move);
+                        tp_move[pos] = move;
                     }
                     break;
                 }
@@ -613,13 +595,8 @@ namespace Chess.Sunfish {
                 best = in_check ? -Sf.MATE_LOWER : 0;
             }
 
-            if (best >= gamma) {
-                tp_score.AddOrUpdate((pos, depth, can_null), new SfEntry(best, entry.upper));
-            }
-
-            if (best < gamma) {
-                tp_score.AddOrUpdate((pos, depth, can_null), new SfEntry(entry.lower, best));
-            }
+            var newEntry = best >= gamma ? new SfEntry(best, entry.upper) : new SfEntry(entry.lower, best);
+            tp_score[(pos, depth, can_null)] = newEntry;
 
             return best;
         }
@@ -639,8 +616,8 @@ namespace Chess.Sunfish {
                     else {
                         upper = score;
                     }
-                    SfMove move = new SfMove(0);
-                    tp_move.TryGetValue(pos, ref move);
+                    SfMove move;
+                    tp_move.TryGetValue(pos, out move);
                     yield return (depth, gamma, score, move);
                     gamma = (lower + upper + 1) / 2;
                 }
