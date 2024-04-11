@@ -9,11 +9,18 @@ using Chess.Sunfish;
 
 namespace SunfishEngine {
     class Program {
+        static string[] startLines = new string[] {
+            "position fen r1b1kbnr/pp3ppp/2N1p3/8/4pP2/2N5/PPP3PP/R1BqKB1R w KQkq - 0 8",
+            "go depth 5"
+        };
+        static Queue<string> startLinesQue = new Queue<string>(startLines);
+
         static void Main(string[] args) {
             var fen = Board.DEFAULT_STARTING_FEN;
-            SfPosition.SimplePst();
+            //Sunfish.SimplePst();
             while (true) {
-                var s = Console.ReadLine();
+                var s = startLinesQue.Count > 0 ? startLinesQue.Dequeue() : Console.ReadLine();
+
                 if (s == "uci") {
                     Console.WriteLine("uciok");
                 }
@@ -31,45 +38,26 @@ namespace SunfishEngine {
                 }
                 else if (s == "go" || s.StartsWith("go ")) {
                     var ps = s.Split(' ');
-                    int depth = -1;
+                    int maxdepth = -1;
                     for (var i = 1; i < ps.Length; i++) {
                         if (ps[i] == "depth") {
-                            depth = int.Parse(ps[i + 1]) + 2;
+                            maxdepth = int.Parse(ps[i + 1]);
                             break;
                         }
-                    }
-
-                    var color = fen.Contains(" w ") ? 1 : -1;
-                    var pos = SfPosition.Load(fen);
-                    if (color == -1) {
-                        pos = pos.rotate();
                     }
 
                     var best = (string)null;
-                    Tuple<int, int> m = null;
-                    for (var i = 0; i < 2; i++) {
-                        var sr = SfPosition.search(pos, maxd: depth, exMove: m);
-                        m = sr.Item1;
-                        var uci = SfPosition.tuple2move(m, color == -1);
-                        var isValid = true;
-                        try {
-                            FEN.Uci2San(fen, uci);
+                    var startMs = DateTime.Now.Ticks / 10000;
+                    foreach (var r in Sunfish.search(fen, maxdepth)) {
+                        var elapsedMs = Math.Max(100, DateTime.Now.Ticks / 10000 - startMs);
+                        var nps = r.nodes * 1000 / elapsedMs;
+                        Console.WriteLine($"info depth {r.depth} nodes {r.nodes} nps {nps} score cp {r.score}" + (r.pv == null ? "" : $" pv {r.pv}"));
+                        if (r.pv != null) {
+                            best = r.pv.Split(' ')[0];
                         }
-                        catch {
-                            isValid = false;
-                        }
+                    }
 
-                        if (m.Item1 == 0 || sr.Item2 == -30000 || !isValid) {
-                            if (i == 0) best = uci;
-                            break;
-                        } 
-                        
-                        Console.WriteLine($"info score cp {sr.Item2 * color} multipv {i+1} pv {uci}");
-                        if (i == 0) best = uci;
-                    }
-                    if (best != null) {
-                        Console.WriteLine($"bestmove {best}");
-                    }
+                    Console.WriteLine($"bestmove {(best == null ? "(none)" : best)}");
                 }
             }
         }

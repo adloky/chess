@@ -1696,12 +1696,14 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
             Sunfish.SimplePst();
-            var pos = SfPosition.FromFen("6k1/1p1b1ppp/p5q1/2QPr3/8/6P1/PP4BP/5R1K w - - 0 1");
+            var pos = SfPosition.FromFen("rnbqqbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQQBNR b KQkq - 0 1");
 
+            /*
             foreach (var x in Sunfish.search(pos)) {
                 Console.WriteLine($"{x.depth} {x.score} {x.move}");
             }
-            
+            */
+
             //pos = pos.move(SfMove.Parse("f4e5")).rotate();
 
             //Console.WriteLine(pos.ToString());
