@@ -585,24 +585,11 @@ namespace Chess.Sunfish {
         }
     }
 
-    public class SfStrDict<T1,T2> : Dictionary<string,T2> {
-        public bool TryGetValue(T1 key, out T2 val) {
-            var r = TryGetValue(key.ToString(), out val);
-            return r;
-        }
-
-        public T2 this[T1 key] {
-            set {
-                this[key.ToString()] = value;
-            }
-        }
-    }
-
-    public static class Sunfish {
+     public static class Sunfish {
         static int nodes = 0;
-
-        public static SfStrDict<(SfPosition pos, int depth, bool can_null), SfEntry> tp_score = new SfStrDict<(SfPosition, int, bool), SfEntry>();
-        public static SfStrDict<SfPosition, SfMove> tp_move = new SfStrDict<SfPosition, SfMove>();
+        // tp_score key  (SfPosition pos, int depth, bool can_null)
+        public static Dictionary<string, SfEntry> tp_score = new Dictionary<string, SfEntry>();
+        public static Dictionary<string, SfMove> tp_move = new Dictionary<string, SfMove>();
 
         public static void SimplePst() {
             SF.simple_pst();
@@ -617,8 +604,6 @@ namespace Chess.Sunfish {
             TP_MOVE_UPDATE
         }
 
-        //static Dictionary<Diag, long> DD = Enum.GetValues(typeof(Diag)).Cast<Diag>().ToDictionary(x => x, x => (long)0);
-
         static long[] DD = new long[Enum.GetValues(typeof(Diag)).Length];
         #endregion
 
@@ -629,13 +614,13 @@ namespace Chess.Sunfish {
                 yield return (new SfMove(0), -bound(pos.rotate(nullmove: true), 1 - gamma, depth - 3));
 
             SfMove killer = new SfMove(0);
-            if (tp_move.TryGetValue(pos, out killer)) {
+            if (tp_move.TryGetValue(pos.ToString(), out killer)) {
                 DD[(int)Diag.TP_MOVE_GET]++;
             }
             if (killer == 0 && depth > 2) {
                 bound(pos, gamma, depth - 3, can_null: false);
 
-                if (tp_move.TryGetValue(pos, out killer)) {
+                if (tp_move.TryGetValue(pos.ToString(), out killer)) {
                     DD[(int)Diag.TP_MOVE_GET]++;
                 }
             }
@@ -679,7 +664,7 @@ namespace Chess.Sunfish {
             }
 
             SfEntry entry;
-            if (!tp_score.TryGetValue((pos, depth, can_null), out entry)) {
+            if (!tp_score.TryGetValue((pos, depth, can_null).ToString(), out entry)) {
                 entry = new SfEntry(-SF.MATE_UPPER, SF.MATE_UPPER);
             }
             else {
@@ -699,10 +684,11 @@ namespace Chess.Sunfish {
                 if (best >= gamma) {
                     if (move != 0) {
                         SfMove ddMove;
-                        if (tp_move.TryGetValue(pos, out ddMove) && ddMove != move) {
+                        var pos_key = pos.ToString();
+                        if (tp_move.TryGetValue(pos_key, out ddMove) && ddMove != move) {
                             DD[(int)Diag.TP_MOVE_UPDATE]++;
                         }
-                        tp_move[pos] = move;
+                        tp_move[pos_key] = move;
                     }
                     break;
                 }
@@ -715,7 +701,7 @@ namespace Chess.Sunfish {
             }
 
             var newEntry = best >= gamma ? new SfEntry(best, entry.upper) : new SfEntry(entry.lower, best);
-            tp_score[(pos, depth, can_null)] = newEntry;
+            tp_score[(pos, depth, can_null).ToString()] = newEntry;
 
             return best;
         }
@@ -737,7 +723,7 @@ namespace Chess.Sunfish {
                         upper = score;
                     }
                     SfMove move;
-                    tp_move.TryGetValue(pos, out move);
+                    tp_move.TryGetValue(pos.ToString(), out move);
                     yield return (depth, gamma, score, move);
                     gamma = (lower + upper + 1) / 2;
                 }
@@ -755,7 +741,7 @@ namespace Chess.Sunfish {
                 var moves = new List<SfMove>();
                 for (var i = 0; i < r.depth; i++) {
                     SfMove move;
-                    tp_move.TryGetValue(pi, out move);
+                    tp_move.TryGetValue(pi.ToString(), out move);
 
                     if (move == 0)
                         break;
