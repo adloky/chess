@@ -11,7 +11,7 @@ namespace SunfishEngine {
     class Program {
         static string[] startLines = new string[] {
             "position fen r1b1kbnr/pp3ppp/2N1p3/8/4pP2/2N5/PPP3PP/R1BqKB1R w KQkq - 0 8",
-            "go depth 5"
+            "go depth 10"
         };
         static Queue<string> startLinesQue = new Queue<string>(startLines);
 
