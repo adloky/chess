@@ -1695,8 +1695,6 @@ namespace ChessAnalCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
-            Sunfish.SimplePst();
-            var pos = SfPosition.FromFen("rnbqqbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQQBNR b KQkq - 0 1");
 
             /*
             foreach (var x in Sunfish.search(pos)) {

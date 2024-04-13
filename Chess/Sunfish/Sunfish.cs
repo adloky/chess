@@ -263,14 +263,37 @@ namespace Chess.Sunfish {
         }
     }
 
-    public class SfTxArray<T> : IList<T> {
-        private IList<T> a;
-
-        private List<(int i, T v)> ch = new List<(int, T)>();
+    public abstract class SfSimpleList<T> : IList<T> {
+        protected IList<T> a;
 
         public int Count => a.Count;
 
-        public T this[int index] { get => a[index];
+        public virtual T this[int index] {
+            get => a[index];
+            set => a[index] = value;
+        }
+
+        #region Not Implemented
+
+        public bool IsReadOnly => throw new NotImplementedException();
+        public void Add(T item) { throw new NotImplementedException(); }
+        public void Clear() { throw new NotImplementedException(); }
+        public bool Contains(T item) { throw new NotImplementedException(); }
+        public void CopyTo(T[] array, int arrayIndex) { throw new NotImplementedException(); }
+        public IEnumerator<T> GetEnumerator() { throw new NotImplementedException(); }
+        public int IndexOf(T item) { throw new NotImplementedException(); }
+        public void Insert(int index, T item) { throw new NotImplementedException(); }
+        public bool Remove(T item) { throw new NotImplementedException(); }
+        public void RemoveAt(int index) { throw new NotImplementedException(); }
+        IEnumerator IEnumerable.GetEnumerator() { throw new NotImplementedException(); }
+
+        #endregion
+    }
+
+    public class SfTxArray<T> : SfSimpleList<T> {
+        private List<(int i, T v)> ch = new List<(int, T)>();
+
+        public override T this[int index] { get => a[index];
             set {
                 if (!ch.Any(x => x.i == index)) {
                     if (value.Equals(a[index])) {
@@ -290,56 +313,69 @@ namespace Chess.Sunfish {
             }
             ch.Clear();
         }
-
-        #region Not Implemented
-
-        public bool IsReadOnly => throw new NotImplementedException();
-        public void Add(T item) { throw new NotImplementedException(); }
-        public void Clear() { throw new NotImplementedException(); }
-        public bool Contains(T item) { throw new NotImplementedException(); }
-        public void CopyTo(T[] array, int arrayIndex) { throw new NotImplementedException(); }
-        public IEnumerator<T> GetEnumerator() { throw new NotImplementedException(); }
-        public int IndexOf(T item) { throw new NotImplementedException(); }
-        public void Insert(int index, T item) { throw new NotImplementedException(); }
-        public bool Remove(T item) { throw new NotImplementedException(); }
-        public void RemoveAt(int index) { throw new NotImplementedException(); }
-        IEnumerator IEnumerable.GetEnumerator() { throw new NotImplementedException(); }
-
-        #endregion
     }
-    public class SfPosition {
-        public char[] board;
-        public bool btm;
-        public int score;
-        public (bool q, bool k) wc;
-        public (bool q, bool k) bc;
-        int ep;
-        int kp;
 
-        public SfPosition(char[] board, bool btm, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp, bool rotate = false) {
-            if (!rotate) {
-                this.board = (char[])board.Clone();
-                this.btm = btm;
-                this.score = score;
-                this.wc = wc;
-                this.bc = bc;
-                this.ep = ep;
-                this.kp = kp;
-            }
-            else {
-                this.board = new char[board.Length];
-                var i = 0; var j = this.board.Length - 1;
-                for (; i < this.board.Length; i++, j--) {
-                    this.board[i] = SF.swap_case(board[j]);
+    public class SfReversed : SfSimpleList<char> {
+        private SfPosition pos;
+
+        public SfReversed(SfPosition pos, char[] a) {
+            this.pos = pos;
+            this.a = a;
+        }
+
+        public override char this[int index] {
+            get => !pos.btm ? a[index] : SF.swap_case(a[119-index]);
+            set {
+                if (!pos.btm) {
+                    a[index] = value;
                 }
-
-                this.btm = !btm;
-                this.score = -score;
-                this.wc = bc;
-                this.bc = wc;
-                this.ep = ep == 0 ? 0 : 119 - ep;
-                this.kp = kp == 0 ? 0 : 119 - kp;
+                else {
+                    a[119 - index] = SF.swap_case(value);
+                }
             }
+        }
+
+        public IList<char> Original { get => a; }
+    }
+
+    public class SfPosition {
+        private SfReversed board;
+        // public char[] board;
+
+        private int _score;
+        private (bool q, bool k) _wc;
+        private (bool q, bool k) _bc;
+        private int _ep;
+        private int _kp;
+
+        public bool btm;
+        public int score { get => !btm ? _score : -_score; set => _score = (!btm) ? value : -value; }
+        public (bool q, bool k) wc {
+            get => !btm ? _wc : _bc;
+            set { if (!btm) _wc = value; else _bc = value; } }
+        public (bool q, bool k) bc {
+            get => !btm ? _bc : _wc;
+            set { if (!btm) _bc = value; else _wc = value; } }
+        public int ep {
+            get => !btm ? _ep : _ep == 0 ? 0 : 119 - _ep;
+            set { if (!btm || value == 0) _ep = value; else _ep = 119 - value; }
+        }
+        public int kp {
+            get => !btm ? _kp : _ep == 0 ? 0 : 119 - _kp;
+            set { if (!btm || value == 0) _kp = value; else _kp = 119 - value; }
+        }
+
+        public SfPosition(IList<char> board, bool btm, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp, bool rotate = false) {
+            this.board = new SfReversed(this, (char[])((char[])board).Clone());
+            this.btm = btm;
+            this.score = score;
+            this.wc = wc;
+            this.bc = bc;
+            this.ep = ep;
+            this.kp = kp;
+
+            if (rotate)
+                this.btm = !btm;
 
             /*
             if (!Regex.IsMatch(string.Concat(this.board), "^ {20}( .{8} ){8} {20}$")) {
@@ -401,8 +437,8 @@ namespace Chess.Sunfish {
             for (var i = SF.A8; i < SF.H1; i += SF.S) {
                 var il = i + 8;
                 for (var j = i; j < il; j++) {
-                    var c = !btm ? board[j] : SF.swap_case(board[119 - j]);
-                    if (c == '.') {
+                    var _j = !btm ? j : 119 - j;
+                    if (board[_j] == '.') {
                         sn++;
                     }
                     else {
@@ -410,7 +446,7 @@ namespace Chess.Sunfish {
                             cs[k++] = dig[sn];
                             sn = 0;
                         }
-                        cs[k++] = c;
+                        cs[k++] = !btm ? board[_j] : SF.swap_case(board[_j]);
                     }
                 }
                 if (sn > 0) {
@@ -423,9 +459,7 @@ namespace Chess.Sunfish {
             cs[k-1] = ' ';
             cs[k++] = btm ? 'b' : 'w';
             cs[k++] = ' ';
-            //var bStr = new string(cs, 0, k - 1);
 
-            //k = 0;
             var wc = btm ? this.bc : this.wc;
             var bc = btm ? this.wc : this.bc;
             if (wc.k) cs[k++] = 'K';
@@ -451,7 +485,7 @@ namespace Chess.Sunfish {
         }
 
         public IEnumerable<SfMove> gen_moves() {
-            for (int i = 0; i < board.Length; i++) {
+            for (int i = 0; i < board.Count; i++) {
                 var p = board[i];
                 if (!char.IsUpper(p))
                     continue;
@@ -501,7 +535,7 @@ namespace Chess.Sunfish {
         }
 
         public SfPosition rotate(bool nullmove = false) {
-            return new SfPosition(board, btm, score, wc, bc, nullmove ? 0 : ep, nullmove ? 0 : kp, rotate: true);
+            return new SfPosition(board.Original, btm, score, wc, bc, nullmove ? 0 : ep, nullmove ? 0 : kp, rotate: true);
         }
 
         public SfPosition move(SfMove m) {
@@ -546,7 +580,7 @@ namespace Chess.Sunfish {
                 }
             }
 
-            var r = new SfPosition(this.board, !btm, score, wc, bc, ep, kp, rotate: true);
+            var r = new SfPosition(this.board.Original, btm, score, wc, bc, ep, kp, rotate: true);
             board.Rollback();
 
             return r;
