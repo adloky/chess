@@ -105,6 +105,7 @@
     <Compile Include="SquareColor.cs" />
     <Compile Include="StalemateReason.cs" />
     <Compile Include="Sunfish\Sunfish.cs" />
+    <Compile Include="Sunfish\SfZobrist.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -17,6 +17,16 @@ namespace SunfishEngine {
 
         static void Main(string[] args) {
             var fen = Board.DEFAULT_STARTING_FEN;
+            /*
+            var zs = SfZobrist.NewArray(10);
+            SfZobristInt zi = new SfZobristInt(zs);
+            //zi.Value = 5;
+            zi.Value = 4;
+            zi.Value = 5;
+            zi.Value = 0;
+            Console.WriteLine(zi.Zobrist);
+            */
+
             //Sunfish.SimplePst();
             while (true) {
                 var s = startLinesQue.Count > 0 ? startLinesQue.Dequeue() : Console.ReadLine();

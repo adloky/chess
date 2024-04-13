@@ -8,8 +8,8 @@ using System.Threading.Tasks;
 
 namespace Chess.Sunfish {
     internal class SF {
-        static public readonly int MATE_LOWER;
-        static public readonly int MATE_UPPER;
+        public const int MATE_LOWER = 60000 - 11 * 900;
+        public const int MATE_UPPER = 60000 + 11 * 900;
         public const int QS = 40;
         public const int QS_A = 140;
         public const int EVAL_ROUGHNESS = 15;
@@ -46,7 +46,8 @@ namespace Chess.Sunfish {
                                     + "          "
                                     + "          ";
 
-        static public readonly Dictionary<char, List<int>> PST = new Dictionary<char, List<int>>() {
+        public static readonly Dictionary<char, List<int>> PST_B = new Dictionary<char, List<int>>();
+        public static readonly Dictionary<char, List<int>> PST = new Dictionary<char, List<int>>() {
             { 'P', new List<int>() {
                 0,   0,   0,   0,   0,   0,   0,   0,
                78,  83,  86,  73, 102,  82,  85,  90,
@@ -128,8 +129,8 @@ namespace Chess.Sunfish {
                 xs.InsertRange(0, Enumerable.Repeat(0, 20));
 
                 // mirror for blacks
-                p = char.ToLower(p);
-                PST.Add(p, xs = xs.ToList());
+                xs = xs.ToList();
+                PST_B.Add(p, xs);
                 for (var i = 0; i < xs.Count; i += 10) {
                     for (var j = 0; j < 5; j++) {
                         var tmp = xs[i + j];
@@ -138,9 +139,6 @@ namespace Chess.Sunfish {
                     }
                 }
             }
-
-            MATE_LOWER = pss['K'] - 10 * pss['Q'];
-            MATE_UPPER = pss['K'] + 10 * pss['Q'];
 
             /*
             foreach (var c in pss.Keys.Concat(pss.Keys.Select(x =>char.ToLower(x)))) {
@@ -252,7 +250,10 @@ namespace Chess.Sunfish {
                 if (j != 0) {
                     cs[n++] = (char)('a' + (j % 10) - 1);
                     cs[n++] = (char)('1' - (j / 10) + 9);
-                    if (k != 0 && k <= PROM.Length) {
+                    if (k > 0) {
+                        if (k > PROM.Length) 
+                            throw new ArgumentOutOfRangeException();
+                        
                         cs[n++] = PROM[k - 1];
                     }
                 }
@@ -369,6 +370,8 @@ namespace Chess.Sunfish {
 
         public void renew_scores() {
             var score = 0;
+            var pst = !btm ? SF.PST : SF.PST_B;
+            var pst_op = btm ? SF.PST : SF.PST_B;
             for (var j = SF.A8; j <= SF.H1; j++) {
                 var p = board[j];
                 if (!char.IsLetter(p))
@@ -376,13 +379,14 @@ namespace Chess.Sunfish {
 
                 var c = 1;
                 var i = j;
-                var pst = get_pst(p);
+                var _pst = pst;
                 if (char.IsLower(p)) {
                     i = 119 - i;
                     c = -1;
+                    _pst = pst_op;
                 }
 
-                score += pst[i] * c;
+                score += _pst[char.ToUpper(p)][i] * c;
             }
 
             this.score = score;
@@ -416,21 +420,34 @@ namespace Chess.Sunfish {
                 cs[k++] = '/';
             }
 
-            var bStr = new string(cs, 0, k - 1);
+            cs[k-1] = ' ';
+            cs[k++] = btm ? 'b' : 'w';
+            cs[k++] = ' ';
+            //var bStr = new string(cs, 0, k - 1);
 
-            k = 0;
-            var wc = !btm ? this.wc : this.bc;
-            var bc = !btm ? this.bc : this.wc;
+            //k = 0;
+            var wc = btm ? this.bc : this.wc;
+            var bc = btm ? this.wc : this.bc;
             if (wc.k) cs[k++] = 'K';
             if (wc.q) cs[k++] = 'Q';
             if (bc.k) cs[k++] = 'k';
             if (bc.q) cs[k++] = 'q';
-            var cStr = k == 0 ? "-" : new string(cs, 0, k);
+            if (cs[k - 1] == ' ') cs[k++] = '-';
+            cs[k++] = ' ';
 
-            var epStr = ep == 0 ? "-" : (new SfMove(!btm ? ep : 119 - ep)).ToString();
+            if (ep == 0) {
+                cs[k++] = '-';
+            }
+            else {
+                var epStr = (new SfMove(!btm ? ep : 119 - ep)).ToString();
+                cs[k++] = epStr[0];
+                cs[k++] = epStr[1];
+            }
+
+            var fen = new string(cs, 0, k);
             var kpStr = kp == 0 ? "-" : (new SfMove(!btm ? kp : 119 - kp)).ToString();
 
-            return $"{bStr} {(!btm ? "w" : "b")} {cStr} {epStr} 0 1,{kpStr} {score}";
+            return $"{fen} 0 1,{kpStr} {score}";
         }
 
         public IEnumerable<SfMove> gen_moves() {
@@ -535,39 +552,36 @@ namespace Chess.Sunfish {
             return r;
         }
 
-        private List<int> get_pst(char p) {
-            if (btm) p = SF.swap_case(p);
-            return SF.PST[p];
-        }
-
         public int value(SfMove m) {
             int i = m.i;
             int j = m.j;
             char p = board[i];
             char q = board[j];
             var prom = m.k == 0 ? 'Q' : char.ToUpper(m.prom.Value);
+            var pst = !btm ? SF.PST : SF.PST_B;
+            var pst_op = btm ? SF.PST : SF.PST_B;
 
-            var score = get_pst(p)[j] - get_pst(p)[i];
+            var score = pst[p][j] - pst[p][i];
 
             if (char.IsLower(q)) {
-                score += get_pst(q)[119 - j];
+                score += pst_op[char.ToUpper(q)][119 - j];
             }
 
             if (Math.Abs(j - kp) <= 1) {
-                score += get_pst('k')[119 - j];
+                score += pst_op['K'][119 - j];
             }
 
             if (p == 'K' && Math.Abs(i - j) == 2) {
-                score += get_pst('R')[(i + j) / 2];
-                score -= get_pst('R')[j < i ? SF.A1 : SF.H1];
+                score += pst['R'][(i + j) / 2];
+                score -= pst['R'][j < i ? SF.A1 : SF.H1];
             }
 
             if (p == 'P') {
                 if (SF.A8 <= j && j <= SF.H8) {
-                    score += get_pst(prom)[j] - get_pst('P')[j];
+                    score += pst[prom][j] - pst['P'][j];
                 }
                 if (j == ep) {
-                    score += get_pst('p')[119 - (j + SF.S)];
+                    score += pst_op['P'][119 - (j + SF.S)];
                 }
             }
 
@@ -688,7 +702,8 @@ namespace Chess.Sunfish {
                         if (tp_move.TryGetValue(pos_key, out ddMove) && ddMove != move) {
                             DD[(int)Diag.TP_MOVE_UPDATE]++;
                         }
-                        tp_move[pos_key] = move;
+
+                        tp_move[pos_key] = move; // depth > 2
                     }
                     break;
                 }
