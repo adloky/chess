@@ -16,18 +16,6 @@ namespace SunfishEngine {
         static Queue<string> startLinesQue = new Queue<string>(startLines);
 
         static void Main(string[] args) {
-            var pos = SfPosition.FromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-
-            var zd = new Dictionary<char, SfZobrist[]>() { { 'P', SfZobrist.NewArray(1) }, { 'Q', SfZobrist.NewArray(1) } };
-            var cs = new SfZobristCharArray(zd);
-            cs[0] = 'P';
-            Console.WriteLine(cs.Zobrist);
-            cs[0] = 'Q';
-            Console.WriteLine(cs.Zobrist);
-            cs[0] = ' ';
-            Console.WriteLine(cs.Zobrist);
-
-
             var fen = Board.DEFAULT_STARTING_FEN;
             /*
             var zs = SfZobrist.NewArray(10);

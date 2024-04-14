@@ -143,9 +143,12 @@ namespace Chess.Sunfish {
         }
     }
 
-    public class SfZobristCharArray : SfZobristArray<char> {
+    public class SfZobristCharArray : SfZobristArray<char>, ISfZobristContainer {
         private Dictionary<char, SfZobrist[]> zd;
-        public SfZobristCharArray(Dictionary<char,SfZobrist[]> zd, int size, ISfZobristContainer parent = null) : base(new char[size], parent) {
+
+        public SfZobrist Zobrist { get; set; }
+
+        public SfZobristCharArray(Dictionary<char,SfZobrist[]> zd, IList<char> a, ISfZobristContainer parent = null) : base(a, parent) {
             this.zd = zd;
         }
 
@@ -156,19 +159,18 @@ namespace Chess.Sunfish {
             SfZobrist[] zs;
             if (zd.TryGetValue(a[index], out zs)) {
                 Xor(zs[index]);
+                Zobrist = Zobrist.Xor(zs[index]);
             }
             if (zd.TryGetValue(value, out zs)) {
                 Xor(zs[index]);
+                Zobrist = Zobrist.Xor(zs[index]);
             }
 
             base.SetValue(index, value);
         }
-    }
 
-    public class SfZobristContainerNCharArray : SfZobristCharArray, ISfZobristContainer {
-
-        public SfZobrist Zobrist { get; set; }
-
-        public SfZobristContainerNCharArray(Dictionary<char, SfZobrist[]> zd, int size, ISfZobristContainer parent = null) : base(zd, size, parent) {}
+        public SfZobristCharArray Clone(ISfZobristContainer parent) {
+            return new SfZobristCharArray(zd, a.ToArray(), parent);
+        }
     }
 }

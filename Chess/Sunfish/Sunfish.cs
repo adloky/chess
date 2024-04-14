@@ -318,7 +318,7 @@ namespace Chess.Sunfish {
     public class SfReversed : SfSimpleList<char> {
         private SfPosition pos;
 
-        public SfReversed(SfPosition pos, char[] a) {
+        public SfReversed(SfPosition pos, IList<char> a) {
             this.pos = pos;
             this.a = a;
         }
@@ -338,35 +338,67 @@ namespace Chess.Sunfish {
         public IList<char> Original { get => a; }
     }
 
-    public class SfPosition {
+    public class SfPosition : ISfZobristContainer {
+        public static SfZobrist[] z120() { return SfZobrist.NewArray(120); }
+
+        public static Dictionary<char, SfZobrist[]> ZBOARD = new Dictionary<char, SfZobrist[]>() {
+            { 'P', z120() }, { 'N', z120() }, { 'B', z120() }, { 'R', z120() }, { 'Q', z120() }, { 'K', z120() },
+            { 'p', z120() }, { 'n', z120() }, { 'b', z120() }, { 'r', z120() }, { 'q', z120() }, { 'k', z120() }};
+
+        public static SfZobrist[] ZBOOLS = SfZobrist.NewArray(5);
+        public static SfZobrist[] ZEP = z120();
+
         private SfReversed board;
         // public char[] board;
 
         private int _score;
-        private (bool q, bool k) _wc;
-        private (bool q, bool k) _bc;
-        private int _ep;
-        private int _kp;
+        private SfZobristBoolArray zBs;
+        private SfZobristInt zEp;
+        private SfZobristInt zKp;
 
-        public bool btm;
+        public bool btm { get => zBs[0]; set => zBs[0] = value; }
+
         public int score { get => !btm ? _score : -_score; set => _score = (!btm) ? value : -value; }
+
         public (bool q, bool k) wc {
-            get => !btm ? _wc : _bc;
-            set { if (!btm) _wc = value; else _bc = value; } }
+            get => !btm ? (zBs[1], zBs[2]) : (zBs[3], zBs[4]);
+            set { if (!btm) { zBs[1] = value.q; zBs[2] = value.k; } else { zBs[3] = value.q; zBs[4] = value.k; } } }
+
         public (bool q, bool k) bc {
-            get => !btm ? _bc : _wc;
-            set { if (!btm) _bc = value; else _wc = value; } }
+            get => !btm ? (zBs[3], zBs[4]) : (zBs[1], zBs[2]);
+            set { if (!btm) { zBs[3] = value.q; zBs[4] = value.k; } else { zBs[1] = value.q; zBs[2] = value.k; } }
+        }
+
         public int ep {
-            get => !btm ? _ep : _ep == 0 ? 0 : 119 - _ep;
-            set { if (!btm || value == 0) _ep = value; else _ep = 119 - value; }
+            get => !btm || zEp.Value == 0 ? zEp.Value : 119 - zEp.Value;
+            set { if (!btm || value == 0) zEp.Value = value; else zEp.Value = 119 - value; }
         }
+
         public int kp {
-            get => !btm ? _kp : _ep == 0 ? 0 : 119 - _kp;
-            set { if (!btm || value == 0) _kp = value; else _kp = 119 - value; }
+            get => !btm || zKp.Value == 0 ? zKp.Value : 119 - zKp.Value;
+            set { if (!btm || value == 0) zKp.Value = value; else zKp.Value = 119 - value; }
         }
+
+        public SfZobrist Zobrist { get; set; }
 
         public SfPosition(IList<char> board, bool btm, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp, bool rotate = false) {
-            this.board = new SfReversed(this, board.ToArray());
+            this.zBs = new SfZobristBoolArray(ZBOOLS, this);
+            this.zEp = new SfZobristInt(ZEP, this);
+            this.zKp = new SfZobristInt(ZEP, this);
+
+            var zBoard = board as SfZobristCharArray;
+            if (zBoard != null) {
+                zBoard = zBoard.Clone(this);
+            }
+            else {
+                zBoard = new SfZobristCharArray(ZBOARD, new char[board.Count], this);
+                for (var i = 0; i < board.Count; i++) {
+                    zBoard[i] = board[i];
+                }
+            }
+            Zobrist = zBoard.Zobrist;
+
+            this.board = new SfReversed(this, zBoard);
             this.btm = btm;
             this.score = score;
             this.wc = wc;
