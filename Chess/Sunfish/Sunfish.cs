@@ -361,7 +361,7 @@ namespace Chess.Sunfish {
             set { if (!btm || value == 0) _ep = value; else _ep = 119 - value; }
         }
         public int kp {
-            get => !btm ? _kp : _ep == 0 ? 0 : 119 - _kp;
+            get => !btm ? _kp : _kp == 0 ? 0 : 119 - _kp;
             set { if (!btm || value == 0) _kp = value; else _kp = 119 - value; }
         }
 
