@@ -10,7 +10,7 @@ namespace Chess.Sunfish {
         ulong a;
         ulong b;
 
-        static Random rnd = new Random();
+        static Random rnd = new Random(0);
 
         public static SfZobrist New() {
             var bytes = new byte[16];
@@ -41,6 +41,10 @@ namespace Chess.Sunfish {
 
         public override string ToString() {
             return a.ToString("X") + b.ToString("X");
+        }
+
+        public override int GetHashCode() {
+            return Convert.ToInt32(a & 0x7FFFFFFF);
         }
     }
 
@@ -138,6 +142,9 @@ namespace Chess.Sunfish {
         }
 
         public override void SetValue(int index, bool value) {
+            if (a[index] == value)
+                return;
+
             Xor(zs[index]);
             base.SetValue(index, value);
         }
@@ -159,18 +166,18 @@ namespace Chess.Sunfish {
             SfZobrist[] zs;
             if (zd.TryGetValue(a[index], out zs)) {
                 Xor(zs[index]);
-                Zobrist = Zobrist.Xor(zs[index]);
             }
             if (zd.TryGetValue(value, out zs)) {
                 Xor(zs[index]);
-                Zobrist = Zobrist.Xor(zs[index]);
             }
 
             base.SetValue(index, value);
         }
 
         public SfZobristCharArray Clone(ISfZobristContainer parent) {
-            return new SfZobristCharArray(zd, a.ToArray(), parent);
+            var r = new SfZobristCharArray(zd, a.ToArray(), parent);
+            r.Zobrist = Zobrist;
+            return r;
         }
     }
 }

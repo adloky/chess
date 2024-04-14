@@ -670,7 +670,7 @@ namespace Chess.Sunfish {
         static int nodes = 0;
         // tp_score key  (SfPosition pos, int depth, bool can_null)
         public static Dictionary<string, SfEntry> tp_score = new Dictionary<string, SfEntry>();
-        public static Dictionary<string, SfMove> tp_move = new Dictionary<string, SfMove>();
+        public static Dictionary<SfZobrist, SfMove> tp_move = new Dictionary<SfZobrist, SfMove>();
 
         public static void SimplePst() {
             SF.simple_pst();
@@ -695,13 +695,13 @@ namespace Chess.Sunfish {
                 yield return (new SfMove(0), -bound(pos.rotate(nullmove: true), 1 - gamma, depth - 3));
 
             SfMove killer = new SfMove(0);
-            if (tp_move.TryGetValue(pos.ToString(), out killer)) {
+            if (tp_move.TryGetValue(pos.Zobrist, out killer)) {
                 DD[(int)Diag.TP_MOVE_GET]++;
             }
             if (killer == 0 && depth > 2) {
                 bound(pos, gamma, depth - 3, can_null: false);
 
-                if (tp_move.TryGetValue(pos.ToString(), out killer)) {
+                if (tp_move.TryGetValue(pos.Zobrist, out killer)) {
                     DD[(int)Diag.TP_MOVE_GET]++;
                 }
             }
@@ -765,12 +765,11 @@ namespace Chess.Sunfish {
                 if (best >= gamma) {
                     if (move != 0) {
                         SfMove ddMove;
-                        var pos_key = pos.ToString();
-                        if (tp_move.TryGetValue(pos_key, out ddMove) && ddMove != move) {
+                        if (tp_move.TryGetValue(pos.Zobrist, out ddMove) && ddMove != move) {
                             DD[(int)Diag.TP_MOVE_UPDATE]++;
                         }
 
-                        tp_move[pos_key] = move; // depth > 2
+                        tp_move[pos.Zobrist] = move; // depth > 2
                     }
                     break;
                 }
@@ -805,7 +804,7 @@ namespace Chess.Sunfish {
                         upper = score;
                     }
                     SfMove move;
-                    tp_move.TryGetValue(pos.ToString(), out move);
+                    tp_move.TryGetValue(pos.Zobrist, out move);
                     yield return (depth, gamma, score, move);
                     gamma = (lower + upper + 1) / 2;
                 }
@@ -823,7 +822,7 @@ namespace Chess.Sunfish {
                 var moves = new List<SfMove>();
                 for (var i = 0; i < r.depth; i++) {
                     SfMove move;
-                    tp_move.TryGetValue(pi.ToString(), out move);
+                    tp_move.TryGetValue(pi.Zobrist, out move);
 
                     if (move == 0)
                         break;

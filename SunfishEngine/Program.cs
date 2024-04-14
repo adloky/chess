@@ -17,6 +17,16 @@ namespace SunfishEngine {
 
         static void Main(string[] args) {
             var fen = Board.DEFAULT_STARTING_FEN;
+            Console.WriteLine(Convert.ToInt32(0xFFFFFFFFFFFFFFFFUL & 0x7FFFFFFF));
+            var pos = SfPosition.FromFen("5r1k/1Q5p/6p1/7r/5q2/3PN3/PP1R1P1P/7K w - - 0 1");
+            Console.WriteLine(pos.Zobrist);
+                pos = SfPosition.FromFen("5r1k/1Q5p/6p1/7r/5q2/3PN3/PP1R1P1P/7K b - - 0 1");
+            Console.WriteLine(pos.Zobrist);
+            
+
+            //var zd = new Dictionary<char, SfZobrist[]>() { { 'a', SfZobrist.NewArray(10) }, { 'b', SfZobrist.NewArray(10) } };
+            //var cs = new 
+
             /*
             var zs = SfZobrist.NewArray(10);
             SfZobristInt zi = new SfZobristInt(zs);
