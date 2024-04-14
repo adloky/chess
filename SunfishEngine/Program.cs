@@ -11,12 +11,15 @@ namespace SunfishEngine {
     class Program {
         static string[] startLines = new string[] {
             "position fen 5r1k/1Q5p/6p1/6r1/5q2/3PN3/PP1R1P1P/7K b - - 0 1",
-            "go depth 10"
+            "go depth 8"
         };
         static Queue<string> startLinesQue = new Queue<string>(startLines);
 
         static void Main(string[] args) {
             var fen = Board.DEFAULT_STARTING_FEN;
+            //var l = new List<int>() { 0, 4, 2 };
+            //l.Sort((a,b) => a - b);
+            //Console.WriteLine(string.Join(" ", l.Select(x => x.ToString())));
 
             //var zd = new Dictionary<char, SfZobrist[]>() { { 'a', SfZobrist.NewArray(10) }, { 'b', SfZobrist.NewArray(10) } };
             //var cs = new 

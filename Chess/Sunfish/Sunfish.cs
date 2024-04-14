@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -110,8 +111,17 @@ namespace Chess.Sunfish {
             } }
         };
 
+        public static char[] SWAP_CASE;
+
         static SF() {
             var pss = new Dictionary<char, int>() { { 'P', 100 }, { 'N', 280 }, { 'B', 320 }, { 'R', 479 }, { 'Q', 929 }, { 'K', 60000 } };
+
+            SWAP_CASE = Enumerable.Range(0, 128).Select(x => (char)x).ToArray();
+            foreach (var c in Enumerable.Range('A', 'Z' - 'A' + 1).Select(x=>(char)x)) {
+                SWAP_CASE[c] = char.ToLower(c);
+                SWAP_CASE[char.ToLower(c)] = c;
+            }
+            
             foreach (var ps in pss) {
                 var p = ps.Key;
                 var s = ps.Value;
@@ -173,7 +183,8 @@ namespace Chess.Sunfish {
         }
 
         public static char swap_case(char c) {
-            return !char.IsLetter(c) ? c : char.IsUpper(c) ? char.ToLower(c) : char.ToUpper(c);
+            return SWAP_CASE[c];
+            //return !char.IsLetter(c) ? c : char.IsUpper(c) ? char.ToLower(c) : char.ToUpper(c);
         }
     }
 
@@ -315,10 +326,10 @@ namespace Chess.Sunfish {
         }
     }
 
-    public class SfReversed : SfSimpleList<char> {
+    public class SfReversedList : SfSimpleList<char> {
         private SfPosition pos;
 
-        public SfReversed(SfPosition pos, IList<char> a) {
+        public SfReversedList(SfPosition pos, IList<char> a) {
             this.pos = pos;
             this.a = a;
         }
@@ -349,7 +360,7 @@ namespace Chess.Sunfish {
         public static SfZobrist[] ZEP = z120();
         public static SfZobrist[] ZKP = z120();
 
-        private SfReversed board;
+        private SfReversedList board;
         // public char[] board;
 
         private int _score;
@@ -399,7 +410,7 @@ namespace Chess.Sunfish {
             }
             Zobrist = zBoard.Zobrist;
 
-            this.board = new SfReversed(this, zBoard);
+            this.board = new SfReversedList(this, zBoard);
             this.btm = btm;
             this.score = score;
             this.wc = wc;
@@ -527,7 +538,7 @@ namespace Chess.Sunfish {
                     for (var j = i + d; ; j += d) {
                         var q = board[j];
 
-                        if (char.IsWhiteSpace(q) || char.IsUpper(q))
+                        if (q == ' ' || char.IsUpper(q))
                             break;
 
                         if (p == 'P') {
@@ -651,7 +662,7 @@ namespace Chess.Sunfish {
                     score += pst_op['P'][119 - (j + SF.S)];
                 }
             }
-
+            
             return score;
         }
     }
@@ -669,6 +680,8 @@ namespace Chess.Sunfish {
      public static class Sunfish {
         static int nodes = 0;
         private static readonly SfZobrist[] ZSCORE = SfZobrist.NewArray(100);
+        public static Stopwatch sw = new Stopwatch();
+        public static Stopwatch swAll = new Stopwatch();
 
         // tp_score key  (SfPosition pos, int depth, bool can_null)
         public static Dictionary<SfZobrist, SfEntry> tp_score = new Dictionary<SfZobrist, SfEntry>();
@@ -721,7 +734,6 @@ namespace Chess.Sunfish {
             }
 
             var val_lower = SF.QS - depth * SF.QS_A;
-
             if (killer != 0 && pos.value(killer) >= val_lower) {
                 yield return (killer, -bound(pos.move(killer), 1 - gamma, depth - 1));
             }
@@ -771,6 +783,7 @@ namespace Chess.Sunfish {
                 return entry.upper;
 
             var best = -SF.MATE_UPPER;
+            if (depth == 1) sw.Start();
             foreach (var ms in boundMoves(pos, gamma, depth, can_null)) {
                 var move = ms.move;
                 var score = ms.score;
@@ -788,6 +801,7 @@ namespace Chess.Sunfish {
                     break;
                 }
             }
+            if (depth == 1) sw.Stop();
 
             if (depth > 2 && best == -SF.MATE_UPPER) {
                 var flipped = pos.rotate(nullmove: true);
@@ -802,6 +816,7 @@ namespace Chess.Sunfish {
         }
 
         public static IEnumerable<(int depth, int gamma, int score, SfMove move)> search(SfPosition pos, int maxdepth = -1) {
+            swAll.Start();
             nodes = 0;
             tp_score.Clear();
             var gamma = 0;
@@ -823,6 +838,7 @@ namespace Chess.Sunfish {
                     gamma = (lower + upper + 1) / 2;
                 }
             }
+            swAll.Stop();
         }
 
         public static IEnumerable<(int depth, int nodes, int score, string pv)> search(string fen, int maxdepth = -1) {
