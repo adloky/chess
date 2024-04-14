@@ -347,6 +347,7 @@ namespace Chess.Sunfish {
 
         public static SfZobrist[] ZBOOLS = SfZobrist.NewArray(5);
         public static SfZobrist[] ZEP = z120();
+        public static SfZobrist[] ZKP = z120();
 
         private SfReversed board;
         // public char[] board;
@@ -384,7 +385,7 @@ namespace Chess.Sunfish {
         public SfPosition(IList<char> board, bool btm, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp, bool rotate = false) {
             this.zBs = new SfZobristBoolArray(ZBOOLS, this);
             this.zEp = new SfZobristInt(ZEP, this);
-            this.zKp = new SfZobristInt(ZEP, this);
+            this.zKp = new SfZobristInt(ZKP, this);
 
             var zBoard = board as SfZobristCharArray;
             if (zBoard != null) {
