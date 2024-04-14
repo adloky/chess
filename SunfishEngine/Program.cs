@@ -17,12 +17,6 @@ namespace SunfishEngine {
 
         static void Main(string[] args) {
             var fen = Board.DEFAULT_STARTING_FEN;
-            Console.WriteLine(Convert.ToInt32(0xFFFFFFFFFFFFFFFFUL & 0x7FFFFFFF));
-            var pos = SfPosition.FromFen("5r1k/1Q5p/6p1/7r/5q2/3PN3/PP1R1P1P/7K w - - 0 1");
-            Console.WriteLine(pos.Zobrist);
-                pos = SfPosition.FromFen("5r1k/1Q5p/6p1/7r/5q2/3PN3/PP1R1P1P/7K b - - 0 1");
-            Console.WriteLine(pos.Zobrist);
-            
 
             //var zd = new Dictionary<char, SfZobrist[]>() { { 'a', SfZobrist.NewArray(10) }, { 'b', SfZobrist.NewArray(10) } };
             //var cs = new 
@@ -70,7 +64,7 @@ namespace SunfishEngine {
                     var startMs = DateTime.Now.Ticks / 10000;
                     foreach (var r in Sunfish.search(fen, maxdepth)) {
                         var elapsedMs = Math.Max(100, DateTime.Now.Ticks / 10000 - startMs);
-                        var nps = r.nodes * 1000 / elapsedMs;
+                        var nps = (long)r.nodes * 1000 / elapsedMs;
                         Console.WriteLine($"info depth {r.depth} nodes {r.nodes} nps {nps} score cp {r.score}" + (r.pv == null ? "" : $" pv {r.pv}"));
                         if (r.pv != null) {
                             best = r.pv.Split(' ')[0];

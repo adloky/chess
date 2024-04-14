@@ -668,9 +668,23 @@ namespace Chess.Sunfish {
 
      public static class Sunfish {
         static int nodes = 0;
+        private static readonly SfZobrist[] ZSCORE = SfZobrist.NewArray(100);
+
         // tp_score key  (SfPosition pos, int depth, bool can_null)
-        public static Dictionary<string, SfEntry> tp_score = new Dictionary<string, SfEntry>();
+        public static Dictionary<SfZobrist, SfEntry> tp_score = new Dictionary<SfZobrist, SfEntry>();
         public static Dictionary<SfZobrist, SfMove> tp_move = new Dictionary<SfZobrist, SfMove>();
+
+        private static SfZobrist get_score_z(SfPosition pos, int depth, bool can_null) {
+            var r = pos.Zobrist;
+            if (depth > 0) {
+                r = r.Xor(ZSCORE[depth - 1]);
+            }
+            if (can_null) {
+                r = r.Xor(ZSCORE.Last());
+            }
+
+            return r;
+        }
 
         public static void SimplePst() {
             SF.simple_pst();
@@ -745,7 +759,7 @@ namespace Chess.Sunfish {
             }
 
             SfEntry entry;
-            if (!tp_score.TryGetValue((pos, depth, can_null).ToString(), out entry)) {
+            if (!tp_score.TryGetValue(get_score_z(pos, depth, can_null), out entry)) {
                 entry = new SfEntry(-SF.MATE_UPPER, SF.MATE_UPPER);
             }
             else {
@@ -782,7 +796,7 @@ namespace Chess.Sunfish {
             }
 
             var newEntry = best >= gamma ? new SfEntry(best, entry.upper) : new SfEntry(entry.lower, best);
-            tp_score[(pos, depth, can_null).ToString()] = newEntry;
+            tp_score[get_score_z(pos, depth, can_null)] = newEntry;
 
             return best;
         }

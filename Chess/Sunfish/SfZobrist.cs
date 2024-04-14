@@ -17,7 +17,7 @@ namespace Chess.Sunfish {
             rnd.NextBytes(bytes);
             var r = new SfZobrist();
             r.a = BitConverter.ToUInt64(bytes, 0);
-            r.b = BitConverter.ToUInt64(bytes, 0);
+            r.b = BitConverter.ToUInt64(bytes, 8);
 
             return r;
         }
