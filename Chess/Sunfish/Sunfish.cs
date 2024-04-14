@@ -366,7 +366,7 @@ namespace Chess.Sunfish {
         }
 
         public SfPosition(IList<char> board, bool btm, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp, bool rotate = false) {
-            this.board = new SfReversed(this, (char[])((char[])board).Clone());
+            this.board = new SfReversed(this, board.ToArray());
             this.btm = btm;
             this.score = score;
             this.wc = wc;

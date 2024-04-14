@@ -44,28 +44,35 @@ namespace Chess.Sunfish {
         }
     }
 
-    public abstract class SfZobristBase {
-        private SfZobristBase parent;
+    public interface ISfZobristContainer {
+        SfZobrist Zobrist { get; set; }
+    }
 
-        public SfZobristBase(SfZobristBase parent = null) {
+    public abstract class SfZobristBase {
+        private ISfZobristContainer iz;
+        private ISfZobristContainer parent;
+
+        public SfZobristBase(ISfZobristContainer parent = null) {
             this.parent = parent;
+            this.iz = this as ISfZobristContainer;
         }
 
         public void Xor(SfZobrist z) {
-            Zobrist = Zobrist.Xor(z);
+            if (iz != null) {
+                iz.Zobrist = iz.Zobrist.Xor(z);
+            }
+
             if (parent != null) {
-                parent.Xor(z);
+                parent.Zobrist = parent.Zobrist.Xor(z);
             }
         }
-
-        public SfZobrist Zobrist { get; private set; }
     }
 
     public class SfZobristInt : SfZobristBase {
         private int val;
         private SfZobrist[] zs;
 
-        public SfZobristInt(SfZobrist[] zs, SfZobristBase parent = null) : base(parent) {
+        public SfZobristInt(SfZobrist[] zs, ISfZobristContainer parent = null) : base(parent) {
             this.zs = zs;
         }
 
@@ -94,7 +101,7 @@ namespace Chess.Sunfish {
     public abstract class SfZobristArray<T> : SfZobristBase, IList<T> {
         protected IList<T> a;
 
-        public SfZobristArray(IList<T> a, SfZobristBase parent = null) : base(parent) {
+        public SfZobristArray(IList<T> a, ISfZobristContainer parent = null) : base(parent) {
             this.a = a;
         }
 
@@ -126,7 +133,7 @@ namespace Chess.Sunfish {
 
     public class SfZobristBoolArray : SfZobristArray<bool> {
         private SfZobrist[] zs;
-        public SfZobristBoolArray(SfZobrist[] zs, SfZobristBase parent = null) : base(new bool[zs.Length], parent) {
+        public SfZobristBoolArray(SfZobrist[] zs, ISfZobristContainer parent = null) : base(new bool[zs.Length], parent) {
             this.zs = zs;
         }
 
@@ -138,7 +145,7 @@ namespace Chess.Sunfish {
 
     public class SfZobristCharArray : SfZobristArray<char> {
         private Dictionary<char, SfZobrist[]> zd;
-        public SfZobristCharArray(Dictionary<char,SfZobrist[]> zd, SfZobristBase parent = null) : base(new char[zd.First().Value.Length], parent) {
+        public SfZobristCharArray(Dictionary<char,SfZobrist[]> zd, int size, ISfZobristContainer parent = null) : base(new char[size], parent) {
             this.zd = zd;
         }
 
@@ -158,4 +165,10 @@ namespace Chess.Sunfish {
         }
     }
 
+    public class SfZobristContainerNCharArray : SfZobristCharArray, ISfZobristContainer {
+
+        public SfZobrist Zobrist { get; set; }
+
+        public SfZobristContainerNCharArray(Dictionary<char, SfZobrist[]> zd, int size, ISfZobristContainer parent = null) : base(zd, size, parent) {}
+    }
 }

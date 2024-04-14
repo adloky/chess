@@ -10,15 +10,13 @@ using Chess.Sunfish;
 namespace SunfishEngine {
     class Program {
         static string[] startLines = new string[] {
-            "position fen 1rb4k/p3n1bp/1q1p2p1/1ppB1rN1/5P2/2PP4/PP5P/R1BQ1RK1 w - - 0 1s",
+            "position fen 5r1k/1Q5p/6p1/6r1/5q2/3PN3/PP1R1P1P/7K b - - 0 1",
             "go depth 10"
         };
         static Queue<string> startLinesQue = new Queue<string>(startLines);
 
         static void Main(string[] args) {
-            var pos = SfPosition.FromFen("5r1k/1Q5p/6p1/6r1/5q2/3PN3/PP1R1P1P/7K b - - 0 1");
-            pos = pos.move(SfMove.Parse("f4e3").Rotate());
-            pos = pos.move(SfMove.Parse("b7e4"));
+            var pos = SfPosition.FromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 
             var zd = new Dictionary<char, SfZobrist[]>() { { 'P', SfZobrist.NewArray(1) }, { 'Q', SfZobrist.NewArray(1) } };
             var cs = new SfZobristCharArray(zd);
