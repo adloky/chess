@@ -277,9 +277,9 @@ namespace Chess.Sunfish {
         private SfPosition pos;
         private IList<int> vals;
 
-        public SfReversedList(SfPosition pos, IList<int> vals) {
+        public SfReversedList(SfPosition pos) {
             this.pos = pos;
-            this.vals = vals;
+            this.vals = pos.vals;
         }
 
         public char this[int index] {
@@ -360,7 +360,7 @@ namespace Chess.Sunfish {
                 vals[i] = board[i];
             }
 
-            this.board = new SfReversedList(this, vals);
+            this.board = new SfReversedList(this);
             this.btm = btm;
             this.score = score;
             this.wc = wc;
@@ -379,7 +379,7 @@ namespace Chess.Sunfish {
         public SfPosition Clone() {
             var r = new SfPosition();
             r.vals = vals.Clone();
-            r.board = new SfReversedList(r, r.vals);
+            r.board = new SfReversedList(r);
 
             return r;
         }
@@ -400,7 +400,6 @@ namespace Chess.Sunfish {
             var pos = new SfPosition(board.ToCharArray(), false, 0, wc, bc, ep, 0);
             pos.btm = fs[1] == "b";
             pos.renew_scores();
-            pos.vals.PopChanges();
 
             return pos;
         }
@@ -427,6 +426,7 @@ namespace Chess.Sunfish {
             }
 
             this.score = score;
+            vals.PopChanges();
         }
 
         private static readonly string dig = "0123456789";
@@ -694,38 +694,24 @@ namespace Chess.Sunfish {
         public static IEnumerable<(SfMove move, int score)> boundMoves(SfPosition pos, int gamma, int depth, bool can_null) {
             if (depth == 0)
                 yield return (new SfMove(0), pos.score);
-            else if (depth > 2 && can_null && Math.Abs(pos.score) < 500) {
-                {
-                    var nxt = pos.rotate(nullmove: true);
-                    var r = (new SfMove(0), -bound(nxt, 1 - gamma, depth - 3));
-                    //pos.Rollback(chs);
-                    yield return r;
-                }
-            }
+            else if (depth > 2 && can_null && Math.Abs(pos.score) < 500)
+                 yield return (new SfMove(0), -bound(pos.rotate(nullmove: true), 1 - gamma, depth - 3));
 
             SfMove killer = new SfMove(0);
-            var pos_str = (string)null;
             if (tp_move.TryGetValue(pos.Zobrist, out killer)) {
-                pos_str = tp_str[pos.Zobrist];
                 DD[(int)Diag.TP_MOVE_GET]++;
             }
             if (killer == 0 && depth > 2) {
                 bound(pos, gamma, depth - 3, can_null: false);
 
                 if (tp_move.TryGetValue(pos.Zobrist, out killer)) {
-                    pos_str = tp_str[pos.Zobrist];
                     DD[(int)Diag.TP_MOVE_GET]++;
                 }
             }
 
             var val_lower = SF.QS - depth * SF.QS_A;
             if (killer != 0 && pos.value(killer) >= val_lower) {
-                {
-                    var nxt = pos.move(killer);
-                    var r = (killer, -bound(nxt, 1 - gamma, depth - 1));
-                    //pos.Rollback(chs);
-                    yield return r;
-                }
+                 yield return (killer, -bound(pos.move(killer), 1 - gamma, depth - 1));
             }
 
             foreach (var vm in pos.gen_moves().Select(m => (val: pos.value(m), move: m)).OrderByDescending(x => x.val)) {
@@ -740,12 +726,7 @@ namespace Chess.Sunfish {
                     break;
                 }
 
-                {
-                    var nxt = pos.move(move);
-                    var r = (move, -bound(nxt, 1 - gamma, depth - 1));
-                    //pos.Rollback(chs);
-                    yield return r;
-                }
+                yield return (move, -bound(pos.move(move), 1 - gamma, depth - 1));
             }
         }
 
@@ -797,12 +778,12 @@ namespace Chess.Sunfish {
                     break;
                 }
             }
+
             if (depth == 1) sw.Stop();
 
             if (depth > 2 && best == -SF.MATE_UPPER) {
-                var nxt = pos.rotate(nullmove: true);
-                var in_check = bound(nxt, SF.MATE_UPPER, 0) == SF.MATE_UPPER;
-                //pos.Rollback(chs);
+                var flipped = pos.rotate(nullmove: true);
+                var in_check = bound(flipped, SF.MATE_UPPER, 0) == SF.MATE_UPPER;
                 best = in_check ? -SF.MATE_LOWER : 0;
             }
 
@@ -845,15 +826,15 @@ namespace Chess.Sunfish {
                 if (r.score < r.gamma)
                     continue;
 
-                var pi = pos.Clone();
+                var pi = pos;
                 var moves = new List<SfMove>();
                 for (var i = 0; i < r.depth; i++) {
                     SfMove move;
                     tp_move.TryGetValue(pi.Zobrist, out move);
 
-                    if (move == 0) {
+                    if (move == 0)
                         break;
-                    }
+                    
                     moves.Add(move);
                     pi = pi.move(move);
                 }
@@ -863,7 +844,7 @@ namespace Chess.Sunfish {
                     pv = string.Join(" ", moves.Take(r.depth).Select((m, i) => (i % 2 == c) ? m.ToString() : m.Rotate().ToString()));
                 }
                 
-                yield return (r.depth, nodes, r.score, moves.FirstOrDefault().ToString());
+                yield return (r.depth, nodes, r.score, pv);
             }
         }
     }

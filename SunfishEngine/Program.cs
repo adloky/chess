@@ -10,8 +10,8 @@ using Chess.Sunfish;
 namespace SunfishEngine {
     class Program {
         static string[] startLines = new string[] {
-            "position fen 4r3/b4pk1/p3p3/Pp1pPnpp/1P5r/2P2B2/3BRPP1/2R1Q1K1 b - - 0 1",
-            "go depth 7"
+            "position fen rnbqkb1r/pp1ppp1p/5np1/2pP4/2P2B2/8/PP2PPPP/RN1QKBNR b KQkq - 1 7",
+            "go depth 9"
         };
         static Queue<string> startLinesQue = new Queue<string>(startLines);
 
