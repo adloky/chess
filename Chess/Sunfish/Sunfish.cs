@@ -111,12 +111,11 @@ namespace Chess.Sunfish {
             } }
         };
 
-        public static char[] SWAP_CASE;
+        public static char[] SWAP_CASE = Enumerable.Range(0, 128).Select(x => (char)x).ToArray();
 
         static SF() {
             var pss = new Dictionary<char, int>() { { 'P', 100 }, { 'N', 280 }, { 'B', 320 }, { 'R', 479 }, { 'Q', 929 }, { 'K', 60000 } };
 
-            SWAP_CASE = Enumerable.Range(0, 128).Select(x => (char)x).ToArray();
             foreach (var c in Enumerable.Range('A', 'Z' - 'A' + 1).Select(x=>(char)x)) {
                 SWAP_CASE[c] = char.ToLower(c);
                 SWAP_CASE[char.ToLower(c)] = c;
@@ -184,7 +183,6 @@ namespace Chess.Sunfish {
 
         public static char swap_case(char c) {
             return SWAP_CASE[c];
-            //return !char.IsLetter(c) ? c : char.IsUpper(c) ? char.ToLower(c) : char.ToUpper(c);
         }
     }
 
@@ -274,152 +272,104 @@ namespace Chess.Sunfish {
         }
     }
 
-    public abstract class SfSimpleList<T> : IList<T> {
-        protected IList<T> a;
 
-        public int Count => a.Count;
+    public class SfReversedList : IList<char> {
+        private SfPosition pos;
+        private IList<int> vals;
 
-        public virtual T this[int index] {
-            get => a[index];
-            set => a[index] = value;
+        public SfReversedList(SfPosition pos, IList<int> vals) {
+            this.pos = pos;
+            this.vals = vals;
         }
 
-        #region Not Implemented
+        public char this[int index] {
+            get => !pos.btm ? (char)vals[index] : SF.swap_case((char)vals[119-index]);
+            set {
+                if (!pos.btm) {
+                    vals[index] = value;
+                }
+                else {
+                    vals[119 - index] = SF.swap_case(value);
+                }
+            }
+        }
 
+        public int Count => 120;
+
+        #region Not Implemented
         public bool IsReadOnly => throw new NotImplementedException();
-        public void Add(T item) { throw new NotImplementedException(); }
+        public void Add(char item) { throw new NotImplementedException(); }
         public void Clear() { throw new NotImplementedException(); }
-        public bool Contains(T item) { throw new NotImplementedException(); }
-        public void CopyTo(T[] array, int arrayIndex) { throw new NotImplementedException(); }
-        public IEnumerator<T> GetEnumerator() { throw new NotImplementedException(); }
-        public int IndexOf(T item) { throw new NotImplementedException(); }
-        public void Insert(int index, T item) { throw new NotImplementedException(); }
-        public bool Remove(T item) { throw new NotImplementedException(); }
+        public bool Contains(char item) { throw new NotImplementedException(); }
+        public void CopyTo(char[] array, int arrayIndex) { throw new NotImplementedException(); }
+        public IEnumerator<char> GetEnumerator() { throw new NotImplementedException(); }
+        public int IndexOf(char item) { throw new NotImplementedException(); }
+        public void Insert(int index, char item) { throw new NotImplementedException(); }
+        public bool Remove(char item) { throw new NotImplementedException(); }
         public void RemoveAt(int index) { throw new NotImplementedException(); }
         IEnumerator IEnumerable.GetEnumerator() { throw new NotImplementedException(); }
-
         #endregion
     }
 
-    public class SfTxArray<T> : SfSimpleList<T> {
-        private List<(int i, T v)> ch = new List<(int, T)>();
+    public class SfPosition {
+        private const int ZBTM = 120;
+        private const int ZC = ZBTM + 1;
+        private const int ZEP = ZC + 4;
+        private const int ZKP = ZEP + 1;
+        private const int SCORE = ZKP + 1;
 
-        public override T this[int index] { get => a[index];
-            set {
-                if (!ch.Any(x => x.i == index)) {
-                    if (value.Equals(a[index])) {
-                        return;
-                    }
-                    ch.Add((index, a[index]));
-                }
-                a[index] = value;
-            }
-        }
+        private static readonly List<SfZobrist[]> ZS = Enumerable.Range(0,SCORE).Select(x => SfZobrist.NewArray(128)).ToList();
 
-        public SfTxArray(IList<T> a) { this.a = a; }
-
-        public void Rollback() {
-            foreach (var x in ch) {
-                a[x.i] = x.v;
-            }
-            ch.Clear();
-        }
-    }
-
-    public class SfReversedList : SfSimpleList<char> {
-        private SfPosition pos;
-
-        public SfReversedList(SfPosition pos, IList<char> a) {
-            this.pos = pos;
-            this.a = a;
-        }
-
-        public override char this[int index] {
-            get => !pos.btm ? a[index] : SF.swap_case(a[119-index]);
-            set {
-                if (!pos.btm) {
-                    a[index] = value;
-                }
-                else {
-                    a[119 - index] = SF.swap_case(value);
-                }
-            }
-        }
-
-        public IList<char> Original { get => a; }
-    }
-
-    public class SfPosition : ISfZobristContainer {
-        public static SfZobrist[] z120() { return SfZobrist.NewArray(120); }
-
-        public static Dictionary<char, SfZobrist[]> ZBOARD = new Dictionary<char, SfZobrist[]>() {
-            { 'P', z120() }, { 'N', z120() }, { 'B', z120() }, { 'R', z120() }, { 'Q', z120() }, { 'K', z120() },
-            { 'p', z120() }, { 'n', z120() }, { 'b', z120() }, { 'r', z120() }, { 'q', z120() }, { 'k', z120() }};
-
-        public static SfZobrist[] ZBOOLS = SfZobrist.NewArray(5);
-        public static SfZobrist[] ZEP = z120();
-        public static SfZobrist[] ZKP = z120();
+        public SfZobristIntArray vals;
 
         private SfReversedList board;
-        // public char[] board;
 
-        private int _score;
-        private SfZobristBoolArray zBs;
-        private SfZobristInt zEp;
-        private SfZobristInt zKp;
-
-        public bool btm { get => zBs[0]; set => zBs[0] = value; }
-
-        public int score { get => !btm ? _score : -_score; set => _score = (!btm) ? value : -value; }
+        public bool btm { get => vals[ZBTM] != 0; set => vals[ZBTM] = value ? 1 : 0; }
 
         public (bool q, bool k) wc {
-            get => !btm ? (zBs[1], zBs[2]) : (zBs[3], zBs[4]);
-            set { if (!btm) { zBs[1] = value.q; zBs[2] = value.k; } else { zBs[3] = value.q; zBs[4] = value.k; } } }
+            get => !btm ? (vals[ZC + 0] != 0, vals[ZC + 1] != 0) : (vals[ZC + 2] != 0, vals[ZC + 3] != 0);
+            set { if (!btm) { vals[ZC + 0] = value.q ? 1 : 0; vals[ZC + 1] = value.q ? 1 : 0; } else { vals[ZC + 2] = value.q ? 1 : 0; vals[ZC + 3] = value.q ? 1 : 0; } } }
 
         public (bool q, bool k) bc {
-            get => !btm ? (zBs[3], zBs[4]) : (zBs[1], zBs[2]);
-            set { if (!btm) { zBs[3] = value.q; zBs[4] = value.k; } else { zBs[1] = value.q; zBs[2] = value.k; } }
-        }
+            get => !btm ? (vals[ZC + 2] != 0, vals[ZC + 3] != 0) : (vals[ZC + 0] != 0, vals[ZC + 3] != 1);
+            set { if (!btm) { vals[ZC + 2] = value.q ? 1 : 0; vals[ZC + 3] = value.q ? 1 : 0; } else { vals[ZC + 0] = value.q ? 1 : 0; vals[ZC + 1] = value.q ? 1 : 0; } } }
 
         public int ep {
-            get => !btm || zEp.Value == 0 ? zEp.Value : 119 - zEp.Value;
-            set { if (!btm || value == 0) zEp.Value = value; else zEp.Value = 119 - value; }
+            get => !btm || vals[ZEP] == 0 ? vals[ZEP] : 119 - vals[ZEP];
+            set { if (!btm || value == 0) vals[ZEP] = value; else vals[ZEP] = 119 - value; }
         }
 
         public int kp {
-            get => !btm || zKp.Value == 0 ? zKp.Value : 119 - zKp.Value;
-            set { if (!btm || value == 0) zKp.Value = value; else zKp.Value = 119 - value; }
+            get => !btm || vals[ZKP] == 0 ? vals[ZKP] : 119 - vals[ZKP];
+            set { if (!btm || value == 0) vals[ZKP] = value; else vals[ZKP] = 119 - value; }
         }
 
-        public SfZobrist Zobrist { get; set; }
+        public int score { get => !btm ? vals[SCORE] : -vals[SCORE]; set => vals[SCORE] = (!btm) ? value : -value; }
 
-        public SfPosition(IList<char> board, bool btm, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp, bool rotate = false) {
-            this.zBs = new SfZobristBoolArray(ZBOOLS, this);
-            this.zEp = new SfZobristInt(ZEP, this);
-            this.zKp = new SfZobristInt(ZKP, this);
+        public SfZobrist Zobrist { get => vals.Zobrist; }
 
-            var zBoard = board as SfZobristCharArray;
-            if (zBoard != null) {
-                zBoard = zBoard.Clone(this);
+        private SfPosition() { }
+
+        public SfPosition(char[] board, bool btm, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp) {
+            vals = new SfZobristIntArray(ZS, SF.INITIAL.Select(x => (int)(x == ' ' ? ' ' : '.'))
+                .Concat(Enumerable.Repeat(0, SCORE - ZBTM + 1)).ToArray(), SCORE);
+
+            for (var i = 0; i < 120; i++) {
+                vals[i] = board[i];
             }
-            else {
-                zBoard = new SfZobristCharArray(ZBOARD, new char[board.Count], this);
-                for (var i = 0; i < board.Count; i++) {
-                    zBoard[i] = board[i];
-                }
-            }
-            Zobrist = zBoard.Zobrist;
 
-            this.board = new SfReversedList(this, zBoard);
+            for (var i = 0; i < 120; i++) {
+                vals[i] = board[i];
+            }
+
+            this.board = new SfReversedList(this, vals);
             this.btm = btm;
             this.score = score;
             this.wc = wc;
             this.bc = bc;
             this.ep = ep;
             this.kp = kp;
-
-            if (rotate)
-                this.btm = !btm;
+            vals.PopChanges();
 
             /*
             if (!Regex.IsMatch(string.Concat(this.board), "^ {20}( .{8} ){8} {20}$")) {
@@ -428,9 +378,16 @@ namespace Chess.Sunfish {
             */
         }
 
+        public SfPosition Clone() {
+            var r = new SfPosition();
+            r.vals = vals.Clone();
+            r.board = new SfReversedList(this, vals);
+
+            return r;
+        }
+
         public static SfPosition FromFen(string fen) {
             var fs = fen.Split(' ');
-            var rotate = fs[1] == "b";
             var f0 = fs[0];
             for (var i = 8; i > 0; i--) {
                 f0 = f0.Replace(i.ToString(), new string('.', i));
@@ -442,8 +399,10 @@ namespace Chess.Sunfish {
 
             var ep = fs[3] == "-" ? 0 : SfMove.Parse(fs[3]);
 
-            var pos = new SfPosition(board.ToCharArray(), false, 0, wc, bc, ep, 0, rotate);
+            var pos = new SfPosition(board.ToCharArray(), false, 0, wc, bc, ep, 0);
+            pos.btm = fs[1] == "b";
             pos.renew_scores();
+            pos.vals.PopChanges();
 
             return pos;
         }
@@ -578,27 +537,28 @@ namespace Chess.Sunfish {
             }
         }
 
-        public SfPosition rotate(bool nullmove = false) {
-            return new SfPosition(board.Original, btm, score, wc, bc, nullmove ? 0 : ep, nullmove ? 0 : kp, rotate: true);
+        public List<(int i, int v)> rotate(bool nullmove = false) {
+            if (nullmove) {
+                ep = 0;
+                kp = 0;
+            }
+            btm = !btm;
+            return vals.PopChanges();
         }
 
-        public SfPosition move(SfMove m) {
+        public List<(int i, int v)> move(SfMove m) {
             var i = m.i;
             var j = m.j;
             var prom = char.ToUpper(m.k == 0 ? 'q' : m.prom.Value);
-            char p = this.board[i];
-            var board = new SfTxArray<char>(this.board);
-            var wc = this.wc;
-            var bc = this.bc;
-            var ep = 0;
-            var kp = 0;
-            var btm = this.btm;
-            var score = this.score + value(m);
+            char p = board[i];
+            ep = 0;
+            kp = 0;
+            score = score + value(m);
 
             if (i == SF.A1) wc = (false, wc.k);
             if (i == SF.H1) wc = (wc.q, false);
-            if (i == SF.A8) wc = (bc.q, false);
-            if (i == SF.H8) wc = (false, bc.k);
+            if (i == SF.A8) bc = (bc.q, false);
+            if (i == SF.H8) bc = (false, bc.k);
 
             board[j] = board[i];
             board[i] = '.';
@@ -624,10 +584,12 @@ namespace Chess.Sunfish {
                 }
             }
 
-            var r = new SfPosition(this.board.Original, btm, score, wc, bc, ep, kp, rotate: true);
-            board.Rollback();
+            btm = !btm;
+            return vals.PopChanges();
+        }
 
-            return r;
+        public void Rollback(List<(int i, int v)> chs) {
+            vals.Rollback(chs);
         }
 
         public int value(SfMove m) {
@@ -718,8 +680,14 @@ namespace Chess.Sunfish {
         public static IEnumerable<(SfMove move, int score)> boundMoves(SfPosition pos, int gamma, int depth, bool can_null) {
             if (depth == 0)
                 yield return (new SfMove(0), pos.score);
-            else if (depth > 2 && can_null && Math.Abs(pos.score) < 500)
-                yield return (new SfMove(0), -bound(pos.rotate(nullmove: true), 1 - gamma, depth - 3));
+            else if (depth > 2 && can_null && Math.Abs(pos.score) < 500) {
+                {
+                    var chs = pos.rotate(nullmove: true);
+                    var r = (new SfMove(0), -bound(pos, 1 - gamma, depth - 3));
+                    pos.Rollback(chs);
+                    yield return r;
+                }
+            }
 
             SfMove killer = new SfMove(0);
             if (tp_move.TryGetValue(pos.Zobrist, out killer)) {
@@ -735,7 +703,12 @@ namespace Chess.Sunfish {
 
             var val_lower = SF.QS - depth * SF.QS_A;
             if (killer != 0 && pos.value(killer) >= val_lower) {
-                yield return (killer, -bound(pos.move(killer), 1 - gamma, depth - 1));
+                {
+                    var chs = pos.move(killer);
+                    var r = (killer, -bound(pos, 1 - gamma, depth - 1));
+                    pos.Rollback(chs);
+                    yield return r;
+                }
             }
 
             foreach (var vm in pos.gen_moves().Select(m => (val: pos.value(m), move: m)).OrderByDescending(x => x.val)) {
@@ -750,7 +723,12 @@ namespace Chess.Sunfish {
                     break;
                 }
 
-                yield return (move, -bound(pos.move(move), 1 - gamma, depth - 1));
+                {
+                    var chs = pos.move(move);
+                    var r = (move, -bound(pos, 1 - gamma, depth - 1));
+                    pos.Rollback(chs);
+                    yield return r;
+                }
             }
         }
 
@@ -804,8 +782,9 @@ namespace Chess.Sunfish {
             if (depth == 1) sw.Stop();
 
             if (depth > 2 && best == -SF.MATE_UPPER) {
-                var flipped = pos.rotate(nullmove: true);
-                var in_check = bound(flipped, SF.MATE_UPPER, 0) == SF.MATE_UPPER;
+                var chs = pos.rotate(nullmove: true);
+                var in_check = bound(pos, SF.MATE_UPPER, 0) == SF.MATE_UPPER;
+                pos.Rollback(chs);
                 best = in_check ? -SF.MATE_LOWER : 0;
             }
 
@@ -843,30 +822,31 @@ namespace Chess.Sunfish {
 
         public static IEnumerable<(int depth, int nodes, int score, string pv)> search(string fen, int maxdepth = -1) {
             var pos = SfPosition.FromFen(fen);
+            var posClone = pos.Clone();
             var c = fen.Contains(" w ") ? 0 : 1;
             foreach (var r in search(pos, maxdepth)) {
                 if (r.score < r.gamma)
                     continue;
 
-                var pi = pos;
+                //var pi = posClone.Clone();
                 var moves = new List<SfMove>();
-                for (var i = 0; i < r.depth; i++) {
+                for (var i = 0; i < 1/*r.depth*/; i++) {
                     SfMove move;
-                    tp_move.TryGetValue(pi.Zobrist, out move);
+                    tp_move.TryGetValue(posClone.Zobrist, out move);
 
-                    if (move == 0)
+                    if (move == 0) {
                         break;
-
+                    }
                     moves.Add(move);
-                    pi = pi.move(move);
+                    //pi.move(move);
                 }
-
+                /*
                 var pv = (string)null;
                 if (moves.Count > 0) {
                     pv = string.Join(" ", moves.Take(r.depth).Select((m, i) => (i % 2 == c) ? m.ToString() : m.Rotate().ToString()));
                 }
-
-                yield return (r.depth, nodes, r.score, pv);
+                */
+                yield return (r.depth, nodes, r.score, moves.FirstOrDefault().ToString());
             }
         }
     }

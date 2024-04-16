@@ -44,140 +44,93 @@ namespace Chess.Sunfish {
         }
 
         public override int GetHashCode() {
-            return Convert.ToInt32(a & 0x7FFFFFFF);
+            return unchecked((int)a);
         }
     }
 
-    public interface ISfZobristContainer {
-        SfZobrist Zobrist { get; set; }
-    }
+     public class SfZobristIntArray : IList<int> {
+        private int[] vals;
+        private int[] init;
+        private List<SfZobrist[]> z;
+        private int zSize;
+        private List<(int i, int v)> chs = new List<(int, int)>(8);
 
-    public abstract class SfZobristBase {
-        private ISfZobristContainer iz;
-        private ISfZobristContainer parent;
+        public int Count => vals.Length;
 
-        public SfZobristBase(ISfZobristContainer parent = null) {
-            this.parent = parent;
-            this.iz = this as ISfZobristContainer;
+        public SfZobrist Zobrist { get; set; }
+
+        private SfZobristIntArray() { }
+
+        public SfZobristIntArray(List<SfZobrist[]> z, int[] vals, int zSize) {
+            this.z = z;
+            this.vals = vals;
+            this.init = vals.ToArray();
+            this.zSize = zSize;
         }
 
-        public void Xor(SfZobrist z) {
-            if (iz != null) {
-                iz.Zobrist = iz.Zobrist.Xor(z);
-            }
-
-            if (parent != null) {
-                parent.Zobrist = parent.Zobrist.Xor(z);
-            }
-        }
-    }
-
-    public class SfZobristInt : SfZobristBase {
-        private int val;
-        private SfZobrist[] zs;
-
-        public SfZobristInt(SfZobrist[] zs, ISfZobristContainer parent = null) : base(parent) {
-            this.zs = zs;
-        }
-
-        public int Value {
-            get => val;
+        public int this[int index] {
+            get => vals[index];
             set {
+                var val = vals[index];
                 if (val == value)
                     return;
 
-                if (value > zs.Length)
-                    throw new ArgumentOutOfRangeException();
-
-                if (val != 0) {
-                    Xor(zs[val-1]);
+                if (index < zSize) {
+                    if (val != init[index]) {
+                        Zobrist = Zobrist.Xor(z[index][val]);
+                    }
+                    if (value != init[index]) {
+                        Zobrist = Zobrist.Xor(z[index][value]);
+                    }
                 }
 
-                if (value != 0) {
-                    Xor(zs[value-1]);
-                }
-
-                val = value;
+                if (!chs.Any(x => x.i == index))
+                    chs.Add((index, vals[index]));
+                
+                vals[index] = value;
             }
         }
-    }
 
-    public abstract class SfZobristArray<T> : SfZobristBase, IList<T> {
-        protected IList<T> a;
+        public List<(int i, int v)> PopChanges() {
+            var r = chs;
+            chs = new List<(int, int)>(8);
 
-        public SfZobristArray(IList<T> a, ISfZobristContainer parent = null) : base(parent) {
-            this.a = a;
+            return r;
         }
 
-        public int Count => a.Count;
+        public void Rollback(List<(int i, int v)> chs) {
+            if (this.chs.Count > 0)
+                throw new Exception("Change list not empty.");
 
-        public virtual void SetValue(int index, T value) {
-            a[index] = value;
+            foreach (var ch in chs)
+                this[ch.i] = ch.v;
+
+            PopChanges();
         }
 
-        public T this[int index] {
-            get => a[index];
-            set => SetValue(index, value);
+        public SfZobristIntArray Clone() {
+            var r = new SfZobristIntArray();
+            r.z = z;
+            r.vals = vals.ToArray();
+            r.init = vals.ToArray();
+            r.zSize = zSize;
+            r.Zobrist = Zobrist;
+
+            return r;
         }
 
         #region Not Implemented
         public bool IsReadOnly => throw new NotImplementedException();
-        public void Add(T item) { throw new NotImplementedException(); }
+        public void Add(int item) { throw new NotImplementedException(); }
         public void Clear() { throw new NotImplementedException(); }
-        public bool Contains(T item) { throw new NotImplementedException(); }
-        public void CopyTo(T[] array, int arrayIndex) { throw new NotImplementedException(); }
-        public IEnumerator<T> GetEnumerator() { throw new NotImplementedException(); }
-        public int IndexOf(T item) { throw new NotImplementedException(); }
-        public void Insert(int index, T item) { throw new NotImplementedException(); }
-        public bool Remove(T item) { throw new NotImplementedException(); }
+        public bool Contains(int item) { throw new NotImplementedException(); }
+        public void CopyTo(int[] array, int arrayIndex) { throw new NotImplementedException(); }
+        public IEnumerator<int> GetEnumerator() { throw new NotImplementedException(); }
+        public int IndexOf(int item) { throw new NotImplementedException(); }
+        public void Insert(int index, int item) { throw new NotImplementedException(); }
+        public bool Remove(int item) { throw new NotImplementedException(); }
         public void RemoveAt(int index) { throw new NotImplementedException(); }
         IEnumerator IEnumerable.GetEnumerator() { throw new NotImplementedException(); }
         #endregion
-    }
-
-    public class SfZobristBoolArray : SfZobristArray<bool> {
-        private SfZobrist[] zs;
-        public SfZobristBoolArray(SfZobrist[] zs, ISfZobristContainer parent = null) : base(new bool[zs.Length], parent) {
-            this.zs = zs;
-        }
-
-        public override void SetValue(int index, bool value) {
-            if (a[index] == value)
-                return;
-
-            Xor(zs[index]);
-            base.SetValue(index, value);
-        }
-    }
-
-    public class SfZobristCharArray : SfZobristArray<char>, ISfZobristContainer {
-        private Dictionary<char, SfZobrist[]> zd;
-
-        public SfZobrist Zobrist { get; set; }
-
-        public SfZobristCharArray(Dictionary<char,SfZobrist[]> zd, IList<char> a, ISfZobristContainer parent = null) : base(a, parent) {
-            this.zd = zd;
-        }
-
-        public override void SetValue(int index, char value) {
-            if (a[index] == value)
-                return;
-
-            SfZobrist[] zs;
-            if (zd.TryGetValue(a[index], out zs)) {
-                Xor(zs[index]);
-            }
-            if (zd.TryGetValue(value, out zs)) {
-                Xor(zs[index]);
-            }
-
-            base.SetValue(index, value);
-        }
-
-        public SfZobristCharArray Clone(ISfZobristContainer parent) {
-            var r = new SfZobristCharArray(zd, a.ToArray(), parent);
-            r.Zobrist = Zobrist;
-            return r;
-        }
     }
 }
