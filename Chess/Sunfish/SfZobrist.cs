@@ -48,7 +48,7 @@ namespace Chess.Sunfish {
         }
     }
 
-     public class SfZobristIntArray : IList<int> {
+    public class SfZobristIntArray : IList<int> {
         private int[] vals;
         private int[] init;
         private List<SfZobrist[]> z;
@@ -61,10 +61,10 @@ namespace Chess.Sunfish {
 
         private SfZobristIntArray() { }
 
-        public SfZobristIntArray(List<SfZobrist[]> z, int[] vals, int zSize) {
+        public SfZobristIntArray(List<SfZobrist[]> z, int[] vals, int[] init, int zSize) {
             this.z = z;
             this.vals = vals;
-            this.init = vals.ToArray();
+            this.init = init;
             this.zSize = zSize;
         }
 
@@ -85,24 +85,24 @@ namespace Chess.Sunfish {
                 }
 
                 if (!chs.Any(x => x.i == index))
-                    chs.Add((index, vals[index]));
+                    chs.Add((index, val));
                 
                 vals[index] = value;
             }
         }
 
-        public List<(int i, int v)> PopChanges() {
-            var r = chs;
+        public Changes PopChanges() {
+            var r = new Changes(chs);
             chs = new List<(int, int)>(8);
 
             return r;
         }
 
-        public void Rollback(List<(int i, int v)> chs) {
+        public void Rollback(Changes zch) {
             if (this.chs.Count > 0)
                 throw new Exception("Change list not empty.");
 
-            foreach (var ch in chs)
+            foreach (var ch in zch.chs)
                 this[ch.i] = ch.v;
 
             PopChanges();
@@ -112,11 +112,20 @@ namespace Chess.Sunfish {
             var r = new SfZobristIntArray();
             r.z = z;
             r.vals = vals.ToArray();
-            r.init = vals.ToArray();
+            r.init = init;
             r.zSize = zSize;
             r.Zobrist = Zobrist;
 
             return r;
+        }
+
+        public struct Changes {
+
+            internal List<(int i, int v)> chs;
+
+            public Changes(List<(int i, int v)> chs) {
+                this.chs = chs;
+            }
         }
 
         #region Not Implemented

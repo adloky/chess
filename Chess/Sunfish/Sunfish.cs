@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Chess.Sunfish {
-    internal class SF {
+    public class SF {
         public const int MATE_LOWER = 60000 - 11 * 900;
         public const int MATE_UPPER = 60000 + 11 * 900;
         public const int QS = 40;
@@ -312,27 +312,30 @@ namespace Chess.Sunfish {
     }
 
     public class SfPosition {
-        private const int ZBTM = 120;
-        private const int ZC = ZBTM + 1;
-        private const int ZEP = ZC + 4;
-        private const int ZKP = ZEP + 1;
-        private const int SCORE = ZKP + 1;
+        public const int ZBTM = 120;
+        public const int ZC = ZBTM + 1;
+        public const int ZEP = ZC + 4;
+        public const int ZKP = ZEP + 1;
+        public const int SCORE = ZKP + 1;
 
-        private static readonly List<SfZobrist[]> ZS = Enumerable.Range(0,SCORE).Select(x => SfZobrist.NewArray(128)).ToList();
+        private static readonly int[] INIT = SF.INITIAL.Select(x => (int)(x == ' ' ? ' ' : '.'))
+                .Concat(Enumerable.Repeat(0, SCORE - ZBTM + 1)).ToArray();
+
+        public static readonly List<SfZobrist[]> ZS = Enumerable.Range(0,SCORE).Select(x => SfZobrist.NewArray(128)).ToList();
 
         public SfZobristIntArray vals;
 
-        private SfReversedList board;
+        public SfReversedList board;
 
         public bool btm { get => vals[ZBTM] != 0; set => vals[ZBTM] = value ? 1 : 0; }
 
         public (bool q, bool k) wc {
             get => !btm ? (vals[ZC + 0] != 0, vals[ZC + 1] != 0) : (vals[ZC + 2] != 0, vals[ZC + 3] != 0);
-            set { if (!btm) { vals[ZC + 0] = value.q ? 1 : 0; vals[ZC + 1] = value.q ? 1 : 0; } else { vals[ZC + 2] = value.q ? 1 : 0; vals[ZC + 3] = value.q ? 1 : 0; } } }
+            set { if (!btm) { vals[ZC + 0] = value.q ? 1 : 0; vals[ZC + 1] = value.k ? 1 : 0; } else { vals[ZC + 2] = value.q ? 1 : 0; vals[ZC + 3] = value.k ? 1 : 0; } } }
 
         public (bool q, bool k) bc {
-            get => !btm ? (vals[ZC + 2] != 0, vals[ZC + 3] != 0) : (vals[ZC + 0] != 0, vals[ZC + 3] != 1);
-            set { if (!btm) { vals[ZC + 2] = value.q ? 1 : 0; vals[ZC + 3] = value.q ? 1 : 0; } else { vals[ZC + 0] = value.q ? 1 : 0; vals[ZC + 1] = value.q ? 1 : 0; } } }
+            get => !btm ? (vals[ZC + 2] != 0, vals[ZC + 3] != 0) : (vals[ZC + 0] != 0, vals[ZC + 1] != 0);
+            set { if (!btm) { vals[ZC + 2] = value.q ? 1 : 0; vals[ZC + 3] = value.k ? 1 : 0; } else { vals[ZC + 0] = value.q ? 1 : 0; vals[ZC + 1] = value.k ? 1 : 0; } } }
 
         public int ep {
             get => !btm || vals[ZEP] == 0 ? vals[ZEP] : 119 - vals[ZEP];
@@ -344,19 +347,14 @@ namespace Chess.Sunfish {
             set { if (!btm || value == 0) vals[ZKP] = value; else vals[ZKP] = 119 - value; }
         }
 
-        public int score { get => !btm ? vals[SCORE] : -vals[SCORE]; set => vals[SCORE] = (!btm) ? value : -value; }
+        public int score { get => !btm ? vals[SCORE] : -vals[SCORE]; set => vals[SCORE] = !btm ? value : -value; }
 
         public SfZobrist Zobrist { get => vals.Zobrist; }
 
         private SfPosition() { }
 
         public SfPosition(char[] board, bool btm, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp) {
-            vals = new SfZobristIntArray(ZS, SF.INITIAL.Select(x => (int)(x == ' ' ? ' ' : '.'))
-                .Concat(Enumerable.Repeat(0, SCORE - ZBTM + 1)).ToArray(), SCORE);
-
-            for (var i = 0; i < 120; i++) {
-                vals[i] = board[i];
-            }
+            vals = new SfZobristIntArray(ZS, INIT.ToArray(), INIT, SCORE);
 
             for (var i = 0; i < 120; i++) {
                 vals[i] = board[i];
@@ -381,7 +379,7 @@ namespace Chess.Sunfish {
         public SfPosition Clone() {
             var r = new SfPosition();
             r.vals = vals.Clone();
-            r.board = new SfReversedList(this, vals);
+            r.board = new SfReversedList(r, r.vals);
 
             return r;
         }
@@ -537,23 +535,28 @@ namespace Chess.Sunfish {
             }
         }
 
-        public List<(int i, int v)> rotate(bool nullmove = false) {
+        public SfPosition rotate(bool nullmove = false) {
             if (nullmove) {
                 ep = 0;
                 kp = 0;
             }
             btm = !btm;
-            return vals.PopChanges();
+            var r = Clone();
+            Rollback(vals.PopChanges());
+
+            return r;
         }
 
-        public List<(int i, int v)> move(SfMove m) {
+        public SfPosition move(SfMove m) {
             var i = m.i;
             var j = m.j;
             var prom = char.ToUpper(m.k == 0 ? 'q' : m.prom.Value);
             char p = board[i];
-            ep = 0;
-            kp = 0;
-            score = score + value(m);
+            var ep = 0;
+            var kp = 0;
+            var wc = this.wc;
+            var bc = this.bc;
+            var score = this.score + value(m);
 
             if (i == SF.A1) wc = (false, wc.k);
             if (i == SF.H1) wc = (wc.q, false);
@@ -584,12 +587,22 @@ namespace Chess.Sunfish {
                 }
             }
 
+            this.ep = ep;
+            this.kp = kp;
+            this.wc = wc;
+            this.bc = bc;
+            this.score = score;
+
             btm = !btm;
-            return vals.PopChanges();
+
+            var r = Clone();
+            Rollback(vals.PopChanges());
+
+            return r;
         }
 
-        public void Rollback(List<(int i, int v)> chs) {
-            vals.Rollback(chs);
+        public void Rollback(SfZobristIntArray.Changes zch) {
+            vals.Rollback(zch);
         }
 
         public int value(SfMove m) {
@@ -648,6 +661,7 @@ namespace Chess.Sunfish {
         // tp_score key  (SfPosition pos, int depth, bool can_null)
         public static Dictionary<SfZobrist, SfEntry> tp_score = new Dictionary<SfZobrist, SfEntry>();
         public static Dictionary<SfZobrist, SfMove> tp_move = new Dictionary<SfZobrist, SfMove>();
+        public static Dictionary<SfZobrist, string> tp_str = new Dictionary<SfZobrist, string>();
 
         private static SfZobrist get_score_z(SfPosition pos, int depth, bool can_null) {
             var r = pos.Zobrist;
@@ -682,21 +696,24 @@ namespace Chess.Sunfish {
                 yield return (new SfMove(0), pos.score);
             else if (depth > 2 && can_null && Math.Abs(pos.score) < 500) {
                 {
-                    var chs = pos.rotate(nullmove: true);
-                    var r = (new SfMove(0), -bound(pos, 1 - gamma, depth - 3));
-                    pos.Rollback(chs);
+                    var nxt = pos.rotate(nullmove: true);
+                    var r = (new SfMove(0), -bound(nxt, 1 - gamma, depth - 3));
+                    //pos.Rollback(chs);
                     yield return r;
                 }
             }
 
             SfMove killer = new SfMove(0);
+            var pos_str = (string)null;
             if (tp_move.TryGetValue(pos.Zobrist, out killer)) {
+                pos_str = tp_str[pos.Zobrist];
                 DD[(int)Diag.TP_MOVE_GET]++;
             }
             if (killer == 0 && depth > 2) {
                 bound(pos, gamma, depth - 3, can_null: false);
 
                 if (tp_move.TryGetValue(pos.Zobrist, out killer)) {
+                    pos_str = tp_str[pos.Zobrist];
                     DD[(int)Diag.TP_MOVE_GET]++;
                 }
             }
@@ -704,9 +721,9 @@ namespace Chess.Sunfish {
             var val_lower = SF.QS - depth * SF.QS_A;
             if (killer != 0 && pos.value(killer) >= val_lower) {
                 {
-                    var chs = pos.move(killer);
-                    var r = (killer, -bound(pos, 1 - gamma, depth - 1));
-                    pos.Rollback(chs);
+                    var nxt = pos.move(killer);
+                    var r = (killer, -bound(nxt, 1 - gamma, depth - 1));
+                    //pos.Rollback(chs);
                     yield return r;
                 }
             }
@@ -724,9 +741,9 @@ namespace Chess.Sunfish {
                 }
 
                 {
-                    var chs = pos.move(move);
-                    var r = (move, -bound(pos, 1 - gamma, depth - 1));
-                    pos.Rollback(chs);
+                    var nxt = pos.move(move);
+                    var r = (move, -bound(nxt, 1 - gamma, depth - 1));
+                    //pos.Rollback(chs);
                     yield return r;
                 }
             }
@@ -774,6 +791,7 @@ namespace Chess.Sunfish {
                             DD[(int)Diag.TP_MOVE_UPDATE]++;
                         }
 
+                        tp_str[pos.Zobrist] = pos.ToString();
                         tp_move[pos.Zobrist] = move; // depth > 2
                     }
                     break;
@@ -782,9 +800,9 @@ namespace Chess.Sunfish {
             if (depth == 1) sw.Stop();
 
             if (depth > 2 && best == -SF.MATE_UPPER) {
-                var chs = pos.rotate(nullmove: true);
-                var in_check = bound(pos, SF.MATE_UPPER, 0) == SF.MATE_UPPER;
-                pos.Rollback(chs);
+                var nxt = pos.rotate(nullmove: true);
+                var in_check = bound(nxt, SF.MATE_UPPER, 0) == SF.MATE_UPPER;
+                //pos.Rollback(chs);
                 best = in_check ? -SF.MATE_LOWER : 0;
             }
 
@@ -822,30 +840,29 @@ namespace Chess.Sunfish {
 
         public static IEnumerable<(int depth, int nodes, int score, string pv)> search(string fen, int maxdepth = -1) {
             var pos = SfPosition.FromFen(fen);
-            var posClone = pos.Clone();
             var c = fen.Contains(" w ") ? 0 : 1;
             foreach (var r in search(pos, maxdepth)) {
                 if (r.score < r.gamma)
                     continue;
 
-                //var pi = posClone.Clone();
+                var pi = pos.Clone();
                 var moves = new List<SfMove>();
-                for (var i = 0; i < 1/*r.depth*/; i++) {
+                for (var i = 0; i < r.depth; i++) {
                     SfMove move;
-                    tp_move.TryGetValue(posClone.Zobrist, out move);
+                    tp_move.TryGetValue(pi.Zobrist, out move);
 
                     if (move == 0) {
                         break;
                     }
                     moves.Add(move);
-                    //pi.move(move);
+                    pi = pi.move(move);
                 }
-                /*
+                
                 var pv = (string)null;
                 if (moves.Count > 0) {
                     pv = string.Join(" ", moves.Take(r.depth).Select((m, i) => (i % 2 == c) ? m.ToString() : m.Rotate().ToString()));
                 }
-                */
+                
                 yield return (r.depth, nodes, r.score, moves.FirstOrDefault().ToString());
             }
         }
