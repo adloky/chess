@@ -54,6 +54,7 @@ namespace Chess.Sunfish {
         private List<SfZobrist[]> z;
         private int zSize;
         private List<(int i, int v)> chs = new List<(int, int)>(8);
+        private SfZobrist prevZobrist;
 
         public int Count => vals.Length;
 
@@ -76,9 +77,14 @@ namespace Chess.Sunfish {
                     return;
 
                 if (index < zSize) {
+                    if (chs.Count == 0) {
+                        prevZobrist = Zobrist;
+                    }
+
                     if (val != init[index]) {
                         Zobrist = Zobrist.Xor(z[index][val]);
                     }
+
                     if (value != init[index]) {
                         Zobrist = Zobrist.Xor(z[index][value]);
                     }
@@ -92,20 +98,21 @@ namespace Chess.Sunfish {
         }
 
         public Changes PopChanges() {
-            var r = new Changes(chs);
+            var r = new Changes(chs.Count == 0 ? Zobrist : prevZobrist, chs);
             chs = new List<(int, int)>(8);
 
             return r;
         }
 
         public void Rollback(Changes zch) {
-            if (this.chs.Count > 0)
+            if (chs.Count > 0)
                 throw new Exception("Change list not empty.");
 
             foreach (var ch in zch.chs)
-                this[ch.i] = ch.v;
+                vals[ch.i] = ch.v;
 
-            PopChanges();
+            if (zch.chs.Count > 0) 
+                Zobrist = zch.zob;
         }
 
         public SfZobristIntArray Clone() {
@@ -120,10 +127,11 @@ namespace Chess.Sunfish {
         }
 
         public struct Changes {
+            public SfZobrist zob;
+            public List<(int i, int v)> chs;
 
-            internal List<(int i, int v)> chs;
-
-            public Changes(List<(int i, int v)> chs) {
+            public Changes(SfZobrist zob, List<(int i, int v)> chs) {
+                this.zob = zob;
                 this.chs = chs;
             }
         }
