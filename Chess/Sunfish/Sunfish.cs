@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Chess.Sunfish {
+ 
     public class SF {
         public const int MATE_LOWER = 60000 - 11 * 900;
         public const int MATE_UPPER = 60000 + 11 * 900;
@@ -25,7 +26,7 @@ namespace Chess.Sunfish {
         public const int S = 10;
         public const int W = -1;
 
-        static public readonly Dictionary<char, int[]> directions = new Dictionary<char, int[]>() {
+        static public readonly OptimDictionary<int[]> directions = new OptimDictionary<int[]> {
             { 'P', new[] { N, N+N, N+W, N+E } },
             { 'B', new[] { N+E, S+E, S+W, N+W } },
             { 'N', new[] { N+N+E, E+N+E, E+S+E, S+S+E, S+S+W, W+S+W, W+N+W, N+N+W } },
@@ -47,8 +48,8 @@ namespace Chess.Sunfish {
                                     + "          "
                                     + "          ";
 
-        public static readonly Dictionary<char, List<int>> PST_B = new Dictionary<char, List<int>>();
-        public static readonly Dictionary<char, List<int>> PST = new Dictionary<char, List<int>>() {
+        public static readonly OptimDictionary<List<int>> PST_B = new OptimDictionary<List<int>>();
+        public static readonly OptimDictionary<List<int>> PST = new OptimDictionary<List<int>> {
             { 'P', new List<int>() {
                 0,   0,   0,   0,   0,   0,   0,   0,
                78,  83,  86,  73, 102,  82,  85,  90,

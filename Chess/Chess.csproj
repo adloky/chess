@@ -104,6 +104,7 @@
     <Compile Include="Square.cs" />
     <Compile Include="SquareColor.cs" />
     <Compile Include="StalemateReason.cs" />
+    <Compile Include="Sunfish\OptimDictionary.cs" />
     <Compile Include="Sunfish\Sunfish.cs" />
     <Compile Include="Sunfish\SfZobrist.cs" />
   </ItemGroup>
