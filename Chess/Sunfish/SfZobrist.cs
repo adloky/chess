@@ -76,11 +76,11 @@ namespace Chess.Sunfish {
                 if (val == value)
                     return;
 
-                if (index < zSize) {
-                    if (chs.Count == 0) {
-                        prevZobrist = Zobrist;
-                    }
+                if (chs.Count == 0) {
+                    prevZobrist = Zobrist;
+                }
 
+                if (index < zSize) {
                     if (val != init[index]) {
                         Zobrist = Zobrist.Xor(z[index][val]);
                     }
