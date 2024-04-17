@@ -316,7 +316,7 @@ namespace Chess.Sunfish {
     public class SfPosition {
         public const int ZBTM = 120;
         public const int ZC = ZBTM + 1;
-        public const int ZEP = ZC + 4;
+        public const int ZEP = ZC + 2;
         public const int ZKP = ZEP + 1;
         public const int SCORE = ZKP + 1;
 
@@ -332,12 +332,14 @@ namespace Chess.Sunfish {
         public bool btm { get => vals[ZBTM] != 0; set => vals[ZBTM] = value ? 1 : 0; }
 
         public (bool q, bool k) wc {
-            get => !btm ? (vals[ZC + 0] != 0, vals[ZC + 1] != 0) : (vals[ZC + 2] != 0, vals[ZC + 3] != 0);
-            set { if (!btm) { vals[ZC + 0] = value.q ? 1 : 0; vals[ZC + 1] = value.k ? 1 : 0; } else { vals[ZC + 2] = value.q ? 1 : 0; vals[ZC + 3] = value.k ? 1 : 0; } } }
+            get { var x = vals[ZC + (!btm ? 0 : 1)]; return ((x & 1) != 0, (x & 2) != 0); }
+            set { var x = (value.q ? 1 : 0) | (value.k ? 2 : 0); vals[ZC + (!btm ? 0 : 1)] = x; }
+        }
 
         public (bool q, bool k) bc {
-            get => !btm ? (vals[ZC + 2] != 0, vals[ZC + 3] != 0) : (vals[ZC + 0] != 0, vals[ZC + 1] != 0);
-            set { if (!btm) { vals[ZC + 2] = value.q ? 1 : 0; vals[ZC + 3] = value.k ? 1 : 0; } else { vals[ZC + 0] = value.q ? 1 : 0; vals[ZC + 1] = value.k ? 1 : 0; } } }
+            get { var x = vals[ZC + (!btm ? 1 : 0)]; return ((x & 1) != 0, (x & 2) != 0); }
+            set { var x = (value.q ? 1 : 0) | (value.k ? 2 : 0); vals[ZC + (!btm ? 1 : 0)] = x; }
+        }
 
         public int ep {
             get => !btm || vals[ZEP] == 0 ? vals[ZEP] : 119 - vals[ZEP];
