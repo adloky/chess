@@ -665,7 +665,6 @@ namespace Chess.Sunfish {
         // tp_score key  (SfPosition pos, int depth, bool can_null)
         public static Dictionary<SfZobrist, SfEntry> tp_score = new Dictionary<SfZobrist, SfEntry>();
         public static Dictionary<SfZobrist, SfMove> tp_move = new Dictionary<SfZobrist, SfMove>();
-        public static Dictionary<SfZobrist, string> tp_str = new Dictionary<SfZobrist, string>();
 
         private static SfZobrist get_score_z(SfPosition pos, int depth, bool can_null) {
             var r = pos.Zobrist;
@@ -793,9 +792,8 @@ namespace Chess.Sunfish {
                         if (tp_move.TryGetValue(pos.Zobrist, out ddMove) && ddMove != move) {
                             DD[(int)Diag.TP_MOVE_UPDATE]++;
                         }
-
-                        tp_str[pos.Zobrist] = pos.ToString();
-                        tp_move[pos.Zobrist] = move; // depth > 2
+                        if (depth > 1)
+                            tp_move[pos.Zobrist] = move; // depth > 2
                     }
                     break;
                 }
