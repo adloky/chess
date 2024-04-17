@@ -12,12 +12,13 @@ namespace SunfishEngine {
 
         static string[] startLines = new string[] {
             "position fen rnbqkb1r/pp1ppp1p/5np1/2pP4/2P2B2/8/PP2PPPP/RN1QKBNR b KQkq - 1 7",
-            "go depth 9"
+            "go depth 8"
         };
         static Queue<string> startLinesQue = new Queue<string>(startLines);
 
         static void Main(string[] args) {
             var fen = Board.DEFAULT_STARTING_FEN;
+            //Console.WriteLine(Convert.ToInt32(true));
             //Sunfish.SimplePst();
             while (true) {
                 var s = startLinesQue.Count > 0 ? startLinesQue.Dequeue() : Console.ReadLine();

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace Chess.Sunfish {
     public struct SfZobrist {
         ulong a;
-        //ulong b;
+        ulong b;
 
         static Random rnd = new Random(0);
 
@@ -17,7 +17,7 @@ namespace Chess.Sunfish {
             rnd.NextBytes(bytes);
             var r = new SfZobrist();
             r.a = BitConverter.ToUInt64(bytes, 0);
-            //r.b = BitConverter.ToUInt64(bytes, 8);
+            r.b = BitConverter.ToUInt64(bytes, 8);
 
             return r;
         }
@@ -34,13 +34,13 @@ namespace Chess.Sunfish {
         public SfZobrist Xor(SfZobrist z) {
             var r = this;
             r.a ^= z.a;
-            //r.b ^= z.b;
+            r.b ^= z.b;
 
             return r;
         }
 
         public override string ToString() {
-            return a.ToString("X");// + b.ToString("X");
+            return a.ToString("X") + b.ToString("X");
         }
 
         public override int GetHashCode() {
@@ -53,7 +53,7 @@ namespace Chess.Sunfish {
         private int[] init;
         private List<SfZobrist[]> z;
         private int zSize;
-        private List<(int i, int v)> chs = new List<(int, int)>(8);
+        private List<(int i, int v)> chs = new List<(int, int)>(4);
         private SfZobrist prevZobrist;
 
         public int Count => vals.Length;
@@ -99,7 +99,7 @@ namespace Chess.Sunfish {
 
         public Changes PopChanges() {
             var r = new Changes(chs.Count == 0 ? Zobrist : prevZobrist, chs);
-            chs = new List<(int, int)>(8);
+            chs = new List<(int, int)>(4);
 
             return r;
         }

@@ -275,19 +275,17 @@ namespace Chess.Sunfish {
     }
 
 
-    public class SfReversedList : IList<char> {
-        private SfPosition pos;
+    public class SfBtmDepList : IList<char> {
         private IList<int> vals;
 
-        public SfReversedList(SfPosition pos) {
-            this.pos = pos;
-            this.vals = pos.vals;
+        public SfBtmDepList(IList<int> vals) {
+            this.vals = vals;
         }
 
         public char this[int index] {
-            get => !pos.btm ? (char)vals[index] : SF.swap_case((char)vals[119-index]);
+            get => !Convert.ToBoolean(vals[SfPosition.ZBTM]) ? (char)vals[index] : SF.swap_case((char)vals[119-index]);
             set {
-                if (!pos.btm) {
+                if (!Convert.ToBoolean(vals[SfPosition.ZBTM])) {
                     vals[index] = value;
                 }
                 else {
@@ -327,7 +325,7 @@ namespace Chess.Sunfish {
 
         public SfZobristIntArray vals;
 
-        public SfReversedList board;
+        public SfBtmDepList board;
         
         public bool btm { get => vals[ZBTM] != 0; set => vals[ZBTM] = value ? 1 : 0; }
 
@@ -364,7 +362,7 @@ namespace Chess.Sunfish {
                 vals[i] = board[i];
             }
 
-            this.board = new SfReversedList(this);
+            this.board = new SfBtmDepList(vals);
             this.btm = btm;
             this.score = score;
             this.wc = wc;
@@ -383,7 +381,7 @@ namespace Chess.Sunfish {
         public SfPosition Clone() {
             var r = new SfPosition();
             r.vals = vals.Clone();
-            r.board = new SfReversedList(r);
+            r.board = new SfBtmDepList(r.vals);
 
             return r;
         }
@@ -704,6 +702,8 @@ namespace Chess.Sunfish {
                 yield return r;
                 // yield return (new SfMove(0), -bound(pos.rotate(nullmove: true), 1 - gamma, depth - 3))
             }}
+            var val_lower = SF.QS - depth * SF.QS_A;
+            
             SfMove killer = new SfMove(0);
             if (tp_move.TryGetValue(pos.Zobrist, out killer)) {
                 DD[(int)Diag.TP_MOVE_GET]++;
@@ -715,8 +715,7 @@ namespace Chess.Sunfish {
                     DD[(int)Diag.TP_MOVE_GET]++;
                 }
             }
-
-            var val_lower = SF.QS - depth * SF.QS_A;
+            
             if (killer != 0 && pos.value(killer) >= val_lower) {
                 {
                     var zch = pos.move(killer);
@@ -724,10 +723,10 @@ namespace Chess.Sunfish {
                     pos.Rollback(zch);
                     yield return r;
 
-                    //yield return (killer, -bound(pos, 1 - gamma, depth - 1));
+                    //yield return (killer, -bound(pos.move(killer), 1 - gamma, depth - 1));
                 }
             }
-
+            
             foreach (var vm in pos.gen_moves().Select(m => (val: pos.value(m), move: m)).OrderByDescending(x => x.val)) {
                 var val = vm.val;
                 var move = vm.move;
@@ -745,9 +744,8 @@ namespace Chess.Sunfish {
                     pos.Rollback(zch);
                     yield return r;
 
-                    //yield return (move, -bound(pos, 1 - gamma, depth - 1));
+                    //yield return (move, -bound(pos.move(move), 1 - gamma, depth - 1));
                 }
-
             }
         }
 
@@ -758,7 +756,7 @@ namespace Chess.Sunfish {
                 DD[(int)Diag.TP_MOVE_SIZE] = tp_move.Count;
                 for (var ddi = 0; ddi < DD.Length; ddi++) {
                     var i = (Diag)ddi;
-                    Console.WriteLine($"{i}: {DD[ddi] / (nodes / 100000)}");
+                    Console.WriteLine($"{i,15}: {DD[ddi] / 1000,4}k {DD[ddi] / (nodes / 100000) / 1000,4}k");
                 }
             }
 
@@ -792,7 +790,7 @@ namespace Chess.Sunfish {
                         if (tp_move.TryGetValue(pos.Zobrist, out ddMove) && ddMove != move) {
                             DD[(int)Diag.TP_MOVE_UPDATE]++;
                         }
-                        if (depth > 1)
+                        if (depth > 0)
                             tp_move[pos.Zobrist] = move; // depth > 2
                     }
                     break;
@@ -805,7 +803,8 @@ namespace Chess.Sunfish {
                 var zch = pos.rotate(nullmove: true);
                 var in_check = bound(pos, SF.MATE_UPPER, 0) == SF.MATE_UPPER;
                 pos.Rollback(zch);
-                // var in_check = bound(pos, SF.MATE_UPPER, 0) == SF.MATE_UPPER;
+                // var in_check = bound(pos.rotate(nullmove: true), SF.MATE_UPPER, 0) == SF.MATE_UPPER;
+
                 best = in_check ? -SF.MATE_LOWER : 0;
             }
 
