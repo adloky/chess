@@ -1670,6 +1670,55 @@ namespace ChessAnalCon {
             File.WriteAllLines(path, pgns.Select(x => x.ToString()));
         }
 
+        private static void testEngine() {
+            var rnd = new Random();
+            var fens = File.ReadAllLines("d:/fens.txt").ToList();
+            var es = new (int depth, Engine engine)[] { (8, Engine.Open("d:/Projects/chess/SunfishEngine/bin/Release/SunfishEngine.exe")), (5, Engine.Open("d:/Distribs/stockfish_16/stockfish-windows-x86-64-modern.exe")) };
+            es[1].engine.SetOption("MultiPV", 1);
+            int stockRating = 2000;
+            int rating = stockRating;
+
+            for (var i = 0; i < 10; i++) {
+                var _fen = fens[rnd.Next(fens.Count)];
+                fens.Remove(_fen);
+                double r = 0.5;
+                for (var c = 0; c <= 1; c++) {
+                    var fen = _fen;
+                    var color = (fen.Contains(" w ") ? 1 : -1) * (1 - Math.Max(c, 0) * 2);
+                    Console.WriteLine($"[{i}] {fen}");
+                    for (var j = 0; j < 15; j++) {
+                        var move = (string)null;
+
+                        move = es[c].engine.CalcScores(fen, depth: es[c].depth).Last().First().uci1st;
+                        Console.WriteLine(move);
+                        fen = FEN.Move(fen, move);
+                        if (FEN.GetMateState(fen) != null)
+                            break;
+
+                        move = es[1 - c].engine.CalcScores(fen, depth: es[1 - c].depth).Last().First().uci1st;
+                        Console.WriteLine(move);
+                        fen = FEN.Move(fen, move);
+                        if (FEN.GetMateState(fen) != null)
+                            break;
+
+                        var score = es[1].engine.CalcScores(fen, depth: 14).Last().First().score;
+                        if (Math.Abs(score) >= 230) {
+                            var sign = Math.Sign(score);
+                            r = ((double)(sign == color ? 1 : -1) + 1) / 2;
+                            break;
+                        }
+                    }
+
+                    var ea = 1 / (1 + Math.Pow(10, ((double)stockRating - rating) / 400));
+                    rating += (int)(20 * (r - ea));
+                    Console.WriteLine($"RATING: {rating}");
+                }
+            }
+
+            Console.WriteLine("Press ENTER");
+            Console.ReadLine();
+        }
+
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
         private static string bookPath = "d:/Projects/smalls/book.html";
         private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|--";
@@ -1686,30 +1735,10 @@ namespace ChessAnalCon {
         private static Regex moveSeqRe = new Regex(moveSeqFullReS, RegexOptions.Compiled);
         private static Regex moveRe = new Regex($"(?<num>\\d+\\.(\\.\\.)?)?{moveNEvalReS}");
 
-        private static IEnumerable<(SfMove m, int i)> test() {
-            for (var i = 1; i < 3; i++) {
-                var m = new SfMove(i+50);
-                yield return (m, i);
-            }
-        }
-
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
-            /*
-            foreach (var x in Sunfish.search(pos)) {
-                Console.WriteLine($"{x.depth} {x.score} {x.move}");
-            }
-            */
-
-            //pos = pos.move(SfMove.Parse("f4e5")).rotate();
-
-            //Console.WriteLine(pos.ToString());
-
-            //foreach (var x in test()) {
-            //}
-
-            Console.ReadLine();
+            testEngine();
             //Sunfish.SimplePst();
             /*
             var a = "1234".ToCharArray();

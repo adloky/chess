@@ -142,6 +142,7 @@ namespace Chess.Sunfish {
                 // mirror for blacks
                 xs = xs.ToList();
                 PST_B.Add(p, xs);
+                
                 for (var i = 0; i < xs.Count; i += 10) {
                     for (var j = 0; j < 5; j++) {
                         var tmp = xs[i + j];
@@ -681,6 +682,8 @@ namespace Chess.Sunfish {
         }
 
         #region Diag
+        public static bool EnableDiag { get; set; } = false;
+
         enum Diag {
             TP_SCORE_GET,
             TP_SCORE_SIZE,
@@ -716,21 +719,19 @@ namespace Chess.Sunfish {
                 }
             }
             
-            if (killer != 0 && pos.value(killer) >= val_lower) {
-                {
+            if (killer != 0 && pos.value(killer) >= val_lower) {{
                     var zch = pos.move(killer);
                     var r = (killer, -bound(pos, 1 - gamma, depth - 1));
                     pos.Rollback(zch);
                     yield return r;
 
                     //yield return (killer, -bound(pos.move(killer), 1 - gamma, depth - 1));
-                }
-            }
+            }}
             
             foreach (var vm in pos.gen_moves().Select(m => (val: pos.value(m), move: m)).OrderByDescending(x => x.val)) {
                 var val = vm.val;
                 var move = vm.move;
-
+                
                 if (val < val_lower)
                     break;
 
@@ -738,20 +739,19 @@ namespace Chess.Sunfish {
                     yield return (move, (val < SF.MATE_LOWER) ? pos.score + val : SF.MATE_UPPER);
                     break;
                 }
-                {
-                    var zch = pos.move(move);
-                    var r = (move, -bound(pos, 1 - gamma, depth - 1));
-                    pos.Rollback(zch);
-                    yield return r;
 
-                    //yield return (move, -bound(pos.move(move), 1 - gamma, depth - 1));
-                }
+                var zch = pos.move(move);
+                var r = (move, -bound(pos, 1 - gamma, depth - 1));
+                pos.Rollback(zch);
+                yield return r;
+
+                //yield return (move, -bound(pos.move(move), 1 - gamma, depth - 1));
             }
         }
 
         public static int bound(SfPosition pos, int gamma, int depth, bool can_null = true) {
             nodes++;
-            if (nodes % 100000 == 0) {
+            if (EnableDiag && nodes % 100000 == 0) {
                 DD[(int)Diag.TP_SCORE_SIZE] = tp_score.Count;
                 DD[(int)Diag.TP_MOVE_SIZE] = tp_move.Count;
                 for (var ddi = 0; ddi < DD.Length; ddi++) {
@@ -778,7 +778,6 @@ namespace Chess.Sunfish {
                 return entry.upper;
 
             var best = -SF.MATE_UPPER;
-            if (depth == 1) sw.Start();
             foreach (var ms in boundMoves(pos, gamma, depth, can_null)) {
                 var move = ms.move;
                 var score = ms.score;
@@ -790,14 +789,11 @@ namespace Chess.Sunfish {
                         if (tp_move.TryGetValue(pos.Zobrist, out ddMove) && ddMove != move) {
                             DD[(int)Diag.TP_MOVE_UPDATE]++;
                         }
-                        if (depth > 0)
-                            tp_move[pos.Zobrist] = move; // depth > 2
+                        tp_move[pos.Zobrist] = move;
                     }
                     break;
                 }
             }
-
-            if (depth == 1) sw.Stop();
 
             if (depth > 2 && best == -SF.MATE_UPPER) {
                 var zch = pos.rotate(nullmove: true);
@@ -807,7 +803,7 @@ namespace Chess.Sunfish {
 
                 best = in_check ? -SF.MATE_LOWER : 0;
             }
-
+            
             var newEntry = best >= gamma ? new SfEntry(best, entry.upper) : new SfEntry(entry.lower, best);
             tp_score[get_score_z(pos, depth, can_null)] = newEntry;
 
@@ -818,6 +814,8 @@ namespace Chess.Sunfish {
             swAll.Start();
             nodes = 0;
             tp_score.Clear();
+            if (tp_move.Count > 10000000)
+                tp_move.Clear();
             var gamma = 0;
             if (maxdepth == -1) maxdepth = 1000;
             for (var depth = 1; depth <= maxdepth; depth++) {
