@@ -1681,10 +1681,10 @@ namespace ChessAnalCon {
             for (var i = 0; i < 10; i++) {
                 var _fen = fens[rnd.Next(fens.Count)];
                 fens.Remove(_fen);
-                double r = 0.5;
                 for (var c = 0; c <= 1; c++) {
+                    var result = 0.5;
                     var fen = _fen;
-                    var color = (fen.Contains(" w ") ? 1 : -1) * (1 - Math.Max(c, 0) * 2);
+                    var color = (fen.Contains(" w ") ? 1 : -1) * (1 - c * 2);
                     Console.WriteLine($"[{i}] {fen}");
                     for (var j = 0; j < 15; j++) {
                         var move = (string)null;
@@ -1704,13 +1704,13 @@ namespace ChessAnalCon {
                         var score = es[1].engine.CalcScores(fen, depth: 14).Last().First().score;
                         if (Math.Abs(score) >= 230) {
                             var sign = Math.Sign(score);
-                            r = ((double)(sign == color ? 1 : -1) + 1) / 2;
+                            result = (double)((sign == color ? 1 : -1) + 1) / 2;
                             break;
                         }
                     }
 
                     var ea = 1 / (1 + Math.Pow(10, ((double)stockRating - rating) / 400));
-                    rating += (int)(20 * (r - ea));
+                    rating += (int)(20 * (result - ea));
                     Console.WriteLine($"RATING: {rating}");
                 }
             }
