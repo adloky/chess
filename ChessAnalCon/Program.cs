@@ -1496,7 +1496,7 @@ namespace ChessAnalCon {
             File.WriteAllLines(path, ss);
         }
 
-        private static IList<EngineCalcResult> puzzleCalc(Engine engine, string fen, int depth, int mateDepthDeff = -2) {
+        private static IList<EngineCalcResult> puzzleCalc(Engine engine, string fen, int depth, int mateDepthDiff = -2) {
             var unmateScores = new ConcurrentDictionary<string, EngineCalcResult>();
             var mateAfterScores = new ConcurrentDictionary<string, EngineCalcResult>();
             var scores = (IList<EngineCalcResult>)null;
@@ -1519,8 +1519,7 @@ namespace ChessAnalCon {
 
             scores = scores.Select(s => {
                 var score = (EngineCalcResult)null;
-                var sAbs = Math.Abs(s.score);
-                if (Math.Abs(s.score) <= 20000 || (sAbs <= 30000 && 30000 - sAbs <= (depth + mateDepthDeff) * 100))
+                if (Math.Abs(s.score) <= 20000 || 30000 - Math.Abs(s.score) <= (depth + mateDepthDiff) * 100)
                     return s;
                 else if (s.san1st != null && mateAfterScores.TryGetValue(s.san1st, out score))
                     return score;
@@ -1530,9 +1529,12 @@ namespace ChessAnalCon {
             return scores;
         }
 
-        private static void solvePuzzles(string path, int limit, bool mateOnly = false, string enginePath = null) {
+        private static void solvePuzzles(string path, int limit, string enginePath = null, string engineOpPath = null) {
             if (enginePath == null) {
                 enginePath = Config.current.enginePath;
+            }
+            if (engineOpPath == null) {
+                engineOpPath = enginePath;
             }
 
             limit = limit * 2 - 1 + 2;
@@ -1543,6 +1545,9 @@ namespace ChessAnalCon {
             }
 
             var engine = Engine.Open(enginePath);
+            engine.SetOption("MultiPV", 3);
+            var engineOp = Engine.Open(engineOpPath);
+            engineOp.SetOption("MultiPV", 1);
 
             Func<IList<string>, int, string> pretty = (ms,c) => c == 1 ? Pgn.PrettyMoves(string.Join(" ", ms)) : Pgn.PrettyMoves("-- " + string.Join(" ", ms), 1);
 
@@ -1586,24 +1591,14 @@ namespace ChessAnalCon {
                     } 
                     
                     var _ms = (scores.First().san ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
-                    if (depth == limit) {
-                        if (_ms.Count == 0) {
-                            pgn.Params.Add("Error", "none");
-                            break;
-                        }
-
-                        if (Math.Abs(scores.First().score) > 20000 && _ms.Count <= limit - 2) {
-                            ms = _ms;
-                            break;
-                        }
-                        else if (mateOnly) {
-                            pgn.Params.Add("Error", "continue");
-                            break;
-                        }
+                    if (depth == limit && Math.Abs(scores.First().score) > 20000 && _ms.Count <= limit - 2) {
+                        ms = _ms;
+                        break;
                     }
 
-                    var scoreDiff = (scores.Count > 1) ? Math.Abs(scores[0].score - scores[1].score) : 30000; 
-                    if (scoreDiff < 150) {
+                    var scoreDiff = (scores.Count > 1) ? Math.Abs(scores[0].score - scores.Last().score) : 30000;
+                    var scoreDiff2 = (scores.Count > 1) ? Math.Abs(scores[0].score - scores[1].score) : 30000;
+                    if (scoreDiff < 150 || scoreDiff2 < 50) {
                         if (depth == limit) {
                             pgn.Params.Add("Error", "dirty");
                             pgn.MovesSource = new List<string>() { "{ " + pretty(_ms, color) + $"; ({scoreDiff / 100})" + pretty(scores[1].san.Split(' '), color) + "}" };
@@ -1611,47 +1606,48 @@ namespace ChessAnalCon {
                         break;
                     }
 
-                    if (depth == 1) {
+                    if (depth <= 1) {
                         pgn.Params.Add("Error", "limit");
+                        pgn.MovesSource = new List<string>() { "{ " + pretty(ms, color) + " }" };
                         ms.Clear();
                         break;
                     }
 
-                    ms.Add(_ms[0]);
+                    ms.Add(scores.First().san1st);
+                    fen = FEN.Move(fen, ms.Last());
+                    /*
                     try {
-                        fen = FEN.Move(fen, _ms[0]);
+                        fen = FEN.Move(fen, move);
                     } catch {
                         pgn.Params.Add("Error", "parse");
                         ms.Clear();
                         break;
                     }
+                    */
                     if (FEN.GetMateState(fen) != null) break;
 
-                    if (_ms.Count < 2) {
-                        if (FEN.GetMateState(fen) != null) {
-                            break;
-                        }
-                        try {
-                            scores = puzzleCalc(engine, fen, depth: depth - 1);
-                        }
-                        catch {
-                            ctrlC = true;
-                            break;
-                        }
-
-                        if (scores.Count == 0) { break; }
-
-                        var move = scores.First().san1st;
-                        _ms.Add(move);
-                    }
-                    ms.Add(_ms[1]);
                     try {
-                        fen = FEN.Move(fen, _ms[1]);
+                        scores = puzzleCalc(engineOp, fen, depth: depth - 1);
+                    }
+                    catch {
+                        ctrlC = true;
+                        break;
+                    }
+
+                    if (scores.Count == 0)
+                        break;
+
+                    ms.Add(scores.First().san1st);
+                    fen = FEN.Move(fen, ms.Last());
+                    /*
+                    try {
+                        fen = FEN.Move(fen, move);
                     } catch {
                         pgn.Params.Add("Error", "parse");
                         ms.Clear();
                         break;
                     }
+                    */
                 }
 
                 if (ctrlC) break;
@@ -1661,7 +1657,7 @@ namespace ChessAnalCon {
                     continue;
                 }
 
-                ms = ms.Take(ms.Count - ((ms.Count + 1) % 2)).ToList();
+                //ms = ms.Take(ms.Count - ((ms.Count + 1) % 2)).ToList();
 
                 pgn.MovesSource = new List<string>() { pretty(ms,color) };
                 Console.WriteLine(pgn.MovesSource[0]);
@@ -1672,13 +1668,14 @@ namespace ChessAnalCon {
 
         private static void testEngine() {
             var rnd = new Random();
-            var fens = File.ReadAllLines("d:/fens.txt").ToList();
-            var es = new (int depth, Engine engine)[] { (8, Engine.Open("d:/Projects/chess/SunfishEngine/bin/Release/SunfishEngine.exe")), (5, Engine.Open("d:/Distribs/stockfish_16/stockfish-windows-x86-64-modern.exe")) };
+            var fens = File.ReadAllLines("d:/fens-elo.txt").ToList(); // d:/Projects/chess/SunfishEngine/bin/Release/SunfishEngine.exe
+            var es = new (int depth, Engine engine)[] { (10, Engine.Open(@"d:\Projects\stockfish-vs\bin\Debug\x64\Stockfish.exe")), (5, Engine.Open("d:/Distribs/stockfish_16/stockfish-windows-x86-64-modern.exe")) };
             es[1].engine.SetOption("MultiPV", 1);
+            es[0].engine.SetOption("MultiPV", 1);
             int stockRating = 2000;
             int rating = stockRating;
 
-            for (var i = 0; i < 10; i++) {
+            for (var i = 0; i < 15; i++) {
                 var _fen = fens[rnd.Next(fens.Count)];
                 fens.Remove(_fen);
                 for (var c = 0; c <= 1; c++) {
@@ -1686,7 +1683,7 @@ namespace ChessAnalCon {
                     var fen = _fen;
                     var color = (fen.Contains(" w ") ? 1 : -1) * (1 - c * 2);
                     Console.WriteLine($"[{i}] {fen}");
-                    for (var j = 0; j < 15; j++) {
+                    for (var j = 0; j < 20; j++) {
                         var move = (string)null;
 
                         move = es[c].engine.CalcScores(fen, depth: es[c].depth).Last().First().uci1st;
@@ -1719,6 +1716,21 @@ namespace ChessAnalCon {
             Console.ReadLine();
         }
 
+        public static Dictionary<char, int> pieceValue = new Dictionary<char, int> { { 'p', -1 }, { 'b', -3 }, { 'n', -3 }, { 'r', -5 }, { 'q', -9 },
+            { 'P', 1 }, { 'B', 3 }, { 'N', 3 }, { 'R', 5 }, { 'Q', 9 } };
+
+        public static int balance(string fen) {
+            var fen0 = fen.Split(' ')[0];
+            var result = 0;
+            foreach (var p in fen0) {
+                if (!pieceValue.ContainsKey(p)) continue;
+
+                result += pieceValue[p];
+            }
+
+            return result;
+        }
+
         private static Regex moveRuRe = new Regex("[a-fасе]?[хx]?[a-fасе][1-8]", RegexOptions.Compiled);
         private static string bookPath = "d:/Projects/smalls/book.html";
         private static string moveReS = "[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?|O-O(-O)?|--";
@@ -1735,21 +1747,17 @@ namespace ChessAnalCon {
         private static Regex moveSeqRe = new Regex(moveSeqFullReS, RegexOptions.Compiled);
         private static Regex moveRe = new Regex($"(?<num>\\d+\\.(\\.\\.)?)?{moveNEvalReS}");
 
+
+        // Material Imbalance Pawns Knights Bishops Rooks Queens Mobility King safety Threats Passed Space Winnable
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
-            testEngine();
-            //Sunfish.SimplePst();
-            /*
-            var a = "1234".ToCharArray();
-            var l = new SfPartList<char>(a);
-            //l[0] = 'X';
-            //l[2] = 'Y';
-            //Console.WriteLine(l[1]);
-            Console.WriteLine(string.Concat(l));*/
-            
 
-            //solvePuzzles("d:/Konotop4-1.pgn", 3, enginePath: @"d:\Distribs\Sunfish\sunfish.exe"); // @"d:\Distribs\Sunfish\sunfish.exe"
+            //testEngine();
+
+            //Sunfish.SimplePst();
+
+            solvePuzzles("d:/Konotop4-3.pgn", 4, enginePath: @"d:\Projects\stockfish-simpleEval\bin\Debug\x64\Stockfish.exe", @"d:\Distribs\stockfish_16\stockfish-windows-x86-64-modern.exe"); // @"d:\Distribs\Sunfish\sunfish.exe"
             //handlePgn();
 
             // processMd("d:/Projects/smalls/ideas-my.md");
@@ -1916,6 +1924,74 @@ namespace ChessAnalCon {
 }
 
 /*
+var paramCount = new Dictionary<string, int>();
+var ss = new List<(string full, string prms)> ();
+File.ReadAllLines("d:/fens-eval.txt").Select(x => (full: x, prms: x.Split(',')[1])).ToList().ForEach(x => {
+    x.prms.Split(' ').ToList().ForEach(y => {
+        if (!paramCount.ContainsKey(y)) paramCount[y] = 0;
+        paramCount[y]++;
+    });
+
+    ss.Add(x);
+});
+
+
+var rs = new List<(string full, string prms)>();
+
+paramCount.Select(kv => (param: kv.Key, pct: kv.Value * 100 / paramCount.Count)).OrderBy(x => x.pct).ToList().ForEach(x => {
+    Console.WriteLine($"{x.param} {x.pct}");
+});
+
+ss.ForEach(x => {
+    if (x.prms.Contains("Ps") | x.prms.Contains("Im")
+    | ((x.prms.Contains("Q_") ? 1 : 0) + (x.prms.Contains("N_") ? 1 : 0) + (x.prms.Contains("P_") ? 1 : 0) + (x.prms.Contains("B_") ? 1 : 0) >= 2)) {
+        rs.Add(x);
+        x.prms.Split(' ').ToList().ForEach(y => {
+            if (!paramCount.ContainsKey(y)) paramCount[y] = 0;
+            paramCount[y]++;
+        });
+    }
+});
+
+paramCount.Select(kv => (param: kv.Key, pct: kv.Value * 100 / paramCount.Count)).OrderBy(x => x.pct).ToList().ForEach(x => {
+    Console.WriteLine($"{x.param} {x.pct}");
+});
+
+File.WriteAllLines("d:/fens-eval-2.txt", rs.Select(x => x.full));
+*/
+
+/*
+var rs = new List<string>();
+var engine = Engine.Open(@"d:\Distribs\stockfish_14.1_win_x64_popcnt\stockfish_14.1_win_x64_popcnt.exe");
+var i = 0;
+File.ReadAllLines("d:/fens-eval.txt").Select(x => x.Split(',')[0]).ToList().ForEach(fen => {
+    i++;
+    if (i % 100 == 0) Console.WriteLine(i);
+    var eval = string.Join(" ", engine.Eval(fen).Where(x => x.val >= 20).Select(x => names[x.param]));
+    if (eval != "")
+        rs.Add(fen + "," + eval);
+});
+File.WriteAllLines("d:/fens-eval-2.txt", rs);
+*/
+/*
+var rs = new List<string>();
+File.ReadAllLines("d:/lichess.json").Select(x => Regex.Replace(x, "[{}\"]", "").Split(',')).Select(x => (fen: x[0].Split(':')[1], eval: int.Parse(x[4].Split(':')[1]))).ToList()
+    .ForEach(x => {
+        var _balance = 0;
+        if (x.eval < -100 || x.eval > 150 || !x.fen.Contains(" w ") || (_balance = balance(x.fen)) > 0 || _balance < -1)
+            return;
+
+        var mCount = int.Parse(x.fen.Split(' ').Last());
+        if (mCount < 11 || mCount > 13 || FEN.GetMateState(x.fen) != null)
+            return;
+
+        rs.Add(x.fen + ",");
+    });
+
+File.WriteAllLines("d:/fens-eval.txt", rs);
+*/
+
+/*
 var dir = "d:/chess/chessable/_all";
 var paths = Directory.GetFiles(dir, "*.pgn", SearchOption.AllDirectories);
 
@@ -2003,3 +2079,4 @@ Console.ReadLine();
             Console.ReadLine();
 
  */
+

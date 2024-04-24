@@ -31,16 +31,15 @@ namespace ChessEngineHub {
 
     public class EngineHub : Hub {
         private static Random rnd = new Random((int)DateTime.Now.Ticks);
-        private static BaseEngine engine { get { return engines[engineNum]; } }
+        private static BaseEngine engine { get { return engines[engineNum].engine; } }
         private static int engineNum = 0;
-        private static BaseEngine[] engines = {
-            new LichessEngine(),
-            Engine.Open(@"d:\Distribs\lc0\lc0.exe"),
-            Engine.Open(@"d:\Distribs\stockfish_16\stockfish-windows-x86-64-modern.exe"),
-            Engine.Open(@"d:\Distribs\komodo-dragon-3\dragon-3-64bit.exe")
+        private static (BaseEngine engine, int nodes, int playNodes)[] engines = {
+            (new LichessEngine(), 0, 0),
+            (Engine.Open(@"d:\Distribs\lc0\lc0.exe"), 20000, 2000),
+            (Engine.Open(@"d:\Distribs\stockfish_16\stockfish-windows-x86-64-modern.exe"), 50000000, 1000000),
+            (Engine.Open(@"d:\Distribs\komodo-dragon-3\dragon-3-64bit.exe"), 50000000, 1000000),
+            (Engine.Open(@"d:\Projects\stockfish-simpleEval\bin\Debug\x64\Stockfish.exe"), 50000000, 1000000)
         };
-        private static int[] nodeCounts = { 0, 20000, 50000000, 50000000 };
-        private static int[] nodePlayCounts = { 0, 2000, 1000000, 1000000 };
         private static object calcSyncRoot = new object();
         private static AutoResetEvent startCalcWaiter = new AutoResetEvent(true);
         private static volatile bool calcStopped;
@@ -95,7 +94,7 @@ namespace ChessEngineHub {
                         sw.Start();
                         IList<EngineCalcResult> lastSkipped = null;
 
-                        var nodeCount = isPlayMode ? nodePlayCounts[engineNum] : nodeCounts[engineNum];
+                        var nodeCount = isPlayMode ? engines[engineNum].playNodes : engines[engineNum].nodes;
                         var interval = isPlayMode ? 60000 : 500;
 
                         foreach (var crs in engine.CalcScores(fen, nodeCount)) {

@@ -12,14 +12,40 @@ using Chess.Sunfish;
 namespace SunfishEngine {
     class Program {
         static string[] startLines = new string[] {
-//            "setoption name EnableDiag value 1"
-//            "position fen rnbqkb1r/pp1ppp1p/5np1/2pP4/2P2B2/8/PP2PPPP/RN1QKBNR b KQkq - 1 7",
-//            "go depth 10"
+            "setoption name EnableDiag value 0",
+            "position fen Nn3rk1/pp2ppbp/6p1/4n1B1/8/7P/PPbR1PP1/4KBNR b K - 1 12",
+            "go depth 7"
         };
 
         static Queue<string> startLinesQue = new Queue<string>(startLines);
 
         static void Main(string[] args) {
+            var scores = new Dictionary<char, int>() { { 'd', -16 }, { 'e', -22 }, { 'g', -26 }, { 'h', -17 }, { 'i', -20 }, { 'l', -15 }, { 'm', -12 }, { 'o', -19 }, { 'p', -10 }, { 'q', -12 } };
+            var moves = new Dictionary<char, char[]> { { 'a', new[] { 'b', 'j' } }, { 'b', new[] { 'c', 'f' } }, { 'c', new[] { 'd', 'e' } },
+                { 'f', new[] { 'g', 'h', 'i' } }, { 'j', new[] { 'k', 'n' } }, { 'k', new[] { 'l', 'm' } }, { 'n', new[] { 'o', 'p', 'q' } } };
+
+            Func<char, int, int, int, int> alphaBeta = null;
+
+            alphaBeta = (pos, alpha, beta, depth) => {
+                if (pos == 'f') {
+                }
+                Console.WriteLine(pos);
+                if (depth == 0)
+                    return scores[pos];
+
+                foreach (var m in moves[pos]) {
+                    var s = -alphaBeta(m, -beta, -alpha, depth - 1);
+                    alpha = Math.Max(alpha, s);
+                    if (alpha >= beta) // cut off
+                        break;
+                }
+
+                return alpha;
+            };
+
+            Console.WriteLine(alphaBeta('a', -(int.MaxValue), int.MaxValue, 3));
+            Console.ReadLine();
+
             var fen = Board.DEFAULT_STARTING_FEN;
             //Sunfish.SimplePst();
 

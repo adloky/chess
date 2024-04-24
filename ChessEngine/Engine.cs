@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Chess;
+using System.Globalization;
 
 namespace ChessEngine
 {
@@ -125,27 +126,30 @@ namespace ChessEngine
             return CalcScores(fen, nodes, depth).Last()[0].score;
         }
 
-        public int Eval(string fen, string param) {
+        public List<(string param, int val)> Eval(string fen) {
             input.WriteLine("ucinewgame");
             input.WriteLine($"position fen {fen}");
             input.WriteLine($"eval");
-            var result = 0;
+            var rs = new List<(string, int)>();
             var s = (string)null;
             do {
                 s = output.ReadLine();
-                if (s.IndexOf("Final evaluation: none") > -1) return 0;
-                if (s.Length == 0 || s[0] != '|' || s.IndexOf(param) < 0) continue;
+                if (s.Contains("Final evaluation: none")) return new List<(string, int)>();
+                if (s.Length == 0 || s[0] != '|' || s.Contains("White") || s.Contains(" MG ")) continue;
 
                 var split = s.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
-                var floatStr = split[3].Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)[0];
-                result = int.Parse(floatStr.Replace(".",""));
+                var name = split[0].Trim();
+                if (name == "Total") break;
+                var floatStr = split[3].Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+                var val = (int)(double.Parse(floatStr, CultureInfo.InvariantCulture) * 100);
+                rs.Add((name, val));
             } while (s.IndexOf("|      Total |") < 0);
 
             do {
                 s = output.ReadLine();
-            } while (s.IndexOf("Final evaluation") < 0);
+            } while (!s.Contains("Final evaluation"));
 
-            return result;
+            return rs;
         }
 
         public override void Stop() {
