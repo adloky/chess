@@ -452,34 +452,6 @@ namespace ChessAnalCon {
         public readonly static Regex ResultRegex = new Regex(@" ?(1-0|0-1|1/2-1/2|\*)$", RegexOptions.Compiled);
     }
 
-    public class Config {
-        public string mdPath { get; set; }
-        public string mdDstDir { get; set; }
-        public string evalPath { get; set; }
-
-        public string enginePath { get; set; }
-
-        public int evalDepth { get; set; }
-
-        public string fn { get; set; }
-
-        private static Config _current;
-
-        private static Config getConfig() {
-            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".chess-anal");
-            if (!File.Exists(path)) {
-                path = "d:/.chess-anal";
-            }
-            return JsonConvert.DeserializeObject<Config>(File.ReadAllText(path));
-        }
-
-        public static Config current {
-            get {
-                return _current ?? (_current = getConfig());
-            }
-        }
-    }
-
     class Program {
         public static string PrettyPgn(string pgn) {
             var result = "";
@@ -758,10 +730,10 @@ namespace ChessAnalCon {
         private static HashSet<string> clearTags = new HashSet<string>() { "add", "addz", "level", "skip", "config", "fen", "fend", "confinue", "diagram" };
         private static Regex headerRe = new Regex("^#+ ", RegexOptions.Compiled);
 
-        private static void processMd(string path = null) {
-            var srcPath = path ?? Config.current.mdPath;
+        private static void compileMd(string path = null) {
+            var srcPath = path ?? ChessConfig.current.mdPath;
             var name = Path.GetFileNameWithoutExtension(srcPath);
-            var dstPath = Path.Combine(Config.current.mdDstDir, $"{name}.html");
+            var dstPath = Path.Combine(ChessConfig.current.mdDstDir, $"{name}.html");
 
             var book = File.ReadAllLines(bookPath);
             var hub = new MoveInfoHub(moveRe);
@@ -1042,8 +1014,8 @@ namespace ChessAnalCon {
         }
 
         private static void evalPgn() {
-            var path = Config.current.evalPath;
-            var engine = Engine.Open(Config.current.enginePath);
+            var path = ChessConfig.current.evalPath;
+            var engine = Engine.Open(ChessConfig.current.enginePath);
 
             Func<string, bool> forHandle = x => x != "" && !x.StartsWith("[") && !x.Contains("{");
             var rs = File.ReadAllLines(path).ToArray();
@@ -1072,7 +1044,7 @@ namespace ChessAnalCon {
                     }
 
                     try {
-                        info.eval = engine.CalcScore(info.fen, depth: Config.current.evalDepth);
+                        info.eval = engine.CalcScore(info.fen, depth: ChessConfig.current.evalDepth);
                     } catch { ctrlC = true; }
 
                     count--;
@@ -1352,7 +1324,7 @@ namespace ChessAnalCon {
                         await Task.Delay(1000, delayCts.Token);
                         if (delayCts.IsCancellationRequested) return;
                        
-                        processMd(e.FullPath);
+                        compileMd(e.FullPath);
                         Console.WriteLine(e.FullPath);
                     });
                 };
@@ -1531,7 +1503,7 @@ namespace ChessAnalCon {
 
         private static void solvePuzzles(string path, int limit, string enginePath = null, string engineOpPath = null) {
             if (enginePath == null) {
-                enginePath = Config.current.enginePath;
+                enginePath = ChessConfig.current.enginePath;
             }
             if (engineOpPath == null) {
                 engineOpPath = enginePath;
@@ -1757,11 +1729,12 @@ namespace ChessAnalCon {
 
             //Sunfish.SimplePst();
 
-            solvePuzzles("d:/Konotop4-3.pgn", 4, enginePath: @"d:\Projects\stockfish-simpleEval\bin\Debug\x64\Stockfish.exe", @"d:\Distribs\stockfish_16\stockfish-windows-x86-64-modern.exe"); // @"d:\Distribs\Sunfish\sunfish.exe"
+            // solvePuzzles("d:/Konotop4-3.pgn", 4, enginePath: @"d:\Projects\stockfish-simpleEval\bin\Debug\x64\Stockfish.exe", @"d:\Distribs\stockfish_16\stockfish-windows-x86-64-modern.exe"); // @"d:\Distribs\Sunfish\sunfish.exe"
+
             //handlePgn();
 
             // processMd("d:/Projects/smalls/ideas-my.md");
-            //mdMonitor();
+            mdMonitor();
 
             // fixGoogleTranslate(@"d:/french-classic-b-mbm-g.txt");
             // prepareTranslate(@"d:\Projects\smalls\french-classic-b-mbm.md");
@@ -1776,6 +1749,34 @@ namespace ChessAnalCon {
             //handleCbMd(@"d:\Projects\smalls\panov-mbm.md");
 
             //removeChessableDublicates(@"d:\Projects\smalls\sicilian-alapin.md");
+
+            /*
+            var ss = File.ReadAllLines(@"d:\Projects\smalls\konotop4.md").Where(x => !string.IsNullOrEmpty(x)).ToArray();
+
+            var rs = new List<string>();
+            var j = 0;
+            for (var i = 0; i < ss.Length; i++) {
+                if (!ss[i].StartsWith("<diagram"))
+                    continue;
+
+                var fen = Tag.Parse(ss[i])[0].attr["fen"];
+                var id = $"{(j / 12) + 1}.{(j % 12) + 1}.";
+                var s = ss[i + 1];
+                if (!Regex.IsMatch(s, @"^\[\d\] ")) {
+                    Console.WriteLine($"Error: {id}");
+                    continue;
+                }
+
+                var score = int.Parse(s.Split(' ')[0].Substring(1, 1));
+                var moves = s.Substring(4).Trim();
+
+                rs.Add($"{{ id: \"{id}\", score: {score}, fen: \"{fen}\", moves: \"{moves}\" }},");
+                j++;
+            }
+
+            File.WriteAllLines("d:/konotop4.js", rs);
+            Console.ReadLine();
+             */
 
             /*
             var pgns = Pgn.LoadMany(File.OpenText("d:/Konotop4-1.pgn")).ToArray();
