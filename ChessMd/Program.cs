@@ -124,12 +124,9 @@ namespace ChessMd {
 
         public MoveInfo Push(int level, int index, string move, bool skipId = false) {
             var prev = getPrev(level, index);
-            var err = false;
-            if (move.Contains("+")) {
-                var uci = FEN.San2Uci(prev.fen, move);
-                var san = FEN.Uci2San(prev.fen, uci);
-                err = move != san;
-            }
+            var uci = FEN.San2Uci(prev.fen, move);
+            var san = FEN.Uci2San(prev.fen, uci);
+            var err = move != san;
             if (!skipId) id++;
             var mi = new MoveInfo() { id = skipId ? null : $"move{id}", prev = prev.id, fen = FEN.Move(prev.fen, move), moveSan = move, moveUci = move == "--" ? null : FEN.San2Uci(prev.fen, move), err = err };
             this[level, index] = mi;

@@ -535,7 +535,7 @@ namespace Chess
             var moves = pieces.Select(x => x.GetValidMove(target)).Where(x => x != null).ToArray();
 
             if (moves.Length > 1) {
-                moves = moves.Where(x => IsValid(x)).ToArray();
+                moves = moves.Where(x => IsValid(x) && !(x.CapturedPiece == null ^ captureG == "")).ToArray();
             }
 
             if (moves.Length != 1) {
