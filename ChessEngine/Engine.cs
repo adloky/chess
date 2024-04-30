@@ -65,12 +65,7 @@ namespace ChessEngine
                 sl = sl.OrderByDescending(x => x.score * turn).ToArray();
 
                 foreach (var s in sl) {
-                    try {
-                        s.san = FEN.Uci2San(fen, s.uci);
-                    }
-                    catch {
-                        break;
-                    }
+                    s.san = FEN.Uci2San(fen, s.uci);
                 }
 
                 return sl;
