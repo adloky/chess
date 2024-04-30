@@ -1200,10 +1200,16 @@ namespace ChessAnalCon {
         private static void testEngine() {
             var rnd = new Random();
             var fens = File.ReadAllLines("d:/fens-elo.txt").ToList(); // d:/Projects/chess/SunfishEngine/bin/Release/SunfishEngine.exe
-            var es = new (int depth, Engine engine)[] { (10, Engine.Open(@"d:\Projects\stockfish-vs\bin\Debug\x64\Stockfish.exe")), (5, Engine.Open("d:/Distribs/stockfish_16/stockfish-windows-x86-64-modern.exe")) };
-            es[1].engine.SetOption("MultiPV", 1);
+            var es = new (int? depth, Engine engine)[] { (8, Engine.Open(@"d:/Projects/chess/SunfishEngine/bin/Release/SunfishEngine.exe")),
+                (5, Engine.Open("d:/Distribs/stockfish_16/stockfish-windows-x86-64-modern.exe")),
+                (14, Engine.Open("d:/Distribs/stockfish_16/stockfish-windows-x86-64-modern.exe")) };
             es[0].engine.SetOption("MultiPV", 1);
+            es[1].engine.SetOption("MultiPV", 5);
+            es[2].engine.SetOption("MultiPV", 1);
             int stockRating = 2000;
+            es[1].engine.SetOption("UCI_LimitStrength", "true");
+            es[1].engine.SetOption("UCI_Elo", stockRating);
+            
             int rating = stockRating;
 
             for (var i = 0; i < 15; i++) {
@@ -1229,10 +1235,10 @@ namespace ChessAnalCon {
                         if (FEN.GetMateState(fen) != null)
                             break;
 
-                        var score = es[1].engine.CalcScores(fen, depth: 14).Last().First().score;
+                        var score = es[2].engine.CalcScores(fen, depth: es[2].depth).Last().First().score;
                         if (Math.Abs(score) >= 230) {
                             var sign = Math.Sign(score);
-                            result = (double)((sign == color ? 1 : -1) + 1) / 2;
+                            result = sign == color ? 1 : 0;
                             break;
                         }
                     }
@@ -1284,7 +1290,7 @@ namespace ChessAnalCon {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
 
-            //testEngine();
+            testEngine();
 
             //Sunfish.SimplePst();
 

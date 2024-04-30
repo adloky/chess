@@ -320,34 +320,6 @@ namespace ChessCon {
 
             var start = "1. e4 c5 2. d4";
 
-            var ss = new List<string>();
-            foreach (var pgn in Pgn.LoadMany(File.OpenText("d:/morra-esserman-li.pgn"))) {
-                if (!pgn.MovesSource.First().Contains("{")) continue;
-                try {
-                    var moves = getMoves(pgn.Moves);
-                    var count = enumNodesByMoves(pgn.Moves).Skip(1).Count();
-                    count += (count % 2 == 0) ? 1 : 0;
-                    ss.Add(string.Join(" ", moves.Take(count)));
-                }
-                catch { }
-            }
-            ss = ss.Distinct().OrderBy(x => x).ToList();
-
-            var prev = new string[] { "--" };
-            for (var i = 0; i < ss.Count; i++) {
-                var s = ss[i];
-                var cur  = s.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                var l = Math.Min(prev.Length, cur.Length);
-                var skip = 0;
-                for (skip = 0; skip < l && prev[skip] == cur[skip]; skip++);
-                ss[i] = Pgn.PrettyMoves(s, skip).Replace(". ", ".");
-                prev = cur;
-            }
-
-            File.WriteAllLines("d:/morra-esserman-pretty.txt", ss);
-            return;
-
-
             //Console.WriteLine(EnumerateNodes(start).Count());
 
             /*
@@ -681,6 +653,34 @@ namespace ChessCon {
 // e4 e5 Nf3: #russian #philidor
 // e4 e5 Nf3 Nc6: #spanish #italian #scotch
 
+/*
+            var ss = new List<string>();
+            foreach (var pgn in Pgn.LoadMany(File.OpenText("d:/morra-esserman-li.pgn"))) {
+                if (!pgn.MovesSource.First().Contains("{")) continue;
+                try {
+                    var moves = getMoves(pgn.Moves);
+                    var count = enumNodesByMoves(pgn.Moves).Skip(1).Count();
+                    count += (count % 2 == 0) ? 1 : 0;
+                    ss.Add(string.Join(" ", moves.Take(count)));
+                }
+                catch { }
+            }
+            ss = ss.Distinct().OrderBy(x => x).ToList();
+
+            var prev = new string[] { "--" };
+            for (var i = 0; i < ss.Count; i++) {
+                var s = ss[i];
+                var cur  = s.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                var l = Math.Min(prev.Length, cur.Length);
+                var skip = 0;
+                for (skip = 0; skip < l && prev[skip] == cur[skip]; skip++);
+                ss[i] = Pgn.PrettyMoves(s, skip).Replace(". ", ".");
+                prev = cur;
+            }
+
+            File.WriteAllLines("d:/morra-esserman-pretty.txt", ss);
+            return;
+ */
 
 
 /*

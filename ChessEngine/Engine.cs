@@ -36,7 +36,7 @@ namespace ChessEngine
             do { str = output.ReadLine(); } while (str != "readyok");
 
             SetOption("Threads", Math.Max(1, Environment.ProcessorCount-1));
-            SetOption("MultiPV", 10);
+            SetOption("MultiPV", 6);
         }
 
         public static Engine Open(string path) {
@@ -45,7 +45,7 @@ namespace ChessEngine
             return engine;
         }
 
-        public void SetOption(string name, int value) {
+        public void SetOption(string name, object value) {
             input.WriteLine($"setoption name {name} value {value}");
         }
 
@@ -65,7 +65,12 @@ namespace ChessEngine
                 sl = sl.OrderByDescending(x => x.score * turn).ToArray();
 
                 foreach (var s in sl) {
-                    s.san = FEN.Uci2San(fen,s.uci);
+                    try {
+                        s.san = FEN.Uci2San(fen, s.uci);
+                    }
+                    catch {
+                        break;
+                    }
                 }
 
                 return sl;

@@ -27,7 +27,7 @@ namespace Chess.Sunfish {
         public const int S = 10;
         public const int W = -1;
 
-        static public readonly OptimDictionary<int[]> directions = new OptimDictionary<int[]> {
+        static public readonly Dictionary<char,int[]> directions = new Dictionary<char, int[]> {
             { 'P', new[] { N, N+N, N+W, N+E } },
             { 'B', new[] { N+E, S+E, S+W, N+W } },
             { 'N', new[] { N+N+E, E+N+E, E+S+E, S+S+E, S+S+W, W+S+W, W+N+W, N+N+W } },
@@ -49,8 +49,8 @@ namespace Chess.Sunfish {
                                     + "          "
                                     + "          ";
 
-        public static readonly OptimDictionary<List<int>> PST_B = new OptimDictionary<List<int>>();
-        public static readonly OptimDictionary<List<int>> PST = new OptimDictionary<List<int>> {
+        public static readonly Dictionary<char, List<int>> PST_B = new Dictionary<char, List<int>>();
+        public static readonly Dictionary<char, List<int>> PST = new Dictionary<char, List<int>>() {
             { 'P', new List<int>() {
                 0,   0,   0,   0,   0,   0,   0,   0,
                78,  83,  86,  73, 102,  82,  85,  90,
@@ -330,14 +330,14 @@ namespace Chess.Sunfish {
         
         public bool btm { get => vals[ZBTM] != 0; set => vals[ZBTM] = value ? 1 : 0; }
 
-        public (bool q, bool k) wc {
+        public (bool a, bool b) wc {
             get { var x = vals[ZC + (!btm ? 0 : 1)]; return ((x & 1) != 0, (x & 2) != 0); }
-            set { var x = (value.q ? 1 : 0) | (value.k ? 2 : 0); vals[ZC + (!btm ? 0 : 1)] = x; }
+            set { var x = (value.a ? 1 : 0) | (value.b ? 2 : 0); vals[ZC + (!btm ? 0 : 1)] = x; }
         }
 
-        public (bool q, bool k) bc {
+        public (bool a, bool b) bc {
             get { var x = vals[ZC + (!btm ? 1 : 0)]; return ((x & 1) != 0, (x & 2) != 0); }
-            set { var x = (value.q ? 1 : 0) | (value.k ? 2 : 0); vals[ZC + (!btm ? 1 : 0)] = x; }
+            set { var x = (value.a ? 1 : 0) | (value.b ? 2 : 0); vals[ZC + (!btm ? 1 : 0)] = x; }
         }
 
         public int ep {
@@ -356,7 +356,7 @@ namespace Chess.Sunfish {
 
         private SfPosition() { }
 
-        public SfPosition(char[] board, bool btm, int score, (bool, bool) wc, (bool, bool) bc, int ep, int kp) {
+        public SfPosition(char[] board, bool btm, (bool, bool) wc, (bool, bool) bc, int ep, int kp) {
             vals = new SfZobristIntArray(ZS, INIT.ToArray(), INIT, SCORE);
 
             for (var i = 0; i < 120; i++) {
@@ -364,12 +364,11 @@ namespace Chess.Sunfish {
             }
 
             this.board = new SfBtmDepList(vals);
-            this.btm = btm;
-            this.score = score;
             this.wc = wc;
             this.bc = bc;
             this.ep = ep;
             this.kp = kp;
+            this.btm = btm;
             vals.PopChanges();
 
             /*
@@ -396,11 +395,11 @@ namespace Chess.Sunfish {
             var board = $"{new string(' ', 20)}{string.Concat(f0.Split('/').Select(x => $" {x} "))}{new string(' ', 20)}";
 
             var wc = (fs[2].Contains("Q"), fs[2].Contains("K"));
-            var bc = (fs[2].Contains("q"), fs[2].Contains("k"));
+            var bc = (fs[2].Contains("k"), fs[2].Contains("q"));
 
             var ep = fs[3] == "-" ? 0 : SfMove.Parse(fs[3]);
 
-            var pos = new SfPosition(board.ToCharArray(), false, 0, wc, bc, ep, 0);
+            var pos = new SfPosition(board.ToCharArray(), false, wc, bc, ep, 0);
             pos.btm = fs[1] == "b";
             pos.renew_scores();
 
@@ -464,12 +463,13 @@ namespace Chess.Sunfish {
             cs[k++] = btm ? 'b' : 'w';
             cs[k++] = ' ';
 
-            var wc = btm ? this.bc : this.wc;
-            var bc = btm ? this.wc : this.bc;
-            if (wc.k) cs[k++] = 'K';
-            if (wc.q) cs[k++] = 'Q';
-            if (bc.k) cs[k++] = 'k';
-            if (bc.q) cs[k++] = 'q';
+            var wc = !btm ? this.wc : this.bc;
+            var bc = !btm ? this.bc : this.wc;
+            if (wc.b) cs[k++] = 'K';
+            if (wc.a) cs[k++] = 'Q';
+            if (bc.a) cs[k++] = 'k';
+            if (bc.b) cs[k++] = 'q';
+
             if (cs[k - 1] == ' ') cs[k++] = '-';
             cs[k++] = ' ';
 
@@ -526,11 +526,11 @@ namespace Chess.Sunfish {
                         if (p == 'P' || p == 'N' || p == 'K' || char.IsLower(q))
                             break;
 
-                        if (i == SF.A1 && board[j + SF.E] == 'K' && wc.q) {
+                        if (i == SF.A1 && board[j + SF.E] == 'K' && wc.a) {
                             yield return new SfMove(j + SF.E, j + SF.W);
                         }
 
-                        if (i == SF.H1 && board[j + SF.W] == 'K' && wc.k) {
+                        if (i == SF.H1 && board[j + SF.W] == 'K' && wc.b) {
                             yield return new SfMove(j + SF.W, j + SF.E);
                         }
                     }
@@ -544,8 +544,6 @@ namespace Chess.Sunfish {
                 kp = 0;
             }
             btm = !btm;
-            //var r = Clone();
-            //Rollback(vals.PopChanges());
 
             return vals.PopChanges();
         }
@@ -561,10 +559,10 @@ namespace Chess.Sunfish {
             var bc = this.bc;
             var score = this.score + value(m);
 
-            if (i == SF.A1) wc = (false, wc.k);
-            if (i == SF.H1) wc = (wc.q, false);
-            if (i == SF.A8) bc = (bc.q, false);
-            if (i == SF.H8) bc = (false, bc.k);
+            if (i == SF.A1) wc = (false, wc.b);
+            if (i == SF.H1) wc = (wc.a, false);
+            if (j == SF.A8) bc = (bc.a, false);
+            if (j == SF.H8) bc = (false, bc.b);
 
             board[j] = board[i];
             board[i] = '.';
@@ -597,9 +595,6 @@ namespace Chess.Sunfish {
             this.score = score;
 
             btm = !btm;
-
-            //var r = Clone();
-            //Rollback(vals.PopChanges());
 
             return vals.PopChanges();
         }
