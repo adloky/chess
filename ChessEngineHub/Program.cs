@@ -38,7 +38,7 @@ namespace ChessEngineHub {
             (Engine.Open(@"d:\Distribs\lc0\lc0.exe"), 20000, 2000),
             (Engine.Open(@"d:\Distribs\stockfish_16\stockfish-windows-x86-64-modern.exe"), 50000000, 1000000),
             (Engine.Open(@"d:\Distribs\komodo-dragon-3\dragon-3-64bit.exe"), 50000000, 1000000),
-            (Engine.Open(@"d:\Projects\stockfish-simpleEval\bin\Debug\x64\Stockfish.exe"), 50000000, 1000000)
+            (Engine.Open(@"d:\Projects\stockfish-simpleEval\bin\Release\x64\Stockfish.exe"), 50000000, 1000000)
         };
         private static object calcSyncRoot = new object();
         private static AutoResetEvent startCalcWaiter = new AutoResetEvent(true);

@@ -312,233 +312,29 @@ namespace ChessCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
 
-            OpeningNode.color = 1;
-            OpeningNode.relCountFunc = x => x.count;
+            OpeningNode.color = -1;
+            OpeningNode.relCountFunc = x => x.midCount;
+            // XX: #english #zukertort
+            // d4: #queens #indian #london
 
-            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#sicilian")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+
+            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#english") || x.Contains("#zukertort") || x.Contains("#queens")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
             Console.WriteLine("nodeDic loaded.");
 
-            var start = "1. e4 c5 2. d4";
+            var start = "1. d4 d5";
 
             //Console.WriteLine(EnumerateNodes(start).Count());
 
-            /*
-            File.ReadAllLines(@"d:/morra-esserman.txt").ToList().ForEach(x => addHints(x));
-            
-            addExcept("1. e4 c5 2. d4 cxd4 3. Nf3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 e6 6. Nf3 Bb4 7. O-O Nge7 8. Qc2");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 e6 6. Nf3 Nf6 7. Qe2");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Bc4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 e6 6. Nf3 Bb4 7. O-O Bxc3 8. bxc3 Nge7 9. Ba3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. Bc4");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. Qxd4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. cxd4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. exd6");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 e6 6. Nf3 Nf6 7. O-O Be7 8. Qe2");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 g6 6. Bf4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 g6 6. Qb3");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 g6 6. Qe2");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 g6 6. Bg5");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 a6 5. Nf3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e5 5. Bc4");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 g6 6. Nf3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 g6 6. h3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 Nb6 7. Bb3 d5 8. exd6 Qxd6 9. cxd4");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 e6 6. Nf3 Bb4 7. O-O Bxc3 8. bxc3 Nge7 9. Qd6 O-O 10. Ba3 Re8 11. Rfd1");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 e6 6. Nf3 Bb4 7. O-O Bxc3 8. bxc3 Nge7 9. Qd6 O-O 10. Ba3 Re8 11. Qg3");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4 e6 6. Nf3 Nf6 7. O-O Be7 8. e5 Ng4 9. Bf4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Nge7 8. Nd5");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Nge7 8. Qe2 O-O 9. Bg5");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 a6 7. Bg5");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 a6 7. O-O Nf6 8. Qe2");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 a6 7. O-O Nf6 8. Be3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 a6 7. O-O Nf6 8. b4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 a6 7. O-O Nf6 8. Nd5");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 g6 7. O-O");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 g6 6. Bc4 Bg7 7. h4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 g6 6. h4");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Bc4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Bc4");
-
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Qxd4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 d6 4. Nf3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 e5 4. Bc4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 dxc3 5. Bc4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 Nf6 6. Bc4 e6 7. O-O");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 Nf6 6. Nf3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 Nf6 6. h3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 d6 7. Bc4 Nc6 8. Qe2");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 Nb6 7. Bb3 d5 8. exd6 Qxd6 9. O-O Be6 10. Bxe6");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 e6 7. Bb3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 e6 5. Nc3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 e5 4. Nf3 Nc6 5. Bc4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 Bg7 5. cxd4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 Bg7 5. b4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 Bg7 5. Bc4");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 g6 6. Bc4 Bg7 7. e5 Nh6 8. O-O O-O 9. Re1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e5 6. Bc4 Bb4 7. O-O");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 Ne7 7. Bg5");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 Bb4 7. O-O Nge7 8. Qc2");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 Bb4 7. O-O Nge7 8. Nd5");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 Nf6 7. O-O");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Ne7 6. Bg5");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Ne7 6. Bc4 Ng6 7. O-O");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Ne7 6. Bc4 Ng6 7. Qe2");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Ne7 6. Bc4 Ng6 7. Bg5");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 e6 6. Nf3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 d6 7. Bc4 Be7 8. Qe2");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 Nc6 7. Bc4 Nb6 8. Bd3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 b6 7. Bd3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 Nf6 6. Nf3");
-            addExcept("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 dxc3 5. Nxc3 Bg7 6. Bc4 Nc6 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 Bg7 5. cxd4 d5 6. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 d3 5. Bxd3");
-            addExcept("1. e4 c5 2. d4 g6 3. c3");
-            addExcept("1. e4 c5 2. d4 g6 3. dxc5");
-            */
-
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 d6 5. c4 Nc6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 d6 5. c4 Nf6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 e6 5. c4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 g6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 e6 6. Nc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 g6 6. Ne2 Bg7 7. Nbc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 Nf6 6. Nc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Nf6 5. Bb5+ Bd7 6. Bc4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 e5 6. Nf3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 Nc6 6. Nf3 Bg4 7. Nc3 Bxf3 8. gxf3 Qxd4 9. Qxd4 Nxd4 10. Nb5 Nc2+ 11. Kd1 Nxa1 12. Nc7+");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 Nc6 6. Nf3 e5 7. Nc3 Bb4 8. Bd2 Bxc3 9. Bxc3 e4 10. Ne5 Nxe5 11. dxe5 Ne7 12. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 Nc6 6. Nf3 e6 7. Nc3 Bb4 8. Bd3 Nf6 9. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 Nf6 6. Nc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d6 4. cxd4 Nf6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 a6 5. Bc4 e6 6. Nf3 b5 7. Bb3 Bb7 8. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 a6 5. Bc4 e6 6. Nf3 Nc6 7. O-O b5 8. Bb3 Bb7 9. a4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 a6 5. Bc4 e6 6. Nf3 Nc6 7. O-O d6 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 a6 5. Bc4 e6 6. Nf3 Qc7 7. Bb3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 a6 6. Bc4 e6 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 e6 6. Bc4 a6 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 e6 6. Bc4 Be7 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 e6 6. Bc4 Nc6 7. O-O a6 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 e6 6. Bc4 Nf6 7. O-O Be7 8. Qe2 O-O 9. Rd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 g6 6. Bc4 Bg7 7. Qb3 e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nc6 6. Bc4 a6 7. O-O Nf6 8. Bf4 Bg4 9. h3 Bxf3 10. Qxf3 e6 11. Rfd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nc6 6. Bc4 e6 7. O-O Be7 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nc6 6. Bc4 e6 7. O-O Nf6 8. Qe2 Be7 9. Rd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nc6 6. Bc4 g6 7. Qb3 e6 8. Bf4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nc6 6. Bc4 Nf6 7. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nf6 6. Bc4 e6 7. O-O Be7 8. Qe2 O-O 9. Rd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nf6 6. Bc4 g6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e5 5. Nf3 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e5 5. Nf3 Nc6 6. Bc4 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e5 5. Nf3 Nc6 6. Bc4 h6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 b5 7. Bb3 Bb7 8. O-O b4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 b5 7. Bb3 Bb7 8. O-O Nc6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 Nc6 7. O-O b5 8. Bb3 Bb7 9. a4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 Nc6 7. O-O d6 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 Ne7 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 Qc7 7. Bb3 Nc6 8. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Bb4 6. Qd4 Bxc3+");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 d6 6. Bc4 a6 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 a6 7. O-O b5 8. Bb3 Bb7 9. a4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 a6 7. O-O Nge7 8. Bg5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 Bb4 7. O-O Bxc3 8. bxc3 Nge7 9. Qd6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 Bb4 7. O-O Nge7 8. Bg5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 d6 7. O-O Be7 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 d6 7. O-O Nf6 8. Qe2 Be7 9. Rd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 Nf6 7. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Ne7 6. Bc4 Ng6 7. h4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nf6 6. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 g6 5. Nf3 Bg7 6. Bc4 d6 7. Qb3 e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 g6 5. Nf3 Bg7 6. Bc4 e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 g6 5. Nf3 Bg7 6. Bc4 Nc6 7. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 g6 5. Nf3 Bg7 6. Bc4 Nf6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 a6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 a6 7. O-O Nf6 8. Bf4 Bg4 9. h3 Bxf3 10. Qxf3 e6 11. Rfd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 Bg4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 e6 7. O-O a6 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 e6 7. O-O Be7 8. Qe2 Nf6 9. Rd1 e5 10. Be3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 e6 7. O-O Nf6 8. Qe2 Be7 9. Rd1 e5 10. Be3 O-O 11. Rac1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 e6 7. O-O Nf6 8. Qe2 Be7 9. Rd1 Qc7 10. Nb5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 g6 7. Qb3 e6 8. Bf4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 Nf6 7. e5 dxe5 8. Qxd8+ Kxd8 9. Ng5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 Nf6 7. e5 dxe5 8. Qxd8+ Nxd8");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e5 6. Bc4 Bb4 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e5 6. Bc4 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e5 6. Bc4 h6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e5 6. Bc4 Nf6 7. Ng5 d5 8. exd5 Na5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 a6 7. O-O b5 8. Bb3 Bb7 9. a4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 a6 7. O-O d6 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 a6 7. O-O Nge7 8. Bg5 h6 9. Be3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 a6 7. O-O Qc7 8. Nd5 exd5 9. exd5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Bxc3 8. bxc3 Nge7 9. Qd6 O-O 10. Ba3 Re8 11. Rad1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Nf6 8. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Nge7 8. Qe2 Bxc3 9. bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Nge7 8. Qe2 O-O 9. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bc5 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Be7 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 d6 7. O-O Be7 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 d6 7. O-O Nf6 8. Qe2 Be7 9. Rd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Nf6 7. O-O Be7 8. e5 Ng4 9. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Nge7 7. O-O Ng6 8. h4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Qc7 7. O-O Nf6 8. Nb5 Qb8 9. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 g6 6. Bc4 Bg7 7. e5 e6 8. Nb5 Nxe5 9. Qd6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 g6 6. Bc4 Bg7 7. e5 Nh6 8. O-O O-O 9. Bf4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 g6 6. Bc4 Bg7 7. e5 Nxe5 8. Nxe5 Bxe5 9. Bxf7+ Kxf7 10. Qd5+ e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 Nf6 6. Bc4 d6 7. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 Nf6 6. Bc4 e6 7. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nf6 5. e5 Ng8 6. Nf3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 e5 4. Nf3 dxc3 5. Nxc3 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 e5 4. Nf3 dxc3 5. Nxc3 Nc6 6. Bc4 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 e5 4. Nf3 dxc3 5. Nxc3 Nc6 6. Bc4 h6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 e5 4. Nf3 Nc6 5. cxd4 exd4 6. Nxd4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 e6 4. cxd4 d5 5. e5 Nc6 6. Nc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 Bg7 5. cxd4 d5 6. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 d3 5. Bxd3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 dxc3 5. Nxc3 Bg7 6. Bc4 d6 7. Qb3 e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 dxc3 5. Nxc3 Bg7 6. Bc4 e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 dxc3 5. Nxc3 Bg7 6. Bc4 Nc6 7. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 d5 5. exd5 Qxd5 6. Nf3 Bg4 7. Nc3 Bxf3 8. gxf3 Qxd4 9. Qxd4 Nxd4 10. Nb5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 d5 5. exd5 Qxd5 6. Nf3 e5 7. Nc3 Bb4 8. Bd2 Bxc3 9. Bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 d5 5. exd5 Qxd5 6. Nf3 e6 7. Nc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 e6 5. d5 exd5 6. exd5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. Bc4 dxe5 7. Nxe5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. Bc4 e6 7. cxd4 dxe5 8. dxe5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. Bc4 Nb6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 b6 7. Nc3 Nxc3 8. bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 d6 7. Bc4 Be7 8. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 d6 7. Bc4 Nb6 8. Bd3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 d6 7. Bc4 Nc6 8. O-O Be7 9. Qe2 O-O 10. Nc3 Nxc3 11. bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 Nc6 7. Bc4 d6 8. O-O Be7 9. Qe2 O-O 10. Nc3 Nxc3 11. bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 Nc6 7. Bc4 Nb6 8. Bb3 d6 9. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 e6 7. cxd4 d6 8. O-O Be7 9. Qe2 O-O 10. Nc3 Nxc3 11. bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 Nb6 7. Bb3 d5 8. exd6 Qxd6 9. O-O Be6 10. Na3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 Nb6 7. Bb3 d6 8. exd6 Qxd6 9. O-O Be6 10. Na3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 Nb6 7. Bb3 dxc3 8. Nxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 Nb6 7. Bb3 e6 8. cxd4 d6 9. Qe2");
-            addHints("1. e4 c5 2. d4 d6");
-            addHints("1. e4 c5 2. d4 e6");
-            addHints("1. e4 c5 2. d4 g6 3. Nf3 cxd4 4. c3");
-            addHints("1. e4 c5 2. d4 Nc6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 a6 6. Bf4 e6 7. Bc4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 a6 6. Bf4 e6 7. Bc4 d6 8. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 b5 7. Bb3 Bb7 8. O-O Nc6 9. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Bb4 6. Qd4 Bxc3+ 7. bxc3 Nf6 8. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Bb4 6. Qd4 Bxc3+ 7. bxc3 Nf6 8. e5 Nc6 9. Qf4 Nd5 10. Qg3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. Bc4 Nb6 7. Bb3");
+            File.ReadAllLines(@"d:/wall-NikitosPopados.txt").ToList().ForEach(x => addHints(x));
+            //        1. d4 d5 2. c4 e6 3. e3 c6 
+            addHints("1. d4 d5 2. c4 e6 3. Nf3 c6 4. e3 Bd6");
+            addHints("1. d4 d5 2. c4 e6 3. Nc3 c6 4. e3 Bd6 5. Nf3 f5");
+            addHints("1. d4 d5 2. c4 e6 3. Nc3 c6 4. e4 dxe4 5. Nxe4 Bb4+ 6. Nc3 c5");
+            addHints("1. d4 d5 2. c4 e6 3. Nc3 c6 4. cxd5 exd5 5. Nf3 Bd6 6. Bg5 Be7");
+            addHints("1. d4 d5 2. c4 e6 3. Nc3 c6 4. cxd5 exd5 5. Bf4 Bd6");
+            addHints("1. d4 d5 2. c4 e6 3. Nc3 c6 4. Nf3 Bd6");
+            addHints("1. d4 d5 2. c4 e6 3. Nc3 c6 4. Bf4 dxc4 5. a4 Bd6");
+            addHints("1. d4 d5 2. c4 e6 3. e3 c6 4. Nf3 Bd6");
 
 
             var startNode = getNodeByMoves(start);
@@ -546,11 +342,11 @@ namespace ChessCon {
             Func<WalkNode, string> scoreDiff = wn => align(((float)(wn.node.relScore - startScore) / 100).ToString("0.00", CultureInfo.InvariantCulture), 6);
 
             Func<WalkNode, WalkState> getState = wn => {
-                if (wn.freq < 0.005) return WalkState.None;
+                if (wn.freq < 0.03) return WalkState.None;
 
                 return wn.node.lastColor == OpeningNode.color
-                    ? (wn.node.relScore >= startScore - 80 ? WalkState.Continue : WalkState.None)
-                    : (wn.node.relScore <= startScore + 80 ? WalkState.Continue : WalkState.Break);
+                    ? (wn.node.relScore >= startScore - 50 ? WalkState.Continue : WalkState.None)
+                    : (wn.node.relScore <= startScore + 100 ? WalkState.Continue : WalkState.Break);
             };
 
             var wns = EnumerateNodes(start, getState).ToList();

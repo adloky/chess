@@ -552,13 +552,13 @@ namespace ChessAnalCon {
         private static HashSet<string> pgnParams = new HashSet<string>(new string[] { "Date", "White", "Black", "Result", "Date", "WhiteElo", "BlackElo", "TimeControl", "Link", "Color" });
 
         private static void handlePgn() {
-            var path = "d:/esserman-li.pgn";
-            var login = "MassterofMayhem";
-            var prefix = "morra-";
-            var open = "1. e4 c5 2. d4";
-            var openSubs = " ";
+            var path = "d:/NikitosPopados.pgn";
+            var login = "NikitosPopados";
+            var prefix = "wall-";
+            var open = "";
+            var openSubs = " f5";
             var fullMoves = true;
-            var findColor = 1;
+            var findColor = -1;
 
             var fileName = Path.GetFileName(path);
             var dstPath = path.Replace(fileName, prefix + fileName);
@@ -575,9 +575,10 @@ namespace ChessAnalCon {
                     var isWin = color == 1 ? pgn.Params["Result"] == "1-0" : pgn.Params["Result"] == "0-1";
                     var isLoss = color == 1 ? pgn.Params["Result"] == "0-1" : pgn.Params["Result"] == "1-0";
                     var control = int.Parse(pgn.Params["TimeControl"].Split('/')[0].Split('+')[0]);
-                    var isOpen = pgn.Moves.StartsWith(open) && pgn.Moves.Contains(openSubs);
+                    var openSubsIndex = pgn.Moves.IndexOf(openSubs);
+                    var isOpen = pgn.Moves.StartsWith(open) && openSubsIndex >= 0 && openSubsIndex < 100;
 
-                    if (!((findColor == color || findColor == 0) && !isLoss && control >= 180 && isOpen)) {
+                    if (!((findColor == color || findColor == 0) && (true || !isLoss) && control >= 180 && isOpen)) {
                         continue;
                     }
 
@@ -1289,8 +1290,31 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
 
+            Func<string,string> sFen = f => string.Join(" ", f.Split(',')[0].Split(' ').Take(4));
+            
+            using (var reader = File.OpenText("d:/lichess_2023-04.csv")) {
+                while (!reader.EndOfStream) {
+                    var fen = Board.DEFAULT_STARTING_FEN;
+                    var moves = reader.ReadLine().Split(',')[0].Split(' ');
+                    var pos = SfPosition.FromFen(fen);
+                    foreach (var san in moves) {
+                        var pos2 = SfPosition.FromFen(fen);
+                        var uci = FEN.San2Uci(fen, san);
+                        fen = FEN.Move(fen, uci);
+                        var m = SfMove.Parse(uci);
+                        pos.move(m);
+                        var p = m.pack();
+                        m = SfMove.unpack(p);
+                        pos2.move(m);
+                        var posFen = sFen(pos.GetFen());
+                        if (posFen != sFen(fen) || posFen != sFen(pos2.GetFen())) {
+                            throw new Exception();
+                        }
+                    }
+                }
+            }
 
-            testEngine();
+            //testEngine();
 
             //Sunfish.SimplePst();
 
@@ -1308,6 +1332,7 @@ namespace ChessAnalCon {
             //handleScidMd(@"d:\Projects\smalls\french-classic-b-mbm.md");
             //Console.ReadLine();
             //pgnSearch();
+            //handlePgn();
             //simplifyChessable();
             //handleCbHtml("D:/sicilian-alapin.html");
             //handleCbMd(@"d:\Projects\smalls\panov-mbm.md");

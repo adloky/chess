@@ -190,9 +190,23 @@ namespace Chess.Sunfish {
     }
 
     public struct SfMove {
+        private static int[] PACK = new int[120];
+        private static int[] UNPACK = new int[64];
+
         private int a;
 
         private static readonly string PROM = "qrbn";
+
+        static SfMove() {
+            var k = 0;
+            for (var i = SF.A1; i >= SF.A8; i -= 10) {
+                for (var j = i; j < i + 8; j++) {
+                    PACK[j] = k;
+                    UNPACK[k] = j;
+                    k++;
+                }
+            }
+        }
 
         public int i {
             get => (a >> 0) & 0xFF;
@@ -212,6 +226,18 @@ namespace Chess.Sunfish {
         public char? prom { get => (k == 0) ? (char?)null : PROM[k - 1]; }
 
         public static implicit operator int(SfMove m) => m.a;
+
+        public ushort pack() {
+            var r = PACK[i] | (PACK[j] << 6) | k << 12;
+            return (ushort)(short)r;
+        }
+
+        public static SfMove unpack(ushort v) {
+            var i = UNPACK[v & 0x3F];
+            var j = UNPACK[(v >> 6) & 0x3F];
+            var k = (v >> 12) & 0x3F;
+            return new SfMove(i, j, k);
+        }
 
         public SfMove(int a) {
             this.a = a;
@@ -235,7 +261,7 @@ namespace Chess.Sunfish {
             return r;
         }
 
-        public static SfMove Parse(string s) {
+        public static SfMove Parse(string s, bool btm = false) {
             int r = 0;
             for (var i = 0; i + 1 < 4 && i + 1 < s.Length; i += 2) {
                 int file = s[i + 0] - 'a';
@@ -250,7 +276,7 @@ namespace Chess.Sunfish {
                 r += (PROM.IndexOf(s[4]) + 1) << 16;
             }
 
-            return new SfMove(r);
+            return !btm ? new SfMove(r) : new SfMove(r).Rotate();
         }
 
         public override string ToString() {
@@ -324,7 +350,7 @@ namespace Chess.Sunfish {
 
         public static readonly List<SfZobrist[]> ZS = Enumerable.Range(0,SCORE).Select(x => SfZobrist.NewArray(128)).ToList();
 
-        public SfZobristIntArray vals;
+        private SfZobristIntArray vals;
 
         public SfBtmDepList board;
         
@@ -356,7 +382,8 @@ namespace Chess.Sunfish {
 
         private SfPosition() { }
 
-        public SfPosition(char[] board, bool btm, (bool, bool) wc, (bool, bool) bc, int ep, int kp) {
+        // params for fen
+        public SfPosition(char[] board, bool btm, (bool, bool) wc, (bool, bool) bc, int ep) {
             vals = new SfZobristIntArray(ZS, INIT.ToArray(), INIT, SCORE);
 
             for (var i = 0; i < 120; i++) {
@@ -367,7 +394,6 @@ namespace Chess.Sunfish {
             this.wc = wc;
             this.bc = bc;
             this.ep = ep;
-            this.kp = kp;
             this.btm = btm;
             vals.PopChanges();
 
@@ -399,7 +425,7 @@ namespace Chess.Sunfish {
 
             var ep = fs[3] == "-" ? 0 : SfMove.Parse(fs[3]);
 
-            var pos = new SfPosition(board.ToCharArray(), false, wc, bc, ep, 0);
+            var pos = new SfPosition(board.ToCharArray(), false, wc, bc, ep);
             pos.btm = fs[1] == "b";
             pos.renew_scores();
 
@@ -431,35 +457,32 @@ namespace Chess.Sunfish {
             vals.PopChanges();
         }
 
-        private static readonly string dig = "0123456789";
-
-        public override string ToString() {
+        public string GetFen() {
             var cs = new char[100];
             var k = 0;
             var sn = 0;
-            for (var i = SF.A8; i < SF.H1; i += SF.S) {
+            for (var i = SF.A8; i <= SF.A1; i += SF.S) {
                 var il = i + 8;
                 for (var j = i; j < il; j++) {
-                    var _j = !btm ? j : 119 - j;
-                    if (board[_j] == '.') {
+                    if (vals[j] == '.') {
                         sn++;
                     }
                     else {
                         if (sn > 0) {
-                            cs[k++] = dig[sn];
+                            cs[k++] = (char)('0' + sn);
                             sn = 0;
                         }
-                        cs[k++] = !btm ? board[_j] : SF.swap_case(board[_j]);
+                        cs[k++] = (char)vals[j];
                     }
                 }
                 if (sn > 0) {
-                    cs[k++] = dig[sn];
+                    cs[k++] = (char)('0' + sn);
                     sn = 0;
                 }
                 cs[k++] = '/';
             }
 
-            cs[k-1] = ' ';
+            cs[k - 1] = ' ';
             cs[k++] = btm ? 'b' : 'w';
             cs[k++] = ' ';
 
@@ -482,10 +505,22 @@ namespace Chess.Sunfish {
                 cs[k++] = epStr[1];
             }
 
-            var fen = new string(cs, 0, k);
-            var kpStr = kp == 0 ? "-" : (new SfMove(!btm ? kp : 119 - kp)).ToString();
+            cs[k++] = ' ';
+            cs[k++] = '0';
+            cs[k++] = ' ';
+            cs[k++] = '1';
 
-            return $"{fen} 0 1,{kpStr} {score}";
+            return new string(cs, 0, k);
+        }
+
+        public override string ToString() {
+            var kpStr = kp == 0 ? "-" : new SfMove(!btm ? kp : 119 - kp).ToString();
+
+            return $"{GetFen()},{kpStr} {score}";
+        }
+
+        private SfMove get_move(int i, int j, int k = 0) {
+            return !btm ? new SfMove(i, j, k) : new SfMove(i, j, k).Rotate();
         }
 
         public IEnumerable<SfMove> gen_moves() {
@@ -515,23 +550,23 @@ namespace Chess.Sunfish {
 
                             if (SF.A8 <= j && j <= SF.H8) {
                                 for (var k = 1; k <= 4; k++) {
-                                    yield return new SfMove(i, j, k);
+                                    yield return get_move(i, j, k);
                                 }
                                 break;
                             }
                         }
 
-                        yield return new SfMove(i, j, 0);
+                        yield return get_move(i, j);
 
                         if (p == 'P' || p == 'N' || p == 'K' || char.IsLower(q))
                             break;
 
                         if (i == SF.A1 && board[j + SF.E] == 'K' && wc.a) {
-                            yield return new SfMove(j + SF.E, j + SF.W);
+                            yield return get_move(j + SF.E, j + SF.W);
                         }
 
                         if (i == SF.H1 && board[j + SF.W] == 'K' && wc.b) {
-                            yield return new SfMove(j + SF.W, j + SF.E);
+                            yield return get_move(j + SF.W, j + SF.E);
                         }
                     }
                 }
@@ -549,6 +584,7 @@ namespace Chess.Sunfish {
         }
 
         public SfZobristIntArray.Changes move(SfMove m) {
+            if (btm) m = m.Rotate();
             var i = m.i;
             var j = m.j;
             var prom = char.ToUpper(m.k == 0 ? 'q' : m.prom.Value);
@@ -580,7 +616,7 @@ namespace Chess.Sunfish {
                 if (SF.A8 <= j && j <= SF.H8) {
                     board[j] = prom;
                 }
-                if (j - i == SF.N + SF.N && (board[j + SF.W] == 'p' || board[j + SF.E] == 'p')) {
+                if (j - i == SF.N + SF.N) {
                     ep = i + SF.N;
                 }
                 if (j == this.ep) {

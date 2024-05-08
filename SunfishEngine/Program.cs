@@ -22,7 +22,7 @@ namespace SunfishEngine {
         static void Main(string[] args) {
             var fen = Board.DEFAULT_STARTING_FEN;
             //Sunfish.SimplePst();
-
+            
             while (true) {
                 var s = startLinesQue.Count > 0 ? startLinesQue.Dequeue() : Console.ReadLine();
                 var ps = s.Split(' ').Skip(1).ToArray();

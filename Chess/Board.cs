@@ -532,10 +532,12 @@ namespace Chess
                 pieces = pieces.Where(x => x.Square.GetRank() == row).ToArray();
             }
 
-            var moves = pieces.Select(x => x.GetValidMove(target)).Where(x => x != null).ToArray();
+            var moves = pieces.Select(x => x.GetValidMove(target)).Where(x => x != null)
+                .Where(x => !(x.CapturedPiece == null ^ captureG == "")).ToArray();
+
 
             if (moves.Length > 1) {
-                moves = moves.Where(x => IsValid(x) && !(x.CapturedPiece == null ^ captureG == "")).ToArray();
+                moves = moves.Where(x => IsValid(x)).ToArray();
             }
 
             if (moves.Length != 1) {
