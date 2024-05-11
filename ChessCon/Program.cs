@@ -21,50 +21,19 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using Newtonsoft.Json.Linq;
 using System.Globalization;
+using Chess.Sunfish;
 
 namespace ChessCon {
 
-    public class OpeningNode {
-
-        public string fen { get; set; }
-
+    public class BaseNode {
         public int count { get; set; }
 
         public int midCount { get; set; }
 
-        public string last { get; set; }
-
         public int? score { get; set; }
-
-        public string moves { get; set; }
-
-        public int status { get; set; }
-
-        public string tags { get; set; }
 
         [JsonIgnore]
         public int topCount { get { return count - midCount; } }
-
-        [JsonIgnore]
-        public int turn {
-            get {
-                return fen.Contains(" w ") ? 1 : -1;
-            }
-        }
-
-        [JsonIgnore]
-        public int lastColor {
-            get {
-                return fen.Contains(" w ") ? -1 : 1;
-            }
-        }
-
-        [JsonIgnore]
-        public string key {
-            get {
-                return GetKey(fen, last);
-            }
-        }
 
         [JsonIgnore]
         public int relCount { get { return relCountFunc(this); } }
@@ -74,9 +43,42 @@ namespace ChessCon {
 
         public static int color { get; set; } = 1;
 
-        public static Func<OpeningNode, int> relCountFunc { get; set; } = x => x.count;
+        public static Func<BaseNode, int> relCountFunc { get; set; } = x => x.count;
 
-        public static Func<OpeningNode, int> relScoreFunc { get; set; } = x => x.score.Value * color;
+        public static Func<BaseNode, int> relScoreFunc { get; set; } = x => x.score.Value * color;
+
+    }
+
+    public class JsonNode : BaseNode {
+
+        public string fen { get; set; }
+
+        public string last { get; set; }
+
+        public string moves { get; set; }
+
+        public int status { get; set; }
+
+        public string tags { get; set; }
+
+        public static Dictionary<string, JsonNode> nodes { get; set; } = new Dictionary<string, JsonNode>();
+
+        [JsonIgnore]
+        public int lastColor {
+            get {
+                return fen.Contains(" w ") ? -1 : 1;
+            }
+        }
+
+        [JsonIgnore]
+        public int id { get; set; }
+
+        [JsonIgnore]
+        public string key {
+            get {
+                return GetKey(fen, last);
+            }
+        }
 
         public static string GetKey(string fen, string last) {
             if (last == null) {
@@ -84,6 +86,118 @@ namespace ChessCon {
             }
 
             return $"{fen} {last}";
+        }
+
+        private static string mergeStr(string a, string b) {
+            if (b == null) return a;
+            if (a == null) return b;
+
+            return string.Join(" ", a.Split(' ').Concat(b.Split(' ')).Distinct());
+        }
+
+        public void Merge(JsonNode node) {
+            count += node.count;
+            midCount += node.midCount;
+            moves = mergeStr(moves, node.moves);
+            tags = mergeStr(tags, node.tags);
+        }
+
+        public FastNode GetFastNode() {
+            var r = new FastNode();
+            r.count = count;
+            r.midCount = midCount;
+            r.score = score;
+            var sans = (moves ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var ms = new List<(SfMove, int)>();
+            foreach (var san in sans) {
+                var m = SfMove.Parse(FEN.San2Uci(fen, san));
+                var key = GetKey(FEN.Basic(FEN.Move(fen, san)), san);
+                ms.Add((m, nodes[key].id));
+            }
+
+            if (ms.Count > 0) r.moves = ms.ToArray();
+
+            return r;
+        }
+    }
+
+    public class FastNode : BaseNode {
+        public (SfMove move, int id)[] moves;
+
+        public static List<FastNode> nodes { get; set; } = new List<FastNode>();
+
+        public void Write(BinaryWriter writer) {
+            writer.WriteVarint(1);
+            writer.WriteVarint(count);
+            writer.WriteVarint(2);
+            writer.WriteVarint(midCount);
+            writer.WriteVarint(3);
+            writer.WriteVarint(score.Value);
+            writer.WriteVarint(4);
+            if (moves == null) {
+                writer.WriteVarint(0);
+            }
+            else {
+                writer.WriteVarint(moves.Length);
+                foreach (var m in moves) {
+                    writer.WriteVarint(1);
+                    writer.Write(m.move.pack());
+                    writer.WriteVarint(2);
+                    writer.WriteVarint(m.id);
+                    writer.WriteVarint(0);
+                }
+            }
+            writer.WriteVarint(0);
+        }
+
+        public static FastNode Read(BinaryReader reader) {
+            var r = new FastNode();
+            long fieldNum;
+            do {
+                fieldNum = reader.ReadVarint();
+                switch (fieldNum) {
+                    case 0:
+                        break;
+                    case 1:
+                        r.count = (int)reader.ReadVarint();
+                        break;
+                    case 2:
+                        r.midCount = (int)reader.ReadVarint();
+                        break;
+                    case 3:
+                        r.score = (int)reader.ReadVarint();
+                        break;
+                    case 4:
+                        var len = (int)reader.ReadVarint();
+                        if (len == 0) break;
+
+                        r.moves = new (SfMove move, int id)[len];
+                        for (var i = 0; i < len; i++) {
+                            long fn2;
+                            do {
+                                fn2 = reader.ReadVarint();
+                                switch (fn2) {
+                                    case 0:
+                                        break;
+                                    case 1:
+                                        r.moves[i].move = SfMove.unpack(reader.ReadUInt16());
+                                        break;
+                                    case 2:
+                                        r.moves[i].id = (int)reader.ReadVarint();
+                                        break;
+                                    default:
+                                        throw new Exception($"Unknown fieldNum: {fieldNum}");
+                                }
+                            } while (fn2 != 0);
+                        }
+                        break;
+                    default:
+                        throw new Exception($"Unknown fieldNum: {fieldNum}");
+                }
+
+            } while (fieldNum != 0);
+
+            return r;
         }
     }
 
@@ -94,9 +208,9 @@ namespace ChessCon {
     }
 
     public class WalkNode {
-        public OpeningNode node { get { return nodes[0]; } }
+        public JsonNode node { get { return nodes[0]; } }
 
-        public OpeningNode parent { get { return nodes[1]; } }
+        public JsonNode parent { get { return nodes[1]; } }
 
         public float freq { get; private set; }
 
@@ -104,7 +218,7 @@ namespace ChessCon {
 
         public WalkState state { get; set; }
 
-        public OpeningNode[] nodes { get; private set; }
+        public JsonNode[] nodes { get; private set; }
 
         public string moves { get { return string.Join(" ", nodes.Reverse().Skip(1).Select(x => x.last)); } } 
 
@@ -112,8 +226,8 @@ namespace ChessCon {
 
         public string info { get; set; }
 
-        public WalkNode(OpeningNode node, OpeningNode[] parents, float freq = 1) {
-            nodes = new OpeningNode[parents.Length + 1];
+        public WalkNode(JsonNode node, JsonNode[] parents, float freq = 1) {
+            nodes = new JsonNode[parents.Length + 1];
             Array.Copy(parents, 0, nodes, 1, parents.Length);
             nodes[0] = node;
             this.freq = freq;
@@ -122,21 +236,21 @@ namespace ChessCon {
 
     class Program {
 
-        private static float getFreq(float freq, OpeningNode node, OpeningNode[] parents) {
-            return node.lastColor == OpeningNode.color ? freq : freq * ((float)Math.Min(node.relCount, parents[0].relCount) / Math.Max(1, parents[0].relCount));
+        private static float getFreq(float freq, JsonNode node, JsonNode[] parents) {
+            return node.lastColor == JsonNode.color ? freq : freq * ((float)Math.Min(node.relCount, parents[0].relCount) / Math.Max(1, parents[0].relCount));
         }
 
-        public static IEnumerable<WalkNode> EnumerateNodesRecurse(OpeningNode[] parents, float freq, Func<WalkNode, WalkState> getState, HashSet<string> hashs = null) {
+        public static IEnumerable<WalkNode> EnumerateNodesRecurse(JsonNode[] parents, float freq, Func<WalkNode, WalkState> getState, HashSet<string> hashs = null) {
             if (hashs == null) hashs = new HashSet<string>();
 
             var ms = (parents[0].moves ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            var keys = ms.Select(m => OpeningNode.GetKey(FEN.Move(parents[0].fen, m), m))
-                .Where(k => nodeDic.ContainsKey(k) && !hashs.Contains(k))
+            var keys = ms.Select(m => JsonNode.GetKey(FEN.Move(parents[0].fen, m), m))
+                .Where(k => JsonNode.nodes.ContainsKey(k) && !hashs.Contains(k))
                 .ToList();
 
             //keys.ForEach(k => hashs.Add(k));
 
-            var nodes = keys.Select(k => nodeDic[k]).OrderByDescending(x => x.relCount).ToArray();
+            var nodes = keys.Select(k => JsonNode.nodes[k]).OrderByDescending(x => x.relCount).ToArray();
             if (nodes.Any(n => hintSet.Contains(n))) {
                 nodes = nodes.Where(n => hintSet.Contains(n)).ToArray();
             }
@@ -164,13 +278,13 @@ namespace ChessCon {
             return moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
         }
 
-        private static IEnumerable<OpeningNode> enumNodesByMoves(string moves = null) {
-            yield return nodeDic[OpeningNode.GetKey(Board.DEFAULT_STARTING_FEN, null)];
+        private static IEnumerable<JsonNode> enumNodesByMoves(string moves = null) {
+            yield return JsonNode.nodes[JsonNode.GetKey(Board.DEFAULT_STARTING_FEN, null)];
             var fen = Board.DEFAULT_STARTING_FEN;
             foreach (var move in getMoves(moves)) {
                 fen = FEN.Move(fen, move);
-                OpeningNode node;
-                if (!nodeDic.TryGetValue(OpeningNode.GetKey(fen, move), out node)) {
+                JsonNode node;
+                if (!JsonNode.nodes.TryGetValue(JsonNode.GetKey(fen, move), out node)) {
                     yield break;
                 }
                 yield return node;
@@ -180,8 +294,8 @@ namespace ChessCon {
         public static IEnumerable<WalkNode> EnumerateNodes(string moves = null, Func<WalkNode, WalkState> getState = null) {
             if (getState == null) getState = x => WalkState.Continue;
 
-            var parents = new List<OpeningNode>();
-            Func<OpeningNode[]> parentsReverse = () => ((IEnumerable<OpeningNode>)parents).Reverse().ToArray();
+            var parents = new List<JsonNode>();
+            Func<JsonNode[]> parentsReverse = () => ((IEnumerable<JsonNode>)parents).Reverse().ToArray();
             var wns = new List<WalkNode>();
             var nodes = enumNodesByMoves(moves).ToArray();
             parents.Add(nodes[0]);
@@ -194,7 +308,7 @@ namespace ChessCon {
             return wns.Concat(EnumerateNodesRecurse(parentsReverse(), 1, getState));
         }
 
-        private static OpeningNode getNodeByMoves(string moves = null) {
+        private static JsonNode getNodeByMoves(string moves = null) {
             return enumNodesByMoves(moves).Last();
         }
 
@@ -204,7 +318,7 @@ namespace ChessCon {
             for (var i = 0; i < nodes.Length; i++) {
                 var color = 1 - (i % 2) * 2;
                 var node = nodes[i];
-                if (color == OpeningNode.color && !hintSet.Contains(node)) {
+                if (color == JsonNode.color && !hintSet.Contains(node)) {
                     hintSet.Add(node);
                 }
             }
@@ -212,7 +326,7 @@ namespace ChessCon {
 
         private static void addExcept(string moves = null) {
             var nodes = enumNodesByMoves(moves).ToList();
-            if ((nodes.Count % 2) * (-2) + 1 == OpeningNode.color) {
+            if ((nodes.Count % 2) * (-2) + 1 == JsonNode.color) {
                 exceptSet.Add(nodes.Last());
             }
         }
@@ -223,16 +337,16 @@ namespace ChessCon {
             var node = nodes.Last();
             var fen = node.fen;
             var nodeColor = node.fen.Contains(" b ") ? 1 : -1;
-            if (nodeColor == OpeningNode.color || ms.Length == 0) {
+            if (nodeColor == JsonNode.color || ms.Length == 0) {
                 return;
             }
 
             var move = ms.First();
             fen = FEN.Move(fen, move);
             node.moves = (node.moves == null) ? move : $"{node.moves} {move}";
-            node = new OpeningNode { fen = fen, last = move, score = node.score, count = node.count, midCount = node.midCount };
-            if (!nodeDic.ContainsKey(node.key)) {
-                nodeDic.Add(node.key, node);
+            node = new JsonNode { fen = fen, last = move, score = node.score, count = node.count, midCount = node.midCount };
+            if (!JsonNode.nodes.ContainsKey(node.key)) {
+                JsonNode.nodes.Add(node.key, node);
             }
 
             /*
@@ -300,25 +414,64 @@ namespace ChessCon {
             return (new string(' ', Math.Max(0, s - r.Length))) + r;
         }
 
-        private static string nodesPath = "d:/lichess.json";
+        private static void compile() {
+            var nodes = File.ReadAllLines(nodesPath).Where(x => x.Contains("#")).Select(x => JsonConvert.DeserializeObject<JsonNode>(x)).ToList();
 
-        private static Dictionary<string,OpeningNode> nodeDic;
+            var id = 1;
+            nodes.ForEach(n => {
+                n.fen = FEN.Basic(n.fen);
+                if (n.last == null) {
+                    n.id = 0;
+                    JsonNode.nodes.Add(n.key, n);
+                    return;
+                }
+
+                if (JsonNode.nodes.TryGetValue(n.key, out var en)) {
+                    en.Merge(n);
+                }
+                else {
+                    n.id = id;
+                    JsonNode.nodes.Add(n.key, n);
+                    id++;
+                }
+            });
+
+            nodes = JsonNode.nodes.Values.OrderBy(n => n.id).ToList();
+
+            using (var writer = new BinaryWriter(File.Open("d:/lichess.dat", FileMode.Create))) {
+                var i = 0;
+                nodes.ForEach(n => { i++; if (i % 1000 == 0) { Console.WriteLine(i); }; n.GetFastNode().Write(writer); });
+            }
+        }
+
+        private static string nodesPath = "d:/lichess.json";
 
         private static volatile bool ctrlC = false;
 
-        private static HashSet<OpeningNode> exceptSet = new HashSet<OpeningNode>();
-        private static HashSet<OpeningNode> hintSet = new HashSet<OpeningNode>();
+        private static HashSet<JsonNode> exceptSet = new HashSet<JsonNode>();
+        private static HashSet<JsonNode> hintSet = new HashSet<JsonNode>();
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
 
-            OpeningNode.color = -1;
-            OpeningNode.relCountFunc = x => x.midCount;
-            // XX: #english #zukertort
-            // d4: #queens #indian #london
+            BaseNode.color = -1;
+            BaseNode.relCountFunc = x => x.midCount;
 
+            //compile();
 
-            nodeDic = File.ReadAllLines(nodesPath).Where(x => x.Contains("#english") || x.Contains("#zukertort") || x.Contains("#queens")).Select(x => JsonConvert.DeserializeObject<OpeningNode>(x)).ToDictionary(x => x.key, x => x);
+            
+            using (var reader = new BinaryReader(File.Open("d:/lichess.dat", FileMode.Open))) {
+                while (reader.BaseStream.Position < reader.BaseStream.Length) {
+                    FastNode.nodes.Add(FastNode.Read(reader));
+                }
+            }
+
+            Console.WriteLine(FastNode.nodes[0].moves.Length);
+            Console.WriteLine("OK");
+            Console.ReadLine();
+            return;
+
+            JsonNode.nodes = File.ReadAllLines(nodesPath).Where(x => x.Contains("#")).Select(x => JsonConvert.DeserializeObject<JsonNode>(x)).ToDictionary(x => x.key, x => x);
             Console.WriteLine("nodeDic loaded.");
 
             var start = "1. d4 d5";
@@ -344,7 +497,7 @@ namespace ChessCon {
             Func<WalkNode, WalkState> getState = wn => {
                 if (wn.freq < 0.03) return WalkState.None;
 
-                return wn.node.lastColor == OpeningNode.color
+                return wn.node.lastColor == JsonNode.color
                     ? (wn.node.relScore >= startScore - 50 ? WalkState.Continue : WalkState.None)
                     : (wn.node.relScore <= startScore + 100 ? WalkState.Continue : WalkState.Break);
             };

@@ -283,5 +283,12 @@ namespace Chess
             var patSquares = Enumerable.Range(0, 64).Select(x => (Square)x).Where(x => patBoard[x] != null).ToArray();
             return !patSquares.Where(s => board[s] == null || board[s].GetType() != patBoard[s].GetType() || board[s].Player != patBoard[s].Player).Any();
         }
+
+        public static string Basic(string fen) {
+            var fs = fen.Split(' ');
+            fs[4] = "0";
+            fs[5] = "1";
+            return string.Join(" ", fs);
+        }
     }
 }

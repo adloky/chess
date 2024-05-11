@@ -1289,8 +1289,8 @@ namespace ChessAnalCon {
         // Material Imbalance Pawns Knights Bishops Rooks Queens Mobility King safety Threats Passed Space Winnable
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
-
-            Func<string,string> sFen = f => string.Join(" ", f.Split(',')[0].Split(' ').Take(4));
+            /*
+            Func<string,string> sFen = f => string.Join(" ", f.Split(' ').Take(4));
             
             using (var reader = File.OpenText("d:/lichess_2023-04.csv")) {
                 while (!reader.EndOfStream) {
@@ -1313,7 +1313,7 @@ namespace ChessAnalCon {
                     }
                 }
             }
-
+            */
             //testEngine();
 
             //Sunfish.SimplePst();
