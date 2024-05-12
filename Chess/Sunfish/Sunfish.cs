@@ -280,6 +280,8 @@ namespace Chess.Sunfish {
         }
 
         public override string ToString() {
+            if (a == 0) return null;
+
             var cs = new char[5];
             var n = 0;
             if (i != 0) {

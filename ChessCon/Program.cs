@@ -25,12 +25,14 @@ using Chess.Sunfish;
 
 namespace ChessCon {
 
-    public class BaseNode {
+    public abstract class BaseNode {
         public int count { get; set; }
 
         public int midCount { get; set; }
 
         public int? score { get; set; }
+
+        public abstract string last { get; set; }
 
         [JsonIgnore]
         public int topCount { get { return count - midCount; } }
@@ -47,13 +49,14 @@ namespace ChessCon {
 
         public static Func<BaseNode, int> relScoreFunc { get; set; } = x => x.score.Value * color;
 
+        public abstract IEnumerable<BaseNode> getChilds(string move = null);
     }
 
     public class JsonNode : BaseNode {
 
         public string fen { get; set; }
 
-        public string last { get; set; }
+        public override string last { get; set; }
 
         public string moves { get; set; }
 
@@ -107,22 +110,69 @@ namespace ChessCon {
             r.count = count;
             r.midCount = midCount;
             r.score = score;
-            var sans = (moves ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (moves == null)
+                return r;
+
+            var sans = moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             var ms = new List<(SfMove, int)>();
             foreach (var san in sans) {
                 var m = SfMove.Parse(FEN.San2Uci(fen, san));
-                var key = GetKey(FEN.Basic(FEN.Move(fen, san)), san);
+                var cFen = FEN.Move(fen, san);
+                //cFen = FEN.Basic(f);
+                var key = GetKey(FEN.Move(cFen, san), san);
                 ms.Add((m, nodes[key].id));
             }
 
-            if (ms.Count > 0) r.moves = ms.ToArray();
+            r.moves = ms.ToArray();
 
             return r;
+        }
+
+        public static void Load(string tags) {
+            var ts = tags.Split(' ');
+            var nodes = File.ReadAllLines("d:/lichess.json").Where(x => ts.Any(t => x.Contains(t))).Select(x => JsonConvert.DeserializeObject<JsonNode>(x)).ToList();
+            var id = 1;
+            var j = 0;
+            nodes.ForEach(n => {
+                // n.fen = FEN.Basic(n.fen);
+                if (n.last == null) {
+                    n.id = 0;
+                    JsonNode.nodes.Add(n.key, n);
+                    return;
+                }
+
+                if (JsonNode.nodes.TryGetValue(n.key, out var en)) {
+                    en.Merge(n);
+                    j++;
+                }
+                else {
+                    n.id = id;
+                    JsonNode.nodes.Add(n.key, n);
+                    id++;
+                }
+            });
+        }
+
+        public override IEnumerable<BaseNode> getChilds(string move = null) {
+            var ms = (moves ?? "").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (move != null)
+                ms = ms.Where(m => m == move).ToArray();
+
+            foreach (var m in ms) {
+                var cFen = FEN.Move(fen, m);
+                if (nodes.TryGetValue(GetKey(cFen, m), out var en)) {
+                    yield return en;
+                }
+            }
         }
     }
 
     public class FastNode : BaseNode {
         public (SfMove move, int id)[] moves;
+
+        private SfMove _last;
+
+        public override string last { get => _last.ToString(); set { throw new NotImplementedException(); } }
 
         public static List<FastNode> nodes { get; set; } = new List<FastNode>();
 
@@ -198,6 +248,24 @@ namespace ChessCon {
             } while (fieldNum != 0);
 
             return r;
+        }
+
+        public static void Load() {
+            using (var reader = new BinaryReader(File.Open("d:/lichess.dat", FileMode.Open))) {
+                var len = reader.BaseStream.Length;
+                while (reader.BaseStream.Position < len) {
+                    nodes.Add(Read(reader));
+                }
+            }
+            var empty = new (SfMove move, int id)[] { };
+            foreach (var m in nodes.SelectMany(x => x.moves ?? empty)) {
+                nodes[m.id]._last = m.move;
+            }
+        }
+
+        public override IEnumerable<BaseNode> getChilds(string move = null) {
+            var ns = moves.Select(m => nodes[m.id]);
+            return move == null ? ns : ns.Where(n => n.last == move);
         }
     }
 
@@ -415,28 +483,7 @@ namespace ChessCon {
         }
 
         private static void compile() {
-            var nodes = File.ReadAllLines(nodesPath).Where(x => x.Contains("#")).Select(x => JsonConvert.DeserializeObject<JsonNode>(x)).ToList();
-
-            var id = 1;
-            nodes.ForEach(n => {
-                n.fen = FEN.Basic(n.fen);
-                if (n.last == null) {
-                    n.id = 0;
-                    JsonNode.nodes.Add(n.key, n);
-                    return;
-                }
-
-                if (JsonNode.nodes.TryGetValue(n.key, out var en)) {
-                    en.Merge(n);
-                }
-                else {
-                    n.id = id;
-                    JsonNode.nodes.Add(n.key, n);
-                    id++;
-                }
-            });
-
-            nodes = JsonNode.nodes.Values.OrderBy(n => n.id).ToList();
+            var nodes = JsonNode.nodes.Values.OrderBy(n => n.id).ToList();
 
             using (var writer = new BinaryWriter(File.Open("d:/lichess.dat", FileMode.Create))) {
                 var i = 0;
@@ -456,17 +503,9 @@ namespace ChessCon {
 
             BaseNode.color = -1;
             BaseNode.relCountFunc = x => x.midCount;
-
-            //compile();
-
-            
-            using (var reader = new BinaryReader(File.Open("d:/lichess.dat", FileMode.Open))) {
-                while (reader.BaseStream.Position < reader.BaseStream.Length) {
-                    FastNode.nodes.Add(FastNode.Read(reader));
-                }
-            }
-
-            Console.WriteLine(FastNode.nodes[0].moves.Length);
+            FastNode.Load();
+            //JsonNode.Load("#");
+            //            compile();
             Console.WriteLine("OK");
             Console.ReadLine();
             return;
