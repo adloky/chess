@@ -552,12 +552,12 @@ namespace ChessAnalCon {
         private static HashSet<string> pgnParams = new HashSet<string>(new string[] { "Date", "White", "Black", "Result", "Date", "WhiteElo", "BlackElo", "TimeControl", "Link", "Color" });
 
         private static void handlePgn() {
-            var path = "d:/NikitosPopados.pgn";
-            var login = "NikitosPopados";
-            var prefix = "wall-";
-            var open = "";
-            var openSubs = " f5";
-            var fullMoves = true;
+            var path = "d:/msb2.pgn";
+            var login = "Msb2";
+            var prefix = "french-";
+            var open = "1. e4 e6";
+            var openSubs = " ";
+            var fullMoves = false;
             var findColor = -1;
 
             var fileName = Path.GetFileName(path);
@@ -566,7 +566,7 @@ namespace ChessAnalCon {
 
             using (var stream = File.OpenRead(path)) {
                 var rs = new List<string>();
-                var pgns = Pgn.LoadMany(stream).ToArray();
+                var pgns = Pgn.LoadMany(stream).OrderByDescending(x => x.Params["Date"]).ToArray();
 
                 foreach (var pgn in pgns) {
                     //var color = int.Parse(pgn.Params["Color"]);
@@ -578,7 +578,7 @@ namespace ChessAnalCon {
                     var openSubsIndex = pgn.Moves.IndexOf(openSubs);
                     var isOpen = pgn.Moves.StartsWith(open) && openSubsIndex >= 0 && openSubsIndex < 100;
 
-                    if (!((findColor == color || findColor == 0) && (true || !isLoss) && control >= 180 && isOpen)) {
+                    if (!((findColor == color || findColor == 0) && (!isLoss) && control >= 120 && isOpen)) {
                         continue;
                     }
 
@@ -1290,37 +1290,92 @@ namespace ChessAnalCon {
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
             /*
-            Func<string,string> sFen = f => string.Join(" ", f.Split(' ').Take(4));
-            
-            using (var reader = File.OpenText("d:/lichess_2023-04.csv")) {
-                while (!reader.EndOfStream) {
-                    var fen = Board.DEFAULT_STARTING_FEN;
-                    var moves = reader.ReadLine().Split(',')[0].Split(' ');
-                    var pos = SfPosition.FromFen(fen);
-                    foreach (var san in moves) {
-                        var pos2 = SfPosition.FromFen(fen);
-                        var uci = FEN.San2Uci(fen, san);
-                        fen = FEN.Move(fen, uci);
-                        var m = SfMove.Parse(uci);
-                        pos.move(m);
-                        var p = m.pack();
-                        m = SfMove.unpack(p);
-                        pos2.move(m);
-                        var posFen = sFen(pos.GetFen());
-                        if (posFen != sFen(fen) || posFen != sFen(pos2.GetFen())) {
-                            throw new Exception();
+                s = s.Replace("{ [%eval ", "{").Replace("] }", "}");
+                s = Regex.Replace(s, @" (1-0|0-1|\*|1/2-1/2)$", "");
+
+                s = handleString(s, new Regex(@"\{#-?(\d+)\}"), (x,m) => {
+                    var n = int.Parse(m.Groups[1].Value);
+                    n = 300 - n;
+                    x = Regex.Replace(x, @"\d+", n.ToString()).Replace("#", "");
+                    return x;
+                });
+            */
+
+            /*
+[Event "Rated Blitz game"]
+[Site "https://lichess.org/sDqaPERm"]
+[White "Supergrobi65"]
+[Black "extrazoom"]
+[Result "1-0"]
+[WhiteElo "1557"]
+[BlackElo "1562"]
+             */
+            var paramSet = new HashSet<string>() { "Color", "Site", "White", "Black", "Result", "WhiteElo", "BlackElo" };
+            var path = "e:/lichess_db_standard_rated_2024-04.pgn";
+            var path2 = path.Replace("e:", "d:").Replace(".pgn", "-adv.pgn");
+            var spaceRe = new Regex(@" +", RegexOptions.Compiled);
+            var numRe = new Regex(@"\d+\.{3}", RegexOptions.Compiled);
+            var cmtRe = new Regex(@"\{[^}]*\}", RegexOptions.Compiled);
+            var evalRe = new Regex(@"\[%eval ([^\]]*)\]", RegexOptions.Compiled);
+            var rs = new List<string>();
+            using (var writer = new StreamWriter(File.OpenWrite(path2))) 
+            using (var stream = File.OpenRead(path)) {
+                var pgns = Pgn.LoadMany(stream);
+                foreach (var pgn in pgns) {
+                    var ev = pgn.Params["Event"];
+                    if (!ev.Contains("Blitz") && !ev.Contains("Rapid"))
+                        continue;
+
+                    var diff = ev.Contains("Rapid") ? 150 : 0;
+                    var elos = new[] { (int.Parse(pgn.Params["WhiteElo"]) - diff, 1), (int.Parse(pgn.Params["BlackElo"]) - diff, -1) }.OrderByDescending(x => x.Item1).ToArray();
+                    var color = elos[0].Item2.ToString();
+                    pgn.Params.Add("Color", color);
+                    if (elos[1].Item1 < 1800 || elos[0].Item1 - elos[1].Item1 < 200)
+                        continue;
+
+                    pgn.Params.Keys.Where(k => !paramSet.Contains(k)).ToList().ForEach(k => pgn.Params.Remove(k));
+
+                    var body = string.Join(" ", pgn.MovesSource);
+                    body = handleString(body, cmtRe, (s, m) => {
+                        var match = evalRe.Match(s);
+                        if (!match.Success)
+                            return "";
+
+                        var evalStr = match.Groups[1].Value;
+                        var isMate = false;
+                        if (evalStr.Contains("#")) {
+                            evalStr = evalStr.Replace("#", "");
+                            isMate = true;
                         }
+                        var eval = double.Parse(evalStr, CultureInfo.InvariantCulture);
+                        if (isMate) {
+                            eval = eval > 0 ? 300 - eval : -300 - eval; 
+                        }
+                        evalStr = eval.ToString(CultureInfo.InvariantCulture);
+
+                        return $"{{{evalStr}}}";
+                    });
+
+                    if (!body.Contains("{")) body = numRe.Replace(body, "");
+                    body = spaceRe.Replace(body, " ").Trim();
+
+                    pgn.MovesSource.Clear();
+                    pgn.MovesSource.Add(body);
+                    rs.Add(pgn.ToString());
+                    if (rs.Count >= 1000) {
+                        writer.Write(string.Join("", rs));
+                        Console.WriteLine(stream.Position / 1000000);
+                        rs.Clear();
                     }
                 }
+                writer.Write(string.Join("", rs));
             }
-            */
+            
             //testEngine();
 
             //Sunfish.SimplePst();
 
             // solvePuzzles("d:/Konotop4-3.pgn", 4, enginePath: @"d:\Projects\stockfish-simpleEval\bin\Debug\x64\Stockfish.exe", @"d:\Distribs\stockfish_16\stockfish-windows-x86-64-modern.exe"); // @"d:\Distribs\Sunfish\sunfish.exe"
-
-            //handlePgn();
 
             // processMd("d:/Projects/smalls/ideas-my.md");
 
@@ -1331,7 +1386,7 @@ namespace ChessAnalCon {
             //handleScidHtml("d:/french-classic-mbm.html");
             //handleScidMd(@"d:\Projects\smalls\french-classic-b-mbm.md");
             //Console.ReadLine();
-            //pgnSearch();
+            // pgnSearch();
             //handlePgn();
             //simplifyChessable();
             //handleCbHtml("D:/sicilian-alapin.html");
@@ -1512,6 +1567,32 @@ namespace ChessAnalCon {
         }
     }
 }
+
+/*
+            Func<string,string> sFen = f => string.Join(" ", f.Split(' ').Take(4));
+            
+            using (var reader = File.OpenText("d:/lichess_2023-04.csv")) {
+                while (!reader.EndOfStream) {
+                    var fen = Board.DEFAULT_STARTING_FEN;
+                    var moves = reader.ReadLine().Split(',')[0].Split(' ');
+                    var pos = SfPosition.FromFen(fen);
+                    foreach (var san in moves) {
+                        var pos2 = SfPosition.FromFen(fen);
+                        var uci = FEN.San2Uci(fen, san);
+                        fen = FEN.Move(fen, uci);
+                        var m = SfMove.Parse(uci);
+                        pos.move(m);
+                        var p = m.pack();
+                        m = SfMove.unpack(p);
+                        pos2.move(m);
+                        var posFen = sFen(pos.GetFen());
+                        if (posFen != sFen(fen) || posFen != sFen(pos2.GetFen())) {
+                            throw new Exception();
+                        }
+                    }
+                }
+            }
+*/
 
 /*
 var paramCount = new Dictionary<string, int>();

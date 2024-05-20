@@ -124,9 +124,12 @@ namespace ChessMd {
 
         public MoveInfo Push(int level, int index, string move, bool skipId = false) {
             var prev = getPrev(level, index);
-            var uci = FEN.San2Uci(prev.fen, move);
-            var san = FEN.Uci2San(prev.fen, uci);
-            var err = move != san;
+            var err = false;
+            if (move != "--") {
+                var uci = FEN.San2Uci(prev.fen, move);
+                var san = FEN.Uci2San(prev.fen, uci);
+                err = move != san;
+            }
             if (!skipId) id++;
             var mi = new MoveInfo() { id = skipId ? null : $"move{id}", prev = prev.id, fen = FEN.Move(prev.fen, move), moveSan = move, moveUci = move == "--" ? null : FEN.San2Uci(prev.fen, move), err = err };
             this[level, index] = mi;
@@ -413,6 +416,9 @@ namespace ChessMd {
 
                 var breakHandle = false;
                 var rs = handleString(s2, moveSeqRe, (x, m) => {
+                    if (s2.StartsWith("7.e7")) {
+                    }
+
                     if (skipAll || skipStarts.Any(y => x.StartsWith(y)) || breakHandle) {
                         return x;
                     }
@@ -533,6 +539,7 @@ namespace ChessMd {
         }
 
         static void Main(string[] args) {
+            //compileMd(@"d:\Projects\smalls\caro-kann-shima.md");
             mdMonitor();
         }
     }

@@ -225,6 +225,22 @@ namespace Chess
             return board.GetMateState();
         }
 
+        public static IEnumerable<string> San2Uci(string fen, IEnumerable<string> sans) {
+            var board = Board.Load(fen);
+            foreach (var san in sans) {
+                yield return board.ParseSanMove(san).ToUciString();
+                board.Move(san);
+            }
+        }
+
+        public static IEnumerable<string> Uci2San(string fen, IEnumerable<string> ucis) {
+            var board = Board.Load(fen);
+            foreach (var uci in ucis) {
+                yield return board.Uci2San(uci);
+                board.Move(uci);
+            }
+        }
+
         public static string San2Uci(string fen, string sans) {
             if (sans == null) {
                 return null;
