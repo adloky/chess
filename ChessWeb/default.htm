@@ -12,11 +12,12 @@
       .arrows.hidden { display: none; }
       .board td, .drag-piece, .arrows { background-repeat: no-repeat; background-position: center center; background-size: cover; }
       .move { display: inline-block; font-size: 16pt; padding: 2pt 5pt; cursor: pointer; border-radius: 2pt; }
-      .move-sel { background-color: #c8daed; }
+      .move-sel, .game-sel { background-color: #c8daed; }
       .pgn-box { display: none; }
       .pgn-box.visible { display: block; }
       .draggable { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 0; margin: 0; }
       .hidden { visibility: collapse; }
+      table { border-collapse: collapse; }
       
       .pbr { background-image: url(img/br.svg); }
       .pbn { background-image: url(img/bn.svg); }
@@ -73,16 +74,20 @@
                   <option value="3">Kmd</option>
                   <option value="4">SEv</option>
               </select>
-              <button class="skip-btn" style="font-size: 12pt; margin-left: 5pt; ">&nbsp;&nbsp;-&nbsp;&nbsp;</button>
+          </div>
+          <div style="align-content: center; display: flex; margin-top: 10pt; height: 24pt; ">
+              <button class="skip-btn" style="font-size: 12pt; margin-left: 5pt; white-space: nowrap;">&nbsp;&nbsp;--&nbsp;&nbsp;</button>
               <button class="flip-btn" style="font-size: 12pt; margin-left: 5pt; ">Flip</button>
               <button class="mode-btn" style="font-size: 12pt; margin-left: 5pt; padding-left: 10pt; padding-right: 10pt; ">A</button>
+              <button class="game-btn" style="font-size: 12pt; margin-left: 5pt; ">&nbsp;&nbsp;G&nbsp;&nbsp;</button>
           </div>
           <div class="move-var" style="padding-top: 5pt; ">&nbsp;</div>
           <div class="pgn-box">
               <textarea class="pgn-text" rows="3" style="width: 100%; margin: 5pt 0; "></textarea>
               <button class="pgn-ok" style="font-size: 12pt; ">OK</button>
           </div>
-          <div class="move-box" style="padding: 10pt 0;"><span class="move-end"/>&nbsp;</div>
+          <div class="move-box" style="padding: 10pt 0; overflow-y: auto; height: 150pt; "><span class="move-end"/>&nbsp;</div>
+          <div class="game-box" style="padding: 10pt 0; overflow-y: auto; height: 200pt; "></div>
       </div>
       <script>
           var startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -384,6 +389,35 @@
                       $(".arrows").removeClass("hidden");
                   }
                   applyFenNCalc(curFen, true);
+              });
+              
+              var gameMoveIndex = -1;
+              
+              $(".game-btn").click(function () {
+                  var ms = $(".move").toArray().map(x => $(x).text());
+                  gameMoveIndex = getMoveIndex();
+                  if (gameMoveIndex >= 0) {
+                      ms = ms.slice(0, gameMoveIndex + 1);
+                  }
+                  var moves = ms.join(" ");
+                  engine.server.getGames(moves, getSide()).done(function (rs) {
+                      var html = rs.map(r => `<tr class="game" data-moves="${r.moves}"><td>${r.result}</td><td>${r.wElo}</td><td>${r.bElo}</td></tr>`).join("");
+                      $(".game-box").html("<table>" + html + "</table>");
+                  });
+              });
+              
+              $(document).on("click", ".game", function() {
+                  engine.server.getMoves(prettyPgn($(this).data("moves"))).done(pgn => {
+                      $(".game-sel").removeClass("game-sel");
+                      $(this).addClass("game-sel");
+                      $(".move-sel").removeClass("move-sel");
+                      addMoves(pgn.moveFens);
+                      $(".move-sel").removeClass("move-sel");
+                      if (gameMoveIndex >= 0) {
+                          $(`.move[data-index=${gameMoveIndex}]`).addClass("move-sel");
+                          applyFenNCalc($(".move-sel").data("fen"));
+                      }
+                  });                  
               });
 
               $(".draggable").draggable({

@@ -193,15 +193,16 @@ namespace Chess {
             moves = Load(moves).Moves;
             long left = 0;
             long right = findStart(stream, stream.Length);
-            while (left != right) {
+            while (left < right) {
                 long middle = findStart(stream, (left + right) / 2);
-                if (middle == left) break;
+                if (middle == left)
+                    break;
                 stream.Position = middle;
                 var pgn = (Pgn)null;
                 using (var reader = new StreamReader(stream, Encoding.UTF8, false, 2048, true)) {
                     pgn = LoadMany(reader).First();
                 }
-                if (moves.CompareTo(pgn.Moves) <= 0) {
+                if (pgn.Moves.IndexOf(moves) == 0 || moves.CompareTo(pgn.Moves) < 0) {
                     right = middle;
                 }
                 else {
@@ -209,9 +210,28 @@ namespace Chess {
                 }
             }
 
-            stream.Position = left;
-            return LoadMany(stream).SkipWhile(x => x.Moves.IndexOf(moves) != 0)
-                .TakeWhile(x => x.Moves.IndexOf(moves) == 0);
+            if (right + 1 < stream.Length)
+                right++;
+
+            long pos = -1;
+            while (left < right) {
+                right = findStart(stream, right);
+                stream.Position = right;
+                var pgn = (Pgn)null;
+                using (var reader = new StreamReader(stream, Encoding.UTF8, false, 2048, true)) {
+                    pgn = LoadMany(reader).First();
+                }
+
+                if (pgn.Moves.IndexOf(moves) == 0) {
+                    pos = right;
+                }
+            }
+
+            if (pos == -1)
+                return Enumerable.Empty<Pgn>();
+
+            stream.Position = pos;
+            return LoadMany(stream).TakeWhile(x => x.Moves.IndexOf(moves) == 0);
         }
     }
 }

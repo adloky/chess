@@ -1290,10 +1290,10 @@ namespace ChessAnalCon {
         // Material Imbalance Pawns Knights Bishops Rooks Queens Mobility King safety Threats Passed Space Winnable
         static void Main(string[] args) {
             Console.CancelKeyPress += (o, e) => { ctrlC = true; e.Cancel = true; };
-            Console.WriteLine(Pgn.LoadMany(File.OpenRead("d:/chess/pgns/_adv.pgn"), "1. e4 Nf6 2. e5 Nd5 3. Nc3").Count());
-            //foreach (var pgn in Pgn.LoadMany(File.OpenRead("d:/chess/pgns/_adv.pgn"), "1. e4 d5 2. exd5 Qxd5 3. Nf3").Take(5)) {
-            //    Console.WriteLine(pgn.Params["Site"] + " " + pgn.Moves.Substring(0,10));
-            //}
+            //Console.WriteLine(Pgn.LoadMany(File.OpenRead("d:/chess/pgns/_adv.pgn"), "1. e4 Nf6 2. e5 Nd5 3. Nc3").Count());
+            foreach (var pgn in Pgn.LoadMany(File.OpenRead("d:/chess/pgns/_adv.pgn"), "1. Nh3")) {
+                Console.WriteLine(pgn.Params["Site"] + " " + pgn.Moves.Substring(0,10));
+            }
 
             Console.WriteLine("FINISH");
             Console.ReadLine();

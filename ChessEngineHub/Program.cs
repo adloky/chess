@@ -11,6 +11,7 @@ using Chess;
 using ChessEngine;
 using System.Diagnostics;
 using System.Threading;
+using System.IO;
 
 namespace ChessEngineHub {
     class Program {
@@ -144,6 +145,29 @@ namespace ChessEngineHub {
                 };
             }
             return engineNum;
+        }
+
+        public GameDto[] getGames(string moves, int color) {
+            var exceptResult = color == 1 ? "0-1" : "1-0";
+            var rnd = new Random();
+            using (var stream = File.OpenRead("d:/chess/pgns/_adv.pgn")) {
+                return Pgn.LoadMany(stream, moves)
+                .Where(p => p.Params["Color"] == color.ToString() && p.Params["Result"] != exceptResult)
+                .Take(10000).Select(p => new GameDto {
+                    wElo = int.Parse(p.Params["WhiteElo"])
+                  , bElo = int.Parse(p.Params["BlackElo"])
+                  , result = p.Params["Result"].Replace("1/2", "½")
+                  , moves = p.Moves
+                }).OrderByDescending(x => Math.Abs(x.wElo - x.bElo) * 1000 + rnd.Next(1000))
+                .Take(100).ToArray();
+            }
+        }
+
+        public class GameDto {
+            public int wElo { get; set; }
+            public int bElo { get; set; }
+            public string moves { get; set; }
+            public string result { get; set; }
         }
 
         public class PgnDto {
