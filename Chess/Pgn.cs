@@ -102,6 +102,10 @@ namespace Chess {
                     yield return pgn;
                     pgn = new Pgn();
                 }
+
+                if (reader.EndOfStream && (pgn.Params.Count > 0 || pgn.MovesSource.Count > 0)) {
+                    yield return pgn;
+                }
             }
         }
 
@@ -163,6 +167,51 @@ namespace Chess {
             sb.Append(Environment.NewLine);
 
             return sb.ToString();
+        }
+
+        private const int BLOCK_SIZE = 10 * 1024;
+
+        private static long findStart(Stream stream, long pos) {
+            var buff = new byte[Math.Min(pos, BLOCK_SIZE)];
+            stream.Position = pos - buff.Length;
+            stream.Read(buff, 0, buff.Length);
+
+            var s = Encoding.UTF8.GetString(buff);
+            if (s.Length != buff.Length)
+                throw new Exception("Pgn contains Unicode.");
+
+            var pat = s.Contains("\r\n") ? "\r\n\r\n[" : "\n\n[";
+
+            var i = s.LastIndexOf(pat);
+            if (i < 0)
+                return pos - buff.Length;
+
+            return pos - buff.Length + i + pat.Length - 1;
+        }
+
+        public static IEnumerable<Pgn> LoadMany(Stream stream, string moves) {
+            moves = Load(moves).Moves;
+            long left = 0;
+            long right = findStart(stream, stream.Length);
+            while (left != right) {
+                long middle = findStart(stream, (left + right) / 2);
+                if (middle == left) break;
+                stream.Position = middle;
+                var pgn = (Pgn)null;
+                using (var reader = new StreamReader(stream, Encoding.UTF8, false, 2048, true)) {
+                    pgn = LoadMany(reader).First();
+                }
+                if (moves.CompareTo(pgn.Moves) <= 0) {
+                    right = middle;
+                }
+                else {
+                    left = middle;
+                }
+            }
+
+            stream.Position = left;
+            return LoadMany(stream).SkipWhile(x => x.Moves.IndexOf(moves) != 0)
+                .TakeWhile(x => x.Moves.IndexOf(moves) == 0);
         }
     }
 }
