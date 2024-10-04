@@ -309,6 +309,27 @@ namespace ChessMd {
             return new string(fc);
         }
 
+        private static Regex enRe = new Regex("[A-Za-z]+", RegexOptions.Compiled);
+        private static Regex ruRe = new Regex("[А-яа-я]+", RegexOptions.Compiled);
+
+        private static int enru(string s) {
+            s = Tag.Clear(s);
+            var m = enRe.Match(s);
+            var en = 0;
+            while (m.Success) {
+                en += m.Value.Length;
+                m = m.NextMatch();
+            }
+            m = ruRe.Match(s);
+            var ru = 0;
+            while (m.Success) {
+                ru += m.Value.Length;
+                m = m.NextMatch();
+            }
+
+            var sum = Math.Max(1, en + ru);
+            return (en * 100 / sum) - (ru * 100 / sum);
+        }
 
         private static HashSet<string> clearTags = new HashSet<string>() { "add", "addz", "level", "skip", "config", "fen", "fend", "confinue", "diagram" };
         private static Regex headerRe = new Regex("^#+ ", RegexOptions.Compiled);
@@ -335,6 +356,9 @@ namespace ChessMd {
             }
             if (configTag.attr.TryGetValue("dnd", out configVal) && configVal == "1") {
                 book = book.Select(x => x.Replace("dnd = false", "dnd = true")).ToArray();
+            }
+            if (configTag.attr.TryGetValue("hidden", out configVal) && configVal == "1") {
+                book = book.Select(x => x.Replace("hidden = false", "hidden = true")).ToArray();
             }
             if (configTag.attr.TryGetValue("hilight", out configVal) && configVal == "1") {
                 book = book.Select(x => x.Replace(".move-hilight", ".move")).ToArray();
@@ -416,9 +440,6 @@ namespace ChessMd {
 
                 var breakHandle = false;
                 var rs = handleString(s2, moveSeqRe, (x, m) => {
-                    if (s2.StartsWith("7.e7")) {
-                    }
-
                     if (skipAll || skipStarts.Any(y => x.StartsWith(y)) || breakHandle) {
                         return x;
                     }
@@ -473,10 +494,17 @@ namespace ChessMd {
             string[] ts1 = null;
             string[] ts2 = null;
             if (configTag.attr.TryGetValue("translate", out configVal)) {
-                var paths = configVal.Split(';');
-                ts1 = File.ReadAllLines(paths[0]);
-                if (paths.Length > 1) {
-                    ts2 = File.ReadAllLines(paths[1]);
+                if (configVal == "") {
+                    ts1 = rss.Where(x => !string.IsNullOrEmpty(x) && (enru(x) < 0 || Tag.Clear(x) == "" || x.Contains("<tcommon/>"))).ToArray();
+                    rss = rss.Where(x => !string.IsNullOrEmpty(x) && (enru(x) >= 0 || x.Contains("<tcommon/>"))).ToList();
+                    content = content.Where(x => enru(Tag.Clear(x)) > 0).ToList();
+                }
+                else {
+                    var paths = configVal.Split(';');
+                    ts1 = File.ReadAllLines(paths[0]).Where(x => !string.IsNullOrEmpty(x)).ToArray();
+                    if (paths.Length > 1) {
+                        ts2 = File.ReadAllLines(paths[1]).Where(x => !string.IsNullOrEmpty(x)).ToArray();
+                    }
                 }
             }
 
@@ -492,7 +520,12 @@ namespace ChessMd {
 
                 var t1 = (i < ts1.Length) ? ts1[i] : "";
                 var t2 = (ts2 != null && i < ts2.Length) ? ts2[i] : "";
-                html.Add($"<table class=\"colums{(ts2 == null ? "2" : "3" )}\"><tr><td>{Markdown.ToHtml(s)}</td><td>{Markdown.ToHtml(t1)}</td>{(ts2 == null ? "" : $"<td>{Markdown.ToHtml(t2)}</td>")}</tr></table>");
+                if (s.Contains("<tcommon/>")) {
+                    html.Add(Markdown.ToHtml(s));
+                    continue;
+                }
+                //html.Add($"<table class=\"colums{(ts2 == null ? "2" : "3" )}\"><tr><td>{Markdown.ToHtml(s)}</td><td>{Markdown.ToHtml(t1)}</td>{(ts2 == null ? "" : $"<td>{Markdown.ToHtml(t2)}</td>")}</tr></table>");
+                html.Add($"<div class=\"colums{(ts2 == null ? "2" : "3")}\"><div>{Markdown.ToHtml(s)}</div><div>{Markdown.ToHtml(t1)}</div>{(ts2 == null ? "" : $"<div>{Markdown.ToHtml(t2)}</div>")}</div>");
             }
 
             for (var i = 0; i < Math.Min(100, html.Count); i++) {

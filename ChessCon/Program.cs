@@ -100,7 +100,7 @@ namespace ChessCon {
             tags = mergeStr(tags, node.tags);
         }
 
-        public FastNode GetFastNode() {
+        public FastNode GetFastNode(Dictionary<string, JsonNode> d) {
             var r = new FastNode();
             r.count = count;
             r.midCount = midCount;
@@ -111,11 +111,10 @@ namespace ChessCon {
             var sans = moves.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             var ms = new List<(SfMove, int)>();
             foreach (var san in sans) {
-                var m = SfMove.Parse(FEN.San2Uci(fen, san));
-                var cFen = FEN.Move(fen, san);
-                //cFen = FEN.Basic(f);
-                var key = GetKey(FEN.Move(cFen, san), san);
-                ms.Add((m, nodes[key].id));
+                var uci = FEN.San2Uci(fen, san);
+                var m = SfMove.Parse(uci);
+                var key = GetKey(FEN.Move(fen, san), uci);
+                ms.Add((m, d[key].id));
             }
 
             r.moves = ms.ToArray();
@@ -123,29 +122,10 @@ namespace ChessCon {
             return r;
         }
 
-        public static void Load(string tags) {
+        public static void Load(string tags = "#") {
             var ts = tags.Split(' ');
             var nodes = File.ReadAllLines("d:/lichess.json").Where(x => ts.Any(t => x.Contains(t))).Select(x => JsonConvert.DeserializeObject<JsonNode>(x)).ToList();
-            var id = 1;
-            var j = 0;
-            nodes.ForEach(n => {
-                // n.fen = FEN.Basic(n.fen);
-                if (n.last == null) {
-                    n.id = 0;
-                    JsonNode.nodes.Add(n.key, n);
-                    return;
-                }
-
-                if (JsonNode.nodes.TryGetValue(n.key, out var en)) {
-                    en.Merge(n);
-                    j++;
-                }
-                else {
-                    n.id = id;
-                    JsonNode.nodes.Add(n.key, n);
-                    id++;
-                }
-            });
+            JsonNode.nodes = nodes.ToDictionary(n => n.key, n => n);
         }
 
         public override IEnumerable<BaseNode> getChilds(string move = null) {
@@ -394,6 +374,9 @@ namespace ChessCon {
 
         public static void ShrinkSubMoves(IList<WalkNode> wns, string start) {
             start = Regex.Replace(start ?? "", @"\d+\.\s+", "");
+            if (BaseNode.root is FastNode) {
+                start = FEN.San2Uci(Board.DEFAULT_STARTING_FEN, start);
+            }
             if (wns.Count < 2) return;
             var i = 1;
             do {
@@ -449,12 +432,32 @@ namespace ChessCon {
             return (new string(' ', Math.Max(0, s - r.Length))) + r;
         }
 
-        private static void compile() {
-            var nodes = JsonNode.nodes.Values.OrderBy(n => n.id).ToList();
+        private static void compileWalk(JsonNode n, string m, ref int id, Dictionary<string, JsonNode> d) {
+            n = JsonConvert.DeserializeObject<JsonNode>(JsonConvert.SerializeObject(n));
+            n.last = m;
+            if (d.ContainsKey(n.key)) return;
 
+            if (id % 1000 == 0) Console.WriteLine(id);
+
+            n.id = id;
+            id++;
+            d[n.key] = n;
+            foreach (var san in (n.moves ?? "").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)) {
+                var uci = FEN.San2Uci(n.fen, san);
+                var nn = JsonNode.nodes[JsonNode.GetKey(FEN.Move(n.fen, san), san)];
+                compileWalk(nn, uci, ref id, d);
+            }
+        }
+
+        private static void compile() {
+            var id = 0;
+            var d = new Dictionary<string, JsonNode>();
+            compileWalk(JsonNode.nodes[Board.DEFAULT_STARTING_FEN], null, ref id, d);
+            var nodes = d.Values.OrderBy(n => n.id).ToList();
+            
             using (var writer = new BinaryWriter(File.Open("d:/lichess.dat", FileMode.Create))) {
                 var i = 0;
-                nodes.ForEach(n => { i++; if (i % 1000 == 0) { Console.WriteLine(i); }; n.GetFastNode().Write(writer); });
+                nodes.ForEach(n => { i++; if (i % 1000 == 0) { Console.WriteLine(i); }; n.GetFastNode(d).Write(writer); });
             }
         }
 
@@ -465,177 +468,18 @@ namespace ChessCon {
 
         static void Main(string[] args) {
             Console.CancelKeyPress += (o,e) => { ctrlC = true; e.Cancel = true; };
+            //JsonNode.Load();
+            //compile();
 
-            BaseNode.color = 1;
+            BaseNode.color = -1;
             BaseNode.relCountFunc = x => x.count;
             FastNode.Load();
-            BaseNode.root = FastNode.nodes[0]; // JsonNode.nodes[Board.DEFAULT_STARTING_FEN];
+            //JsonNode.Load("#queen");
+            BaseNode.root = FastNode.nodes[0]; //JsonNode.nodes[Board.DEFAULT_STARTING_FEN]; // 
 
-            var ss = new List<string>();
-            foreach (var pgn in Pgn.LoadMany(File.OpenText("d:/french-msb2.pgn"))) {
-                // if (!pgn.MovesSource.First().Contains("{")) continue;
-                try {
-                    var moves = getMoves(pgn.Moves);
-                    var count = enumNodesByMoves(pgn.Moves).Skip(1).Count();
-                    count += (count % 2 == 0) ? 1 : 0;
-                    ss.Add(string.Join(" ", moves.Take(count)));
-                }
-                catch { }
-            }
-            ss = ss.Distinct().OrderBy(x => x).ToList();
-
-            var prev = new string[] { "--" };
-            for (var i = 0; i < ss.Count; i++) {
-                var s = ss[i];
-                var cur = s.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                var l = Math.Min(prev.Length, cur.Length);
-                var skip = 0;
-                for (skip = 0; skip < l && prev[skip] == cur[skip]; skip++) ;
-                ss[i] = Pgn.PrettyMoves(s, skip).Replace(". ", ".");
-                prev = cur;
-            }
-
-            File.WriteAllLines("d:/french-msb2-pretty.txt", ss);
-            return;
-
-
-
-
-            var start = "1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3";
+            var start = "1. d4 d5 2. c4 Nc6";
 
             //Console.WriteLine(EnumerateNodes(start).Count());
-
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 d6 5. c4 Nc6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 d6 5. c4 Nf6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 e6 5. c4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 g6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 e6 6. Nc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 g6 6. Ne2 Bg7 7. Nbc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d3 4. Bxd3 Nc6 5. c4 Nf6 6. Nc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Nf6 5. Bb5+ Bd7 6. Bc4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 e5 6. Nf3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 Nc6 6. Nf3 Bg4 7. Nc3 Bxf3 8. gxf3 Qxd4 9. Qxd4 Nxd4 10. Nb5 Nc2+ 11. Kd1 Nxa1 12. Nc7+");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 Nc6 6. Nf3 e5 7. Nc3 Bb4 8. Bd2 Bxc3 9. Bxc3 e4 10. Ne5 Nxe5 11. dxe5 Ne7 12. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 Nc6 6. Nf3 e6 7. Nc3 Bb4 8. Bd3 Nf6 9. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d5 4. exd5 Qxd5 5. cxd4 Nf6 6. Nc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 d6 4. cxd4 Nf6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 a6 5. Bc4 e6 6. Nf3 b5 7. Bb3 Bb7 8. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 a6 5. Bc4 e6 6. Nf3 Nc6 7. O-O b5 8. Bb3 Bb7 9. a4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 a6 5. Bc4 e6 6. Nf3 Nc6 7. O-O d6 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 a6 5. Bc4 e6 6. Nf3 Qc7 7. Bb3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 a6 6. Bc4 e6 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 e6 6. Bc4 a6 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 e6 6. Bc4 Be7 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 e6 6. Bc4 Nc6 7. O-O a6 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 e6 6. Bc4 Nf6 7. O-O Be7 8. Qe2 O-O 9. Rd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 g6 6. Bc4 Bg7 7. Qb3 e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nc6 6. Bc4 a6 7. O-O Nf6 8. Bf4 Bg4 9. h3 Bxf3 10. Qxf3 e6 11. Rfd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nc6 6. Bc4 e6 7. O-O Be7 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nc6 6. Bc4 e6 7. O-O Nf6 8. Qe2 Be7 9. Rd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nc6 6. Bc4 g6 7. Qb3 e6 8. Bf4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nc6 6. Bc4 Nf6 7. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nf6 6. Bc4 e6 7. O-O Be7 8. Qe2 O-O 9. Rd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 d6 5. Nf3 Nf6 6. Bc4 g6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e5 5. Nf3 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e5 5. Nf3 Nc6 6. Bc4 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e5 5. Nf3 Nc6 6. Bc4 h6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 b5 7. Bb3 Bb7 8. O-O b4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 b5 7. Bb3 Bb7 8. O-O Nc6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 Nc6 7. O-O b5 8. Bb3 Bb7 9. a4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 Nc6 7. O-O d6 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 Ne7 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 Qc7 7. Bb3 Nc6 8. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Bb4 6. Qd4 Bxc3+");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 d6 6. Bc4 a6 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 a6 7. O-O b5 8. Bb3 Bb7 9. a4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 a6 7. O-O Nge7 8. Bg5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 Bb4 7. O-O Bxc3 8. bxc3 Nge7 9. Qd6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 Bb4 7. O-O Nge7 8. Bg5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 d6 7. O-O Be7 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 d6 7. O-O Nf6 8. Qe2 Be7 9. Rd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nc6 6. Bc4 Nf6 7. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Ne7 6. Bc4 Ng6 7. h4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Nf6 6. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 g6 5. Nf3 Bg7 6. Bc4 d6 7. Qb3 e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 g6 5. Nf3 Bg7 6. Bc4 e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 g6 5. Nf3 Bg7 6. Bc4 Nc6 7. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 g6 5. Nf3 Bg7 6. Bc4 Nf6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 a6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 a6 7. O-O Nf6 8. Bf4 Bg4 9. h3 Bxf3 10. Qxf3 e6 11. Rfd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 Bg4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 e6 7. O-O a6 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 e6 7. O-O Be7 8. Qe2 Nf6 9. Rd1 e5 10. Be3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 e6 7. O-O Nf6 8. Qe2 Be7 9. Rd1 e5 10. Be3 O-O 11. Rac1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 e6 7. O-O Nf6 8. Qe2 Be7 9. Rd1 Qc7 10. Nb5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 g6 7. Qb3 e6 8. Bf4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 Nf6 7. e5 dxe5 8. Qxd8+ Kxd8 9. Ng5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 d6 6. Bc4 Nf6 7. e5 dxe5 8. Qxd8+ Nxd8");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e5 6. Bc4 Bb4 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e5 6. Bc4 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e5 6. Bc4 h6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e5 6. Bc4 Nf6 7. Ng5 d5 8. exd5 Na5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 a6 7. O-O b5 8. Bb3 Bb7 9. a4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 a6 7. O-O d6 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 a6 7. O-O Nge7 8. Bg5 h6 9. Be3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 a6 7. O-O Qc7 8. Nd5 exd5 9. exd5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Bxc3 8. bxc3 Nge7 9. Qd6 O-O 10. Ba3 Re8 11. Rad1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Nf6 8. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Nge7 8. Qe2 Bxc3 9. bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bb4 7. O-O Nge7 8. Qe2 O-O 9. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Bc5 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Be7 7. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 d6 7. O-O Be7 8. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 d6 7. O-O Nf6 8. Qe2 Be7 9. Rd1");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Nf6 7. O-O Be7 8. e5 Ng4 9. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Nge7 7. O-O Ng6 8. h4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Qc7 7. O-O Nf6 8. Nb5 Qb8 9. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 g6 6. Bc4 Bg7 7. e5 e6 8. Nb5 Nxe5 9. Qd6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 g6 6. Bc4 Bg7 7. e5 Nh6 8. O-O O-O 9. Bf4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 g6 6. Bc4 Bg7 7. e5 Nxe5 8. Nxe5 Bxe5 9. Bxf7+ Kxf7 10. Qd5+ e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 Nf6 6. Bc4 d6 7. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 Nf6 6. Bc4 e6 7. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nf6 5. e5 Ng8 6. Nf3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 e5 4. Nf3 dxc3 5. Nxc3 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 e5 4. Nf3 dxc3 5. Nxc3 Nc6 6. Bc4 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 e5 4. Nf3 dxc3 5. Nxc3 Nc6 6. Bc4 h6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 e5 4. Nf3 Nc6 5. cxd4 exd4 6. Nxd4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 e6 4. cxd4 d5 5. e5 Nc6 6. Nc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 Bg7 5. cxd4 d5 6. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 d3 5. Bxd3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 dxc3 5. Nxc3 Bg7 6. Bc4 d6 7. Qb3 e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 dxc3 5. Nxc3 Bg7 6. Bc4 e6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 g6 4. Nf3 dxc3 5. Nxc3 Bg7 6. Bc4 Nc6 7. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 d5 5. exd5 Qxd5 6. Nf3 Bg4 7. Nc3 Bxf3 8. gxf3 Qxd4 9. Qxd4 Nxd4 10. Nb5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 d5 5. exd5 Qxd5 6. Nf3 e5 7. Nc3 Bb4 8. Bd2 Bxc3 9. Bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 d5 5. exd5 Qxd5 6. Nf3 e6 7. Nc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 d6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nc6 4. cxd4 e6 5. d5 exd5 6. exd5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. Bc4 dxe5 7. Nxe5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. Bc4 e6 7. cxd4 dxe5 8. dxe5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. Bc4 Nb6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 b6 7. Nc3 Nxc3 8. bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 d6 7. Bc4 Be7 8. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 d6 7. Bc4 Nb6 8. Bd3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 d6 7. Bc4 Nc6 8. O-O Be7 9. Qe2 O-O 10. Nc3 Nxc3 11. bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 Nc6 7. Bc4 d6 8. O-O Be7 9. Qe2 O-O 10. Nc3 Nxc3 11. bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 e6 6. cxd4 Nc6 7. Bc4 Nb6 8. Bb3 d6 9. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 e6 7. cxd4 d6 8. O-O Be7 9. Qe2 O-O 10. Nc3 Nxc3 11. bxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 Nb6 7. Bb3 d5 8. exd6 Qxd6 9. O-O Be6 10. Na3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 Nb6 7. Bb3 d6 8. exd6 Qxd6 9. O-O Be6 10. Na3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 Nb6 7. Bb3 dxc3 8. Nxc3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 Nc6 6. Bc4 Nb6 7. Bb3 e6 8. cxd4 d6 9. Qe2");
-            addHints("1. e4 c5 2. d4 d6");
-            addHints("1. e4 c5 2. d4 e6");
-            addHints("1. e4 c5 2. d4 g6 3. Nf3 cxd4 4. c3");
-            addHints("1. e4 c5 2. d4 Nc6");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 a6 6. Bf4 e6 7. Bc4");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 a6 6. Bf4 e6 7. Bc4 d6 8. O-O");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 a6 6. Bc4 b5 7. Bb3 Bb7 8. O-O Nc6 9. Qe2");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Bb4 6. Qd4 Bxc3+ 7. bxc3 Nf6 8. e5");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 e6 5. Nf3 Bb4 6. Qd4 Bxc3+ 7. bxc3 Nf6 8. e5 Nc6 9. Qf4 Nd5 10. Qg3");
-            addHints("1. e4 c5 2. d4 cxd4 3. c3 Nf6 4. e5 Nd5 5. Nf3 d6 6. Bc4 Nb6 7. Bb3");
-
 
             var startNode = getNodeByMoves(start);
             var startScore = startNode.relScore;
@@ -645,16 +489,23 @@ namespace ChessCon {
                 if (wn.freq < 0.10) return WalkState.None;
 
                 return wn.lastColor == BaseNode.color
-                    ? (wn.node.relScore >= startScore - 50 ? WalkState.Continue : WalkState.None)
-                    : (wn.node.relScore <= startScore + 100 ? WalkState.Continue : WalkState.Break);
+                    ? (wn.node.relScore >= startScore - 30 ? WalkState.Continue : WalkState.None)
+                    : (wn.node.relScore <= startScore + 80 ? WalkState.Continue : WalkState.Break);
             };
+
+            addHints("1. d4 d5 2. c4 Nc6 3. Nc3 Nf6 4. Nf3 Bg4");
+            addHints("1. d4 d5 2. c4 Nc6 3. Nc3 Nf6 4. cxd5 Nxd5 5. e4 Nxc3 6. bxc3 e5 7. d5 Nb8");
+            addHints("1. d4 d5 2. c4 Nc6 3. Nc3 Nf6 4. Bg5 Ne4");
+            addHints("1. d4 d5 2. c4 Nc6 3. Nc3 Nf6 4. e3 Bf5");
+            addHints("1. d4 d5 2. c4 Nc6 3. cxd5 Qxd5 4. Nf3 e5");
+            addHints("1. d4 d5 2. c4 Nc6 3. Nf3 Bg4");
+            addHints("1. d4 d5 2. c4 Nc6 3. e3 e5");
+
+            //        1. d4 d5 2. c4 Nc6 3. cxd5 Qxd5 4. Nf3 e5
 
             var wns = EnumerateNodes(start, getState).ToList();
 
             ShrinkSubMoves(wns, start);
-
-            //wns = wns.OrderBy(x => x.moves).ToList();
-            //wns.ForEach(x => Console.WriteLine("addHints(\"" + Pgn.PrettyMoves(x.moves) + "\");")); Console.ReadLine();
 
             Prettify(wns);
 
@@ -741,6 +592,36 @@ namespace ChessCon {
         }
     }
 }
+
+/*
+var ss = new List<string>();
+foreach (var pgn in Pgn.LoadMany(File.OpenText("d:/french-msb2.pgn"))) {
+    // if (!pgn.MovesSource.First().Contains("{")) continue;
+    try {
+        var moves = getMoves(pgn.Moves);
+        var count = enumNodesByMoves(pgn.Moves).Skip(1).Count();
+        count += (count % 2 == 0) ? 1 : 0;
+        ss.Add(string.Join(" ", moves.Take(count)));
+    }
+    catch { }
+}
+ss = ss.Distinct().OrderBy(x => x).ToList();
+
+var prev = new string[] { "--" };
+for (var i = 0; i < ss.Count; i++) {
+    var s = ss[i];
+    var cur = s.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+    var l = Math.Min(prev.Length, cur.Length);
+    var skip = 0;
+    for (skip = 0; skip < l && prev[skip] == cur[skip]; skip++) ;
+    ss[i] = Pgn.PrettyMoves(s, skip).Replace(". ", ".");
+    prev = cur;
+}
+
+File.WriteAllLines("d:/french-msb2-pretty.txt", ss);
+return;
+*/
+
 
 // XX: #english #zukertort
 // d4: #queens #indian #london
